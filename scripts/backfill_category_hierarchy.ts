@@ -40,6 +40,7 @@ const CATEGORY_EXECUTE_DATABASES = new Set([
   "bookverse_ai_test",
   "bookverse_ai_category_legacy_test",
   "bookverse_ai_deploy_rehearsal",
+  "bookverse_ai_full_deploy_rehearsal",
 ]);
 
 function parseOptions(args: string[]): BackfillOptions {

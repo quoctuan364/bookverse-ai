@@ -87,8 +87,10 @@ async function main(): Promise<void> {
   const rehearsalTarget = assertSafeDatabase({ operation: "read-only", databaseUrl: rehearsalUrl });
   const demoTarget = assertSafeDatabase({ operation: "read-only", databaseUrl: demoUrl });
   invariant(
-    rehearsalTarget.databaseName === "bookverse_ai_deploy_rehearsal",
-    "Verifier chỉ được đọc database rehearsal.",
+    ["bookverse_ai_deploy_rehearsal", "bookverse_ai_full_deploy_rehearsal"].includes(
+      rehearsalTarget.databaseName,
+    ),
+    "Verifier chỉ được đọc database rehearsal đã cho phép.",
   );
   invariant(demoTarget.databaseName === "bookverse_ai", "Nguồn so sánh phải là database demo read-only.");
 

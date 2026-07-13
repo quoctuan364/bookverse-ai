@@ -78,7 +78,13 @@ async function main(): Promise<void> {
     operation: options.mode === "execute" ? "destructive" : "read-only",
     databaseUrl: process.env.DATABASE_URL,
   });
-  if (!["bookverse_ai_test", "bookverse_ai_deploy_rehearsal"].includes(target.databaseName)) {
+  if (
+    ![
+      "bookverse_ai_test",
+      "bookverse_ai_deploy_rehearsal",
+      "bookverse_ai_full_deploy_rehearsal",
+    ].includes(target.databaseName)
+  ) {
     throw new Error(`Stock backfill không được phép chạy trên database ${target.databaseName}.`);
   }
 

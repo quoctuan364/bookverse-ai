@@ -24,6 +24,10 @@
     "test:category-legacy": "tsx scripts/verify_category_legacy_integration.ts",
     "test:stock-integration": "tsx --test tests/integration/stock-checkout.integration.ts",
     "test:stock-deployment": "tsx scripts/verify_stock_deployment.ts",
+    "deployment:pgvector": "tsx scripts/preflight_pgvector.ts",
+    "deployment:audit-migrations": "tsx scripts/audit_migration_history.ts",
+    "deployment:verify-fresh": "tsx scripts/verify_fresh_migration.ts",
+    "deployment:verify-rollback": "tsx scripts/verify_rollback_rehearsal.ts",
     "embeddings:books": "tsx scripts/generate_book_embeddings.ts"
   },
   "prisma": {

@@ -371,9 +371,11 @@ npm run test:stock-integration
 
 Test tự tạo fixture có prefix riêng, bao phủ tranh stock 1, retry cùng idempotency key, quantity lớn hơn 1, rollback nhiều item, self-purchase, listing không khả dụng, user bị khóa và hủy đồng thời; cleanup chỉ fixture của lượt test.
 
-Deployment rehearsal ngày 14/07/2026 trên clone demo đã PASS profile legacy, Category backfill, stock backfill, catalog/filter/canonical/FastAPI, marketplace, checkout concurrency, self-purchase, out-of-stock, cancellation và idempotency. Verifier xác nhận count/checksum clone khớp demo và không còn blocker. `bookverse_ai` chưa bị migration/backfill; triển khai demo cần phê duyệt riêng.
+Checkpoint A.2 ngày 14/07/2026 đã thay rehearsal cũ bằng quy trình đầy đủ: database rỗng chạy 11 migration hai lần, full clone demo được audit/reconcile rồi chạy trọn `prisma migrate deploy`, Category/stock idempotency, catalog/filter/canonical/FastAPI/vector/marketplace/checkout smoke đều PASS. Rollback restore từ backup cũng khớp count và semantic schema checksum. Ba database tạm đã được drop sau khi lưu report.
 
-Lưu ý: container database local hiện thiếu extension `vector` dù Compose khai báo image pgvector, và migration history demo chỉ ghi nhận 5 migration đầu. `npx prisma migrate deploy` trên clone vì vậy dừng ở migration pgvector trước Checkpoint A. Rehearsal dùng đúng file SQL additive + `migrate resolve` trên clone; trước triển khai thật phải sửa configuration drift và chạy lại full migrate deploy, không đánh dấu pgvector applied mù.
+Compose nguồn đã pin `pgvector/pgvector:0.8.5-pg16` và có `docker-compose.rehearsal.yml` tách project/volume/port. Container demo đang chạy vẫn là `postgres:16-alpine`, thiếu extension `vector` và chỉ có 5 migration history row vì A.2 không restart/recreate hoặc ghi demo. Triển khai thật phải đi đúng runbook 15 bước trong `docs/DEPLOYMENT.md` và cần phê duyệt riêng.
+
+Ba mapping MEDIUM (`C013`, `C023`, `C024`) đã được review bằng 15 Book metadata mỗi Category. Nội dung ủng hộ mapping hiện tại nhưng taxonomy đích chưa đủ chi tiết và tag synthetic bị nhiễu, nên mapping/profile/checksum được giữ nguyên với confidence MEDIUM. Bảng 45 mẫu nằm trong `docs/CATEGORY_LEGACY_COMPATIBILITY.md`.
 
 ## Chạy bằng Docker Compose
 

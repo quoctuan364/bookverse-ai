@@ -113,7 +113,11 @@ async function cleanupFixtures(): Promise<void> {
     databaseUrl: process.env.DATABASE_URL,
   });
   assert.ok(
-    ["bookverse_ai_test", "bookverse_ai_deploy_rehearsal"].includes(expectedDatabaseName),
+    [
+      "bookverse_ai_test",
+      "bookverse_ai_deploy_rehearsal",
+      "bookverse_ai_full_deploy_rehearsal",
+    ].includes(expectedDatabaseName),
     "Tên database integration không nằm trong allowlist cứng.",
   );
   assert.equal(target.databaseName, expectedDatabaseName);
@@ -163,7 +167,11 @@ test("Checkpoint A chạy thật trên PostgreSQL", async (t) => {
     databaseUrl: process.env.DATABASE_URL,
   });
   assert.ok(
-    ["bookverse_ai_test", "bookverse_ai_deploy_rehearsal"].includes(expectedDatabaseName),
+    [
+      "bookverse_ai_test",
+      "bookverse_ai_deploy_rehearsal",
+      "bookverse_ai_full_deploy_rehearsal",
+    ].includes(expectedDatabaseName),
     "Tên database integration không nằm trong allowlist cứng.",
   );
   assert.equal(target.databaseName, expectedDatabaseName, "Integration test đang trỏ sai database an toàn.");

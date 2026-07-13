@@ -8,9 +8,9 @@ Trạng thái ngày 14/07/2026:
 - Đã có database guard, runtime validation, dataset analyzer, dry-run, import report và unit test.
 - Rehearsal đã chạy trên database độc lập `bookverse_ai_test`; database demo `bookverse_ai` chỉ được đọc để xác minh guard.
 - **Checkpoint B: ĐÃ DUYỆT và đã hoàn thành Lượt 1B trên `bookverse_ai_test`.** Migration, backfill, idempotency, ba chế độ import, integration verifier, FastAPI compatibility và restore rehearsal đều PASS.
-- **Checkpoint A: ĐÃ DUYỆT và đã hoàn thành về mã nguồn, Category legacy compatibility, stock/checkout, concurrency và deployment rehearsal trên clone. Database demo chưa được thay đổi.**
+- **Checkpoint A.2: ĐÃ HOÀN THÀNH deployment readiness.** Fresh migration, full clone, pgvector, migration reconciliation, Category/stock idempotency, smoke và rollback rehearsal đều PASS. Database demo chưa được thay đổi.
 - **Checkpoint D: CHƯA DUYỆT.** Chưa thay đổi service boundary/chatbot.
-- Git local đã được khởi tạo an toàn; baseline trước Checkpoint A.1 là commit `df4602f`. Branch triển khai là `checkpoint-a-legacy-category`; không có remote và chưa push.
+- Git local đã được khởi tạo an toàn; baseline A.2 là commit `ae7f4b801744034860ba2eca7da36f308628811d`. Branch hiện tại là `checkpoint-a-deployment-readiness`; không có remote và chưa push.
 
 ## 1. Mục tiêu
 
@@ -154,9 +154,9 @@ Không bắt đầu UI polish cho một luồng khi contract/error state của l
 
 ## 9. Checkpoint
 
-### CHECKPOINT: A — Listing stock và chống oversell — ĐÃ HOÀN THÀNH REHEARSAL
+### CHECKPOINT: A — Listing stock và chống oversell — ĐÃ HOÀN THÀNH DEPLOYMENT READINESS
 
-Trạng thái thực thi ngày 14/07/2026: schema/migration, backup, profile `legacy-demo-24`, Category/stock backfill, atomic checkout, idempotency, cancel/restock, unit test, PostgreSQL concurrency, ultra-2200 regression, FastAPI smoke, build và deployment verifier trên clone đều PASS. Database demo chỉ được đọc và chưa có migration/backfill. Việc triển khai thật vẫn cần phê duyệt riêng và phải xử lý configuration drift pgvector/migration history nêu trong `docs/DEPLOYMENT.md`.
+Trạng thái thực thi ngày 14/07/2026: schema/migration, backup, profile `legacy-demo-24`, Category/stock backfill, atomic checkout, idempotency, cancel/restock, unit test, PostgreSQL concurrency, ultra-2200 regression, FastAPI smoke, build và deployment verifier đều PASS. A.2 bổ sung image pgvector pin đúng PostgreSQL 16, audit bảy trạng thái, fresh database từ rỗng, full clone migration deploy và rollback rehearsal. Database demo chỉ được đọc và chưa có migration/backfill; triển khai thật vẫn cần phê duyệt riêng theo `docs/DEPLOYMENT.md`.
 
 Kết quả bổ sung A.1:
 
@@ -165,6 +165,17 @@ Kết quả bổ sung A.1:
 - Tampered name/slug fail-closed trước write; không partial update.
 - Clone có 24 root, 0 child, 24 mapped, 0 unmapped; checksum ID/name/slug và Book–Category khớp demo.
 - Stock/checkout integration 11/11 PASS; deployment verifier `status=PASS`, không còn blocker Category.
+
+Kết quả bổ sung A.2:
+
+- Review 45 Book metadata cho ba mapping MEDIUM; giữ mapping/profile/checksum vì chưa có bằng chứng mapping sai.
+- PostgreSQL rehearsal `16.14`, pgvector `0.8.5`; cast, L2/cosine/inner-product operator PASS.
+- Fresh database: 11/11 migration `APPLIED_VALID`; deploy lần hai không pending; Prisma/schema/constraint smoke PASS.
+- Full clone: 5 migration valid, 2 history-missing được chứng minh đầy đủ và resolve bằng Prisma, 4 pending được deploy; audit cuối 11/11 valid.
+- Category dry/execute/execute là 0 write/24/0; stock là 0 write/1.193/0.
+- Full smoke giữ nguyên count 300/24/1.200/1.200/1.500/2.570, không orphan; checkout integration 11/11 PASS.
+- Rollback restore exit 0 trong 1.931 ms, schema semantic checksum và count khớp pre-deployment.
+- Ba database rehearsal đã drop; container demo không restart/recreate và vẫn ở schema cũ.
 
 1. **Vấn đề hiện tại**
    - Model Listing chưa có stock/soldAt. Quantity chỉ bị chặn 1–9, không dựa trên tồn kho.
