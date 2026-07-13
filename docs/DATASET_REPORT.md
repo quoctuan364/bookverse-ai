@@ -54,4 +54,13 @@ SHA-256: **e1e7b7d29f659fa9ea9272ce5ab1ca28095e289b0cc170d8f93e43221acf0047**
 
 - Dataset gốc chỉ được đọc; script không sửa hoặc ghi đè dataset.
 - Mô tả trùng cao và timestamp synthetic làm dataset chưa phù hợp để công bố metric temporal AI.
-- Category hierarchy chỉ được phân tích trong Lượt 1A, chưa canonicalize và chưa thay đổi Prisma schema.
+- Category hierarchy đã hoàn tất rehearsal Lượt 1B trên `bookverse_ai_test`: 43 root, 2.157 child, orphan/cycle/self-parent bằng 0.
+- Mapping dẫn xuất có 27 canonical group, 2.200/2.200 category đã map và SHA-256 `dd07599644f68458139e836b8f5cb7529de28fb197076392fe5f8f2c6cc09527`.
+- Import dry-run, non-replace và replace-existing đều chạy thành công trên database test; sau replace, backfill dry-run báo `changed = 0`.
+- Database demo `bookverse_ai` vẫn có 1.200 Book, 24 Category và chưa có migration Category mới.
+
+## Giới hạn dữ liệu Category
+
+- 2.157 tên category con có dấu hiệu synthetic; canonical mapping chỉ dùng root đã review, không dùng fuzzy matching hoặc AI để đoán nghĩa.
+- 844 category không có sách và 770 category chỉ có một sách vẫn được giữ nguyên để bảo toàn dữ liệu gốc.
+- Canonical category là feature kỹ thuật cho recommendation, không thay thế ID category gốc trong `Book.categoryId`.

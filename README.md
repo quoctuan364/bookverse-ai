@@ -280,6 +280,45 @@ Tài khoản demo của dataset lớn sau khi import thành công trên test dat
 Quản trị viên: user005@bookverse.local / 123456
 ```
 
+## Category hierarchy và canonical mapping
+
+Dataset gốc có 43 category root và 2.157 category con. Lượt 1B giữ nguyên toàn bộ ID/tên/slug gốc, bổ sung `parentId`, `level`, `canonicalKey`, `canonicalName` và gom feature recommendation vào 27 nhóm canonical đã review.
+
+Phân tích và tạo lại mapping dẫn xuất, không sửa dataset gốc:
+
+```powershell
+npm run data:analyze-categories
+```
+
+Trước mọi migration/backfill, đặt URL của database test và allowlist trong đúng terminal đang chạy:
+
+```powershell
+$env:DATABASE_URL="postgresql://YOUR_USER:YOUR_PASSWORD@localhost:5433/bookverse_ai_test?schema=public"
+$env:ALLOWED_DESTRUCTIVE_DATABASES="bookverse_ai_test"
+```
+
+Apply migration và chạy backfill theo thứ tự:
+
+```powershell
+npx prisma migrate deploy
+npm run data:backfill-categories -- --dry-run
+npm run data:backfill-categories -- --execute
+npm run data:backfill-categories -- --execute
+```
+
+Lần execute thứ hai phải báo `changed: 0` và `unchanged: 2200`. Mỗi lần chạy tạo report mới trong `outputs/categories`; script dùng `flag: wx` nên không ghi đè report cũ.
+
+Chạy integration verifier trên database test và đọc schema demo cũ ở chế độ read-only:
+
+```powershell
+$env:CATEGORY_LEGACY_DATABASE_URL="postgresql://YOUR_USER:YOUR_PASSWORD@localhost:5432/bookverse_ai?schema=public"
+npm run test:category-integration
+```
+
+Verifier kiểm tra 2.200 Category, 43 root, 2.157 child, 27 canonical group, Book–Category, orphan/cycle/self-parent, thứ tự canonical → parent → category gốc và khả năng chạy với database demo chưa có cột mới.
+
+Backup trước migration được giữ ngoài Git tại `backups/database`. Quy trình restore rehearsal dùng database tạm `bookverse_ai_restore_test`: tạo database tạm, chạy `pg_restore`, đối chiếu count/schema, sau đó chỉ drop đúng database tạm. Tuyệt đối không restore đè hoặc apply migration Category lên `bookverse_ai` nếu chưa được duyệt riêng.
+
 ## Chạy bằng Docker Compose
 
 Chạy toàn bộ hệ thống:

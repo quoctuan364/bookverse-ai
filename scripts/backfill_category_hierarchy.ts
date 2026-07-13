@@ -3,7 +3,11 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import prisma from "@/lib/prisma";
-import { validateParentAssignments, type CategoryNode } from "@/lib/category-hierarchy";
+import {
+  validateParentAssignments,
+  type CategoryCanonicalEntry,
+  type CategoryNode,
+} from "@/lib/category-hierarchy";
 import { loadCategoryMapping } from "@/lib/category-mapping-file";
 import { assertSafeDatabase } from "@/lib/database-safety";
 
@@ -114,7 +118,7 @@ async function main(): Promise<void> {
   let levelUpdates = 0;
   let canonicalUpdates = 0;
   let unchanged = 0;
-  const changedEntries = [];
+  const changedEntries: CategoryCanonicalEntry[] = [];
 
   for (const entry of mapping.file.entries) {
     const current = currentById.get(entry.categoryId);

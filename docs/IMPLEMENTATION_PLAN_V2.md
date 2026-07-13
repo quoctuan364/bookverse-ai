@@ -1,13 +1,15 @@
 # BookVerse AI Implementation Plan V2
 
-Tài liệu này chia việc nâng cấp thành các lượt có checkpoint. Không nội dung nào dưới đây đã được triển khai trong Phase 0.
+Tài liệu này chia việc nâng cấp thành các lượt có checkpoint và ghi trạng thái thực thi đã được kiểm chứng.
 
-Trạng thái ngày 12/07/2026:
+Trạng thái ngày 13/07/2026:
 
 - **Checkpoint C: ĐÃ DUYỆT và đã hoàn thành Lượt 1A.**
 - Đã có database guard, runtime validation, dataset analyzer, dry-run, import report và unit test.
 - Rehearsal đã chạy trên database độc lập `bookverse_ai_test`; database demo `bookverse_ai` chỉ được đọc để xác minh guard.
-- **Checkpoint A, B và D: CHƯA DUYỆT.** Không triển khai stock, category hierarchy/canonicalization hoặc thay đổi service boundary.
+- **Checkpoint B: ĐÃ DUYỆT và đã hoàn thành Lượt 1B trên `bookverse_ai_test`.** Migration, backfill, idempotency, ba chế độ import, integration verifier, FastAPI compatibility và restore rehearsal đều PASS.
+- **Checkpoint A và D: CHƯA DUYỆT.** Chưa triển khai stock/checkout hoặc thay đổi service boundary/chatbot.
+- Git local đã được khởi tạo an toàn; baseline trước khi hoàn tất Category là commit `133bb2b`. Không có remote và chưa push.
 
 ## 1. Mục tiêu
 
@@ -33,7 +35,7 @@ Hoàn thiện BookVerse AI theo hướng có thể demo, kiểm thử và giải
 4. Review unique theo userId + bookId; không liên kết trực tiếp OrderItem. Verified purchase, nếu bật, chỉ chấp nhận PAID, PAID_DEMO, SHIPPED, COMPLETED từ query server-side.
 5. Không bắt buộc chuyển chatbot sang FastAPI. Ưu tiên contract, UI, error, auth và bỏ mock trước khi đổi service boundary.
 6. Mọi destructive operation, migration rehearsal, import và integration/concurrency test chỉ chạy trên **bookverse_ai_test**.
-7. Không init hoặc sửa **.git** cho đến khi người dùng quyết định việc phục hồi lịch sử.
+7. Git cũ không có HEAD/config/refs/logs/objects để phục hồi. Sau khi được duyệt, repository local mới đã được khởi tạo và loại secret, dump, output runtime, dataset/ebook lớn khỏi index.
 
 ## 3. Lượt 1 - Dataset và chống oversell
 
@@ -219,7 +221,17 @@ Không bắt đầu UI polish cho một luồng khi contract/error state của l
 14. **Yêu cầu duyệt: YES/NO**
     - Bạn có duyệt Checkpoint A để sau Phase 0 thiết kế migration/rehearsal stock đúng nội dung trên, chỉ trên **bookverse_ai_test**, không áp dụng database demo khi chưa có báo cáo test không? Trả lời **YES A** hoặc **NO A + nội dung cần sửa**.
 
-### CHECKPOINT: B — Category hierarchy và canonical category
+### CHECKPOINT: B — Category hierarchy và canonical category — ĐÃ HOÀN THÀNH TRÊN DATABASE TEST
+
+Kết quả thực thi ngày 13/07/2026:
+
+- Migration `20260712153000_add_category_hierarchy_and_canonical_fields` chỉ được apply lên `bookverse_ai_test`.
+- 2.200 Category gồm 43 root và 2.157 child; 27 canonical group; orphan/cycle/self-parent/unmapped đều bằng 0.
+- Dry-run dự kiến 2.200 thay đổi; execute lần một cập nhật 2.200 row; execute lần hai `changed = 0`, `unchanged = 2200`.
+- Import dry-run, non-replace và replace-existing đều giữ hierarchy; backfill sau replace tiếp tục `changed = 0`.
+- FastAPI sử dụng canonical → parent → category gốc và chạy được với cả schema test mới lẫn schema demo cũ.
+- Backup SHA-256 đúng kỳ vọng; restore sang `bookverse_ai_restore_test` trả 2.200 Book/Category, 2.200 quan hệ, 9 migration cũ và không có cột Category mới; database tạm đã được drop sau kiểm tra.
+- Database demo không được ghi: vẫn có 1.200 Book, 24 Category và chưa apply migration Category.
 
 1. **Vấn đề hiện tại**
    - Category trong Prisma là danh sách phẳng. Dataset có cây parent_id/level nhưng import không lưu.
@@ -249,8 +261,8 @@ Không bắt đầu UI polish cho một luồng khi contract/error state của l
 
 7. **Kế hoạch backfill**
    - Validate unique id/slug, parent tồn tại, không cycle, level khớp độ sâu.
-   - Root: parentId null, level 0, canonicalKey theo root slug chuẩn hóa.
-   - Child: parentId theo dataset, level theo cây đã tính lại, canonicalKey kế thừa root.
+   - Root: parentId null, level 1 theo schema nguồn, canonicalKey theo bảng rule root đã review.
+   - Child: parentId theo dataset, level 2 theo cây đã tính lại, canonicalKey kế thừa root.
    - Report riêng 844 category rỗng và 770 category một sách; chưa xóa/merge tự động.
 
 8. **Backup và restore test**
@@ -275,8 +287,8 @@ Không bắt đầu UI polish cho một luồng khi contract/error state của l
 13. **Khuyến nghị**
     - Duyệt parentId + level + canonicalKey; hoãn canonicalId và mọi merge/delete cho tới khi có alias audit.
 
-14. **Yêu cầu duyệt: YES/NO**
-    - Bạn có duyệt Checkpoint B theo phương án giữ nguyên toàn bộ category gốc, thêm hierarchy/canonicalKey và chỉ rehearsal trên **bookverse_ai_test** không? Trả lời **YES B** hoặc **NO B + nội dung cần sửa**.
+14. **Trạng thái duyệt**
+    - Đã duyệt và hoàn thành rehearsal trên **bookverse_ai_test**. Việc apply migration lên `bookverse_ai` cần một phê duyệt riêng; không tự động suy rộng từ Checkpoint B.
 
 ### CHECKPOINT: C — Dataset import — ĐÃ DUYỆT, LƯỢT 1A HOÀN THÀNH
 
@@ -435,4 +447,4 @@ Không bắt đầu UI polish cho một luồng khi contract/error state của l
 - Deploy theo expand → backfill → switch code → contract; không drop field cũ cùng lượt.
 - Nếu reconciliation hoặc test fail: dừng, không retry destructive; rollback app/feature flag và restore test dump.
 - Database demo chỉ được áp dụng khi người dùng duyệt riêng sau khi xem report rehearsal.
-- Source rollback qua Git chưa khả dụng vì **.git** trống; trước Lượt 1 cần người dùng quyết định phục hồi repo hoặc cho phép khởi tạo version control mới. Không tự git init.
+- Source rollback local đã khả dụng từ baseline commit `133bb2b`. Repository chưa có remote và chưa push; dataset/ebook lớn, secret, dump và output runtime không nằm trong Git.

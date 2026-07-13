@@ -18,6 +18,7 @@
     "data:backfill-categories": "tsx scripts/backfill_category_hierarchy.ts",
     "data:import": "tsx scripts/import_seed_1200.ts",
     "test:unit": "tsx --test tests/*.test.ts",
+    "test:category-integration": "tsx scripts/verify_category_integration.ts",
     "embeddings:books": "tsx scripts/generate_book_embeddings.ts"
   },
   "prisma": {

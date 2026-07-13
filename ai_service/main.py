@@ -20,6 +20,32 @@ READING_AUTHOR_WEIGHT = 6.0
 PURCHASE_CATEGORY_WEIGHT = 8.0
 POPULARITY_WEIGHT = 3.0
 
+# Các biểu thức này chỉ đọc metadata Category và vẫn chạy với schema demo cũ.
+# `to_jsonb(c)` trả về JSON của row hiện có; key chưa tồn tại sẽ cho NULL thay
+# vì làm PostgreSQL báo lỗi "column does not exist".
+CATEGORY_FEATURE_SQL = """
+COALESCE(
+  NULLIF(NULLIF(to_jsonb(c)->>'canonicalKey', ''), 'unmapped'),
+  NULLIF(to_jsonb(c)->>'parentId', ''),
+  b."categoryId"
+)
+""".strip()
+
+CATEGORY_NAME_SQL = """
+COALESCE(
+  CASE
+    WHEN COALESCE(to_jsonb(c)->>'canonicalKey', 'unmapped') <> 'unmapped'
+    THEN NULLIF(to_jsonb(c)->>'canonicalName', '')
+  END,
+  pc.name,
+  c.name
+)
+""".strip()
+
+CATEGORY_PARENT_JOIN_SQL = """
+LEFT JOIN "Category" pc ON pc.id = NULLIF(to_jsonb(c)->>'parentId', '')
+""".strip()
+
 app = FastAPI(
     title="BookVerse AI Recommendation Service",
     version="2.0.0",
@@ -89,36 +115,40 @@ def min_max_normalize(series: pd.Series) -> pd.Series:
 
 def get_books() -> pd.DataFrame:
     return read_dataframe(
-        """
+        f"""
         SELECT
           b.id AS "bookId",
           b.title AS "title",
           b."authorName" AS "authorName",
-          b."categoryId" AS "categoryId",
-          c.name AS "categoryName",
+          {CATEGORY_FEATURE_SQL} AS "categoryId",
+          {CATEGORY_NAME_SQL} AS "categoryName",
           COALESCE(b.rating::float, 0) AS "rating"
         FROM "Book" b
         JOIN "Category" c ON c.id = b."categoryId"
+        {CATEGORY_PARENT_JOIN_SQL}
         """
     )
 
 
 def get_user_reading_sessions(user_id: str) -> pd.DataFrame:
     return read_dataframe(
-        """
+        f"""
         SELECT
           rs."bookId" AS "bookId",
           b.title AS "title",
           b."authorName" AS "authorName",
-          b."categoryId" AS "categoryId",
-          c.name AS "categoryName",
+          {CATEGORY_FEATURE_SQL} AS "categoryId",
+          {CATEGORY_NAME_SQL} AS "categoryName",
           SUM(rs."timeSpent") AS "timeSpent",
           COUNT(*) AS "sessionCount"
         FROM reading_sessions rs
         JOIN "Book" b ON b.id = rs."bookId"
         JOIN "Category" c ON c.id = b."categoryId"
+        {CATEGORY_PARENT_JOIN_SQL}
         WHERE rs."userId" = :user_id
-        GROUP BY rs."bookId", b.title, b."authorName", b."categoryId", c.name
+        GROUP BY
+          rs."bookId", b.title, b."authorName",
+          {CATEGORY_FEATURE_SQL}, {CATEGORY_NAME_SQL}
         """,
         {"user_id": user_id},
     )
@@ -126,19 +156,22 @@ def get_user_reading_sessions(user_id: str) -> pd.DataFrame:
 
 def get_user_bookmarks(user_id: str) -> pd.DataFrame:
     return read_dataframe(
-        """
+        f"""
         SELECT
           bm."bookId" AS "bookId",
           b.title AS "title",
           b."authorName" AS "authorName",
-          b."categoryId" AS "categoryId",
-          c.name AS "categoryName",
+          {CATEGORY_FEATURE_SQL} AS "categoryId",
+          {CATEGORY_NAME_SQL} AS "categoryName",
           COUNT(*) AS "bookmarkCount"
         FROM bookmarks bm
         JOIN "Book" b ON b.id = bm."bookId"
         JOIN "Category" c ON c.id = b."categoryId"
+        {CATEGORY_PARENT_JOIN_SQL}
         WHERE bm."userId" = :user_id
-        GROUP BY bm."bookId", b.title, b."authorName", b."categoryId", c.name
+        GROUP BY
+          bm."bookId", b.title, b."authorName",
+          {CATEGORY_FEATURE_SQL}, {CATEGORY_NAME_SQL}
         """,
         {"user_id": user_id},
     )
@@ -146,21 +179,24 @@ def get_user_bookmarks(user_id: str) -> pd.DataFrame:
 
 def get_user_interaction_events(user_id: str) -> pd.DataFrame:
     return read_dataframe(
-        """
+        f"""
         SELECT
           ie."bookId" AS "bookId",
           ie."actionType" AS "actionType",
           b.title AS "title",
           b."authorName" AS "authorName",
-          b."categoryId" AS "categoryId",
-          c.name AS "categoryName",
+          {CATEGORY_FEATURE_SQL} AS "categoryId",
+          {CATEGORY_NAME_SQL} AS "categoryName",
           COUNT(*) AS "eventCount"
         FROM interaction_events ie
         JOIN "Book" b ON b.id = ie."bookId"
         JOIN "Category" c ON c.id = b."categoryId"
+        {CATEGORY_PARENT_JOIN_SQL}
         WHERE ie."userId" = :user_id
           AND ie."actionType" IN ('READ', 'BOOKMARK', 'VIEW')
-        GROUP BY ie."bookId", ie."actionType", b.title, b."authorName", b."categoryId", c.name
+        GROUP BY
+          ie."bookId", ie."actionType", b.title, b."authorName",
+          {CATEGORY_FEATURE_SQL}, {CATEGORY_NAME_SQL}
         """,
         {"user_id": user_id},
     )
@@ -168,20 +204,23 @@ def get_user_interaction_events(user_id: str) -> pd.DataFrame:
 
 def get_user_purchases(user_id: str) -> pd.DataFrame:
     return read_dataframe(
-        """
+        f"""
         SELECT
           oi."bookId" AS "bookId",
           b.title AS "title",
           b."authorName" AS "authorName",
-          b."categoryId" AS "categoryId",
-          c.name AS "categoryName",
+          {CATEGORY_FEATURE_SQL} AS "categoryId",
+          {CATEGORY_NAME_SQL} AS "categoryName",
           SUM(oi.quantity) AS "purchaseCount"
         FROM "OrderItem" oi
         JOIN "Order" o ON o.id = oi."orderId"
         JOIN "Book" b ON b.id = oi."bookId"
         JOIN "Category" c ON c.id = b."categoryId"
+        {CATEGORY_PARENT_JOIN_SQL}
         WHERE o."buyerId" = :user_id
-        GROUP BY oi."bookId", b.title, b."authorName", b."categoryId", c.name
+        GROUP BY
+          oi."bookId", b.title, b."authorName",
+          {CATEGORY_FEATURE_SQL}, {CATEGORY_NAME_SQL}
         """,
         {"user_id": user_id},
     )

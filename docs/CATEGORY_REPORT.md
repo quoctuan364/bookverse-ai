@@ -1,6 +1,6 @@
 # BookVerse AI Category Report
 
-Ngày tạo: 2026-07-12T14:28:47.907Z
+Ngày cập nhật sau rehearsal: 13/07/2026
 
 ## 1. Hiện trạng
 
@@ -74,29 +74,85 @@ Ngày tạo: 2026-07-12T14:28:47.907Z
 
 ## 6. Migration
 
-Migration chỉ thêm field/FK/index nullable, không xóa column, không đổi primary key và không sửa Book.categoryId.
+Migration `20260712153000_add_category_hierarchy_and_canonical_fields` chỉ thêm field/FK/index nullable, không xóa column, không đổi primary key và không sửa `Book.categoryId`.
+
+Kết quả trên `bookverse_ai_test`:
+
+- Bốn cột nullable: `parentId`, `level`, `canonicalKey`, `canonicalName`.
+- Ba index: `Category_parentId_idx`, `Category_level_idx`, `Category_canonicalKey_idx`.
+- Self foreign key `Category_parentId_fkey`: `ON DELETE SET NULL`, `ON UPDATE CASCADE`.
+- Count trước và sau migration giữ nguyên: 2.200 Category, 2.200 Book, 2.200 quan hệ Book–Category.
 
 ## 7. Backfill
 
-Backfill đọc data/derived/category-canonical-map.json, kiểm tra checksum nguồn, orphan/cycle/self-parent/level trước transaction và có dry-run/execute riêng.
+Backfill đọc `data/derived/category-canonical-map.json`, kiểm tra checksum nguồn, orphan/cycle/self-parent/level trước transaction và có dry-run/execute riêng.
 
-## 8. Test
+| Lần chạy | Kết quả | Changed | Unchanged | Category checksum |
+|---|---|---:|---:|---|
+| Dry-run trước backfill | PASS, không ghi DB | 2.200 dự kiến | 0 | `e8996448...5705` giữ nguyên |
+| Execute lần một | PASS | 2.200 | 0 | `7f946dd2...f836` |
+| Execute lần hai | PASS, idempotent | 0 | 2.200 | `7f946dd2...f836` giữ nguyên |
+| Dry-run sau replace import | PASS | 0 | 2.200 | `7f946dd2...f836` giữ nguyên |
 
-Unit test bao phủ mapping, unmapped, orphan, self-parent, cycle, depth và deterministic output. Integration test chạy trên bookverse_ai_test.
+Report được tạo riêng trong `outputs/categories`, không ghi đè file cũ.
 
-## 9. Limitations
+## 8. Import regression
+
+| Chế độ | Kết quả | Bằng chứng chính |
+|---|---|---|
+| `--dry-run` | PASS | 2.200 record warning hợp lệ; create 0, update dự kiến 2.200; count không đổi |
+| `--execute` | PASS | updated 2.200; hierarchy được nối lại 2.200/2.200 |
+| `--execute --replace-existing` | PASS | inserted 2.200; hierarchy 2.200/2.200; orphan/unmapped bằng 0 |
+
+Dataset JSON gốc không bị sửa. Mapping checksum trong import là `dd07599644f68458139e836b8f5cb7529de28fb197076392fe5f8f2c6cc09527`.
+
+## 9. Recommendation integration
+
+FastAPI dùng feature category theo thứ tự:
+
+1. `canonicalKey` nếu có và khác `unmapped`.
+2. `parentId` nếu canonical chưa có.
+3. `Book.categoryId` gốc.
+
+Tên hiển thị dùng `canonicalName` → tên parent → tên category gốc. Query dùng `to_jsonb(c)` để key chưa tồn tại trả `NULL`, do đó cùng source chạy được với schema demo cũ chưa có bốn cột mới.
+
+Kiểm tra trực tiếp bằng source hiện tại:
+
+- Schema test: 2.200 Book, 27 feature category; các query session/bookmark/event/purchase đều thực thi thành công.
+- Schema demo cũ: 1.200 Book, fallback về 24 category gốc; không lỗi `column does not exist`.
+
+Không thay đổi bốn trọng số recommendation trong lượt này.
+
+## 10. Test
+
+- Unit test bao phủ mapping, unmapped, orphan, self-parent, cycle, depth và deterministic output.
+- Analyzer chạy hai lần cho cùng mapping SHA-256 `dd075996...09527`; output mapping không đổi.
+- Integration verifier PASS các kiểm tra catalog/Book–Category, hierarchy, canonical priority, parent fallback, category gốc fallback, Book ID tồn tại và legacy schema compatibility.
+- Fixture fallback parent: `C044 → C001`.
+- Fixture fallback category gốc: `C001 → C001`.
+
+## 11. Backup và restore rehearsal
+
+- File: `backups/database/bookverse_ai_test_pre_category_20260712.dump` (không nằm trong Git).
+- Kích thước: 2.001.126 byte.
+- SHA-256: `2A62AEA4AF470610F497F591A9AAEB6C57929F03BF7C2B7FCB1186B84A2BF9B6` — PASS.
+- Restore sang `bookverse_ai_restore_test`: 2.200 Book, 2.200 Category, 2.200 quan hệ, 9 migration đã apply.
+- Backup phản ánh schema trước Lượt 1B: 0 cột Category mới và 0 migration Category.
+- Database tạm đã được drop sau khi mọi query kiểm tra PASS; `pg_database` xác nhận còn 0 database cùng tên.
+
+## 12. Limitations
 
 - 2.157 tên child là synthetic; canonical signal chỉ dựa trên root đã review.
 - Canonical group là taxonomy phục vụ kỹ thuật, không thay thế category gốc.
 - Không công bố metric recommendation mới trong lượt này.
 
-## 10. Rollback
+## 13. Rollback
 
 Rollback ứng dụng trước; các field mới nullable nên code cũ vẫn hoạt động. Chỉ drop field/index/FK bằng migration riêng sau khi xác minh. Backup test DB phải restore được trước khi xem xét database demo.
 
-## 11. Demo database status
+## 14. Demo database status
 
-Database bookverse_ai chưa được apply migration hoặc backfill trong Lượt 1B.
+Query read-only xác nhận database `bookverse_ai` vẫn có 1.200 Book, 24 Category, 0 cột Category mới và 0 migration Category. Không migration, backfill hoặc import nào được chạy lên database demo trong Lượt 1B.
 
 Source SHA-256: e1e7b7d29f659fa9ea9272ce5ab1ca28095e289b0cc170d8f93e43221acf0047
 
