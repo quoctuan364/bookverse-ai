@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { PrismaClient } from "@prisma/client";
+
 import {
   buildCategoryCanonicalMapping,
   calculateCategoryDepth,
@@ -9,6 +11,8 @@ import {
   type CategoryCanonicalEntry,
   type CategoryNode,
 } from "@/lib/category-hierarchy";
+import { detectCategoryProfile, loadCategoryProfiles } from "@/lib/category-profiles";
+import { assertSafeDatabase } from "@/lib/database-safety";
 
 const DEFAULT_SOURCE_PATH = path.resolve(
   process.cwd(),
@@ -39,6 +43,19 @@ interface CategoryMappingFile {
   sourceFile: string;
   sourceChecksum: string;
   entries: CategoryCanonicalEntry[];
+}
+
+interface DatabaseCategoryRow {
+  id: string;
+  name: string;
+  slug: string;
+  bookCount: number;
+  listingCount: number;
+  parentId?: string | null;
+}
+
+interface ColumnRow {
+  column_name: string;
 }
 
 const REHEARSAL_RESULTS_MARKER = "<!-- CATEGORY_REHEARSAL_RESULTS -->";
@@ -196,7 +213,95 @@ function buildReportMarkdown(
   ].join("\n");
 }
 
+async function analyzeDatabaseProfile(): Promise<void> {
+  const target = assertSafeDatabase({
+    operation: "read-only",
+    databaseUrl: process.env.DATABASE_URL,
+  });
+  const client = new PrismaClient();
+  try {
+    const columns = await client.$queryRawUnsafe<ColumnRow[]>(`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = current_schema() AND table_name = 'Category'
+      ORDER BY ordinal_position
+    `);
+    const columnNames = new Set(columns.map((column) => column.column_name));
+    const parentProjection = columnNames.has("parentId") ? ', c."parentId"' : "";
+    const categories = await client.$queryRawUnsafe<DatabaseCategoryRow[]>(`
+      SELECT
+        c.id,
+        c.name,
+        c.slug,
+        (SELECT COUNT(*)::int FROM "Book" b WHERE b."categoryId" = c.id) AS "bookCount",
+        (
+          SELECT COUNT(*)::int
+          FROM "Listing" l
+          JOIN "Book" lb ON lb.id = l."bookId"
+          WHERE lb."categoryId" = c.id
+        ) AS "listingCount"
+        ${parentProjection}
+      FROM "Category" c
+      ORDER BY c.id
+    `);
+    const profiles = await loadCategoryProfiles();
+    const detected = detectCategoryProfile(categories, profiles);
+    const mappingById = new Map(
+      detected.profile.entries.map((entry) => [entry.expectedId, entry]),
+    );
+    const rows = categories.map((category) => {
+      const mapping = mappingById.get(category.id);
+      if (!mapping) throw new Error(`Profile đã chọn nhưng thiếu mapping cho ${category.id}.`);
+      return {
+        legacyId: category.id,
+        name: category.name,
+        slug: category.slug,
+        bookCount: category.bookCount,
+        listingCount: category.listingCount,
+        parentId: category.parentId ?? null,
+        canonicalKey: mapping.canonicalKey,
+        canonicalName: mapping.canonicalName,
+        reason: mapping.reason,
+        confidence: mapping.confidence,
+      };
+    });
+    const report = {
+      generatedAt: new Date().toISOString(),
+      mode: "READ_ONLY",
+      databaseName: target.databaseName,
+      profile: detected.profile.profileName,
+      profileVersion: detected.profile.profileVersion,
+      categoryCount: categories.length,
+      sourceFingerprint: detected.fingerprint,
+      mappingChecksum: detected.profile.mappingChecksum,
+      hierarchyColumns: ["parentId", "level", "canonicalKey", "canonicalName"].map(
+        (column) => ({ column, exists: columnNames.has(column) }),
+      ),
+      rows,
+    };
+    const outputDirectory = path.resolve(process.cwd(), "outputs", "categories");
+    await mkdir(outputDirectory, { recursive: true });
+    const stem = new Date().toISOString().replace(/[:.]/g, "-") + "-" + process.pid;
+    const reportPath = path.join(outputDirectory, stem + "-database-profile-analysis.json");
+    await writeFile(reportPath, JSON.stringify(report, null, 2) + "\n", {
+      encoding: "utf-8",
+      flag: "wx",
+    });
+    console.log(`[DATABASE] ${target.maskedUrl}`);
+    console.log(`[PROFILE] ${detected.profile.profileName}@${detected.profile.profileVersion}`);
+    console.log(`[FINGERPRINT] SHA-256 ${detected.fingerprint}`);
+    console.log("[REPORT] " + path.relative(process.cwd(), reportPath));
+    console.log(JSON.stringify(report, null, 2));
+  } finally {
+    await client.$disconnect();
+  }
+}
+
 async function main(): Promise<void> {
+  if (process.argv.slice(2).includes("--database-profile")) {
+    await analyzeDatabaseProfile();
+    return;
+  }
   const sourceArgument = process.argv.slice(2).find((argument) => !argument.startsWith("--"));
   const sourcePath = path.resolve(
     process.cwd(),

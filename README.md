@@ -283,14 +283,27 @@ Tài khoản demo của dataset lớn sau khi import thành công trên test dat
 Quản trị viên: user005@bookverse.local / 123456
 ```
 
-## Category hierarchy và canonical mapping
+## Category hierarchy, canonical mapping và profile legacy
 
 Dataset gốc có 43 category root và 2.157 category con. Lượt 1B giữ nguyên toàn bộ ID/tên/slug gốc, bổ sung `parentId`, `level`, `canonicalKey`, `canonicalName` và gom feature recommendation vào 27 nhóm canonical đã review.
+
+Database demo lại có 24 Category legacy dùng cùng ID `C001–C024` nhưng khác nghĩa. Checkpoint A.1 vì vậy dùng hai profile độc lập:
+
+- `ultra-2200`: mapping cũ, SHA-256 `dd07599644f68458139e836b8f5cb7529de28fb197076392fe5f8f2c6cc09527`.
+- `legacy-demo-24`: mapping theo name/slug, fingerprint `23b01b3ef8d4b9293fbf4bc9e9d893880661e00ec834919a410ee30f348acea3`.
+
+Auto detection chỉ thành công khi count, toàn bộ normalized name/slug, fingerprint và expected ID kiểm tra phụ cùng khớp. Không map Category theo ID đơn lẻ.
 
 Phân tích và tạo lại mapping dẫn xuất, không sửa dataset gốc:
 
 ```powershell
 npm run data:analyze-categories
+```
+
+Phân tích profile database ở chế độ chỉ đọc:
+
+```powershell
+npm run data:analyze-category-profile
 ```
 
 Trước mọi migration/backfill, đặt URL của database test và allowlist trong đúng terminal đang chạy:
@@ -320,6 +333,16 @@ npm run test:category-integration
 
 Verifier kiểm tra 2.200 Category, 43 root, 2.157 child, 27 canonical group, Book–Category, orphan/cycle/self-parent, thứ tự canonical → parent → category gốc và khả năng chạy với database demo chưa có cột mới.
 
+Integration riêng cho legacy tự tạo database tạm, từ chối ghi đè database có sẵn, test dry-run/execute/idempotency/tamper rồi drop đúng database do lượt test tạo:
+
+```powershell
+$env:CATEGORY_LEGACY_TEST_ADMIN_URL="postgresql://USER:PASSWORD@localhost:5433/postgres?schema=public"
+$env:CATEGORY_LEGACY_TEST_ALLOW_CREATE="bookverse_ai_category_legacy_test"
+npm run test:category-legacy
+```
+
+Xem bảng 24 mapping và lý do tại `docs/CATEGORY_LEGACY_COMPATIBILITY.md`; runbook migration/restore nằm tại `docs/DEPLOYMENT.md`.
+
 Backup trước migration được giữ ngoài Git tại `backups/database`. Quy trình restore rehearsal dùng database tạm `bookverse_ai_restore_test`: tạo database tạm, chạy `pg_restore`, đối chiếu count/schema, sau đó chỉ drop đúng database tạm. Tuyệt đối không restore đè hoặc apply migration Category lên `bookverse_ai` nếu chưa được duyệt riêng.
 
 ## Tồn kho và checkout an toàn — Checkpoint A
@@ -348,7 +371,9 @@ npm run test:stock-integration
 
 Test tự tạo fixture có prefix riêng, bao phủ tranh stock 1, retry cùng idempotency key, quantity lớn hơn 1, rollback nhiều item, self-purchase, listing không khả dụng, user bị khóa và hủy đồng thời; cleanup chỉ fixture của lượt test.
 
-Deployment rehearsal ngày 13/07/2026 đã xác minh migration/constraint/stock backfill/checkout trên clone demo, nhưng toàn bộ rehearsal vẫn **BLOCKED** vì 24 Category legacy của demo không tương thích mapping 2.200 Category đã duyệt. Không được ép mapping theo ID; cần checkpoint Category legacy riêng trước khi apply database demo. `bookverse_ai` chưa bị ghi và database rehearsal đã bị drop.
+Deployment rehearsal ngày 14/07/2026 trên clone demo đã PASS profile legacy, Category backfill, stock backfill, catalog/filter/canonical/FastAPI, marketplace, checkout concurrency, self-purchase, out-of-stock, cancellation và idempotency. Verifier xác nhận count/checksum clone khớp demo và không còn blocker. `bookverse_ai` chưa bị migration/backfill; triển khai demo cần phê duyệt riêng.
+
+Lưu ý: container database local hiện thiếu extension `vector` dù Compose khai báo image pgvector, và migration history demo chỉ ghi nhận 5 migration đầu. `npx prisma migrate deploy` trên clone vì vậy dừng ở migration pgvector trước Checkpoint A. Rehearsal dùng đúng file SQL additive + `migrate resolve` trên clone; trước triển khai thật phải sửa configuration drift và chạy lại full migrate deploy, không đánh dấu pgvector applied mù.
 
 ## Chạy bằng Docker Compose
 

@@ -1,6 +1,6 @@
 # BookVerse AI Category Report
 
-Ngày tạo: 2026-07-13T15:42:36.518Z
+Ngày tạo: 2026-07-13T17:45:50.935Z
 
 ## 1. Hiện trạng
 
@@ -158,3 +158,33 @@ Query read-only xác nhận database `bookverse_ai` vẫn có 1.200 Book, 24 Cat
 Source SHA-256: e1e7b7d29f659fa9ea9272ce5ab1ca28095e289b0cc170d8f93e43221acf0047
 
 Mapping SHA-256: dd07599644f68458139e836b8f5cb7529de28fb197076392fe5f8f2c6cc09527
+
+## 15. Profile tương thích 24 Category legacy
+
+Checkpoint A.1 bổ sung profile `legacy-demo-24@1.0.0` trong file riêng `data/mappings/category_canonical_legacy_24.json`; mapping ultra-2200 phía trên không bị sửa. Matching không dựa vào ID đơn lẻ mà dùng toàn bộ count + normalized name/slug + fingerprint, sau đó mới kiểm tra expected ID.
+
+- Legacy fingerprint: `23b01b3ef8d4b9293fbf4bc9e9d893880661e00ec834919a410ee30f348acea3`.
+- Legacy mapping SHA-256: `fb547a5e5cda329aeaf0046e24aeef94f650c7108255320f50d5a8de1aa760e9`.
+- Analyzer chạy trên demo read-only và clone đều chọn `legacy-demo-24` với cùng fingerprint.
+- 21 mapping confidence HIGH; 3 mapping MEDIUM do taxonomy đích rộng/hẹp không hoàn toàn tương đương.
+- Danh sách 24 mapping và lý do nằm trong `docs/CATEGORY_LEGACY_COMPATIBILITY.md`.
+
+## 16. Legacy backfill và fail-closed test
+
+Trên database integration tạm: dry-run ghi 0 row; execute đầu ghi 24 row; execute lần hai `changedRows=0`. Tamper tên `C001` trả exit code 1 trước write và canonical checksum không đổi. ID `C001` legacy được map `artificial-intelligence`, không bị dùng rule `technology` của ultra-2200.
+
+Trên deployment rehearsal clone demo:
+
+| Chỉ số | Kết quả |
+|---|---:|
+| Category | 24 |
+| Root / child | 24 / 0 |
+| Mapped / unmapped | 24 / 0 |
+| Canonical group được dùng | 17 |
+| Orphan / cycle / self-parent | 0 / 0 / 0 |
+| Book / Book–Category | 1.200 / 1.200 |
+| Identity checksum khớp demo | Có |
+| Book–Category SHA-256 | `f051090fb24abf12888453c87498030839ade45f3c6901721c1cbc6f75327ebc` |
+| Execute lần hai | `changedRows=0` |
+
+Deployment verifier trả `status=PASS`; catalog 1.200 Book, filter `C001` 50 Book và recommendation query 1.200 row đều dùng canonical đúng. Database demo vẫn chưa có bốn cột hierarchy và chưa được backfill.

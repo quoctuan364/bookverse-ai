@@ -2,15 +2,15 @@
 
 Tài liệu này chia việc nâng cấp thành các lượt có checkpoint và ghi trạng thái thực thi đã được kiểm chứng.
 
-Trạng thái ngày 13/07/2026:
+Trạng thái ngày 14/07/2026:
 
 - **Checkpoint C: ĐÃ DUYỆT và đã hoàn thành Lượt 1A.**
 - Đã có database guard, runtime validation, dataset analyzer, dry-run, import report và unit test.
 - Rehearsal đã chạy trên database độc lập `bookverse_ai_test`; database demo `bookverse_ai` chỉ được đọc để xác minh guard.
 - **Checkpoint B: ĐÃ DUYỆT và đã hoàn thành Lượt 1B trên `bookverse_ai_test`.** Migration, backfill, idempotency, ba chế độ import, integration verifier, FastAPI compatibility và restore rehearsal đều PASS.
-- **Checkpoint A: ĐÃ DUYỆT, phần stock/checkout đã triển khai và test PASS; toàn checkpoint CHƯA HOÀN THÀNH do deployment rehearsal bị chặn ở Category mapping legacy 24 ↔ taxonomy 2.200.**
+- **Checkpoint A: ĐÃ DUYỆT và đã hoàn thành về mã nguồn, Category legacy compatibility, stock/checkout, concurrency và deployment rehearsal trên clone. Database demo chưa được thay đổi.**
 - **Checkpoint D: CHƯA DUYỆT.** Chưa thay đổi service boundary/chatbot.
-- Git local đã được khởi tạo an toàn; baseline trước khi hoàn tất Category là commit `133bb2b`. Không có remote và chưa push.
+- Git local đã được khởi tạo an toàn; baseline trước Checkpoint A.1 là commit `df4602f`. Branch triển khai là `checkpoint-a-legacy-category`; không có remote và chưa push.
 
 ## 1. Mục tiêu
 
@@ -154,9 +154,17 @@ Không bắt đầu UI polish cho một luồng khi contract/error state của l
 
 ## 9. Checkpoint
 
-### CHECKPOINT: A — Listing stock và chống oversell
+### CHECKPOINT: A — Listing stock và chống oversell — ĐÃ HOÀN THÀNH REHEARSAL
 
-Trạng thái thực thi ngày 13/07/2026: schema/migration, backup, stock backfill, atomic checkout, idempotency, cancel/restock, unit test, PostgreSQL concurrency, Category regression, build và stock smoke trên clone đều PASS. Toàn Checkpoint A vẫn **CHƯA HOÀN THÀNH** vì Category backfill trên clone demo fail-closed: 24 Category legacy không cùng taxonomy/mapping với 2.200 Category đã duyệt. Không có migration hoặc backfill nào được ghi vào database demo.
+Trạng thái thực thi ngày 14/07/2026: schema/migration, backup, profile `legacy-demo-24`, Category/stock backfill, atomic checkout, idempotency, cancel/restock, unit test, PostgreSQL concurrency, ultra-2200 regression, FastAPI smoke, build và deployment verifier trên clone đều PASS. Database demo chỉ được đọc và chưa có migration/backfill. Việc triển khai thật vẫn cần phê duyệt riêng và phải xử lý configuration drift pgvector/migration history nêu trong `docs/DEPLOYMENT.md`.
+
+Kết quả bổ sung A.1:
+
+- 24 Category legacy được map bằng name/slug + whole-profile fingerprint, không dùng ID làm khóa nhận diện chính.
+- Dry-run ghi 0; execute đầu ghi 24; execute lần hai `changed=0`.
+- Tampered name/slug fail-closed trước write; không partial update.
+- Clone có 24 root, 0 child, 24 mapped, 0 unmapped; checksum ID/name/slug và Book–Category khớp demo.
+- Stock/checkout integration 11/11 PASS; deployment verifier `status=PASS`, không còn blocker Category.
 
 1. **Vấn đề hiện tại**
    - Model Listing chưa có stock/soldAt. Quantity chỉ bị chặn 1–9, không dựa trên tồn kho.
@@ -450,4 +458,4 @@ Kết quả thực thi ngày 13/07/2026:
 - Deploy theo expand → backfill → switch code → contract; không drop field cũ cùng lượt.
 - Nếu reconciliation hoặc test fail: dừng, không retry destructive; rollback app/feature flag và restore test dump.
 - Database demo chỉ được áp dụng khi người dùng duyệt riêng sau khi xem report rehearsal.
-- Source rollback local đã khả dụng từ baseline commit `133bb2b`. Repository chưa có remote và chưa push; dataset/ebook lớn, secret, dump và output runtime không nằm trong Git.
+- Source rollback local đã khả dụng từ baseline commit `df4602f`. Repository chưa có remote và chưa push; dataset/ebook lớn, secret, dump và output runtime không nằm trong Git.
