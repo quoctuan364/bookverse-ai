@@ -292,6 +292,8 @@ model Listing {
   views           Int              @default(0)
   cartAdds        Int              @default(0)
   purchases       Int              @default(0)
+  stock           Int              @default(1)
+  soldAt          DateTime?
   tags            String[]         @default([])
   hasCover        Boolean          @default(false)
   targetAudience  String?
@@ -305,6 +307,7 @@ model Listing {
   @@index([sellerId])
   @@index([bookId])
   @@index([status])
+  @@index([status, stock])
   @@index([reportCount])
 }
 
@@ -356,6 +359,7 @@ model Order {
   buyerId          String
   status           OrderStatus          @default(PENDING)
   paymentMethod    PaymentMethod?
+  checkoutKey      String?
   shippingSnapshot Json?
   shippingFullName String?
   shippingPhone    String?
@@ -373,6 +377,7 @@ model Order {
 
   @@index([buyerId])
   @@index([status])
+  @@unique([buyerId, checkoutKey])
 }
 
 model ShippingAddress {

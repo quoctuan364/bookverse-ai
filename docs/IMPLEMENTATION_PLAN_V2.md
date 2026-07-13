@@ -8,7 +8,8 @@ Trạng thái ngày 13/07/2026:
 - Đã có database guard, runtime validation, dataset analyzer, dry-run, import report và unit test.
 - Rehearsal đã chạy trên database độc lập `bookverse_ai_test`; database demo `bookverse_ai` chỉ được đọc để xác minh guard.
 - **Checkpoint B: ĐÃ DUYỆT và đã hoàn thành Lượt 1B trên `bookverse_ai_test`.** Migration, backfill, idempotency, ba chế độ import, integration verifier, FastAPI compatibility và restore rehearsal đều PASS.
-- **Checkpoint A và D: CHƯA DUYỆT.** Chưa triển khai stock/checkout hoặc thay đổi service boundary/chatbot.
+- **Checkpoint A: ĐÃ DUYỆT, phần stock/checkout đã triển khai và test PASS; toàn checkpoint CHƯA HOÀN THÀNH do deployment rehearsal bị chặn ở Category mapping legacy 24 ↔ taxonomy 2.200.**
+- **Checkpoint D: CHƯA DUYỆT.** Chưa thay đổi service boundary/chatbot.
 - Git local đã được khởi tạo an toàn; baseline trước khi hoàn tất Category là commit `133bb2b`. Không có remote và chưa push.
 
 ## 1. Mục tiêu
@@ -34,7 +35,7 @@ Hoàn thiện BookVerse AI theo hướng có thể demo, kiểm thử và giải
 3. Không thêm trạng thái order mới. Enum REFUNDED đang tồn tại sẽ không được dùng hoặc mở transition nếu chưa có checkpoint hoàn tiền riêng.
 4. Review unique theo userId + bookId; không liên kết trực tiếp OrderItem. Verified purchase, nếu bật, chỉ chấp nhận PAID, PAID_DEMO, SHIPPED, COMPLETED từ query server-side.
 5. Không bắt buộc chuyển chatbot sang FastAPI. Ưu tiên contract, UI, error, auth và bỏ mock trước khi đổi service boundary.
-6. Mọi destructive operation, migration rehearsal, import và integration/concurrency test chỉ chạy trên **bookverse_ai_test**.
+6. Mọi destructive operation, import và integration/concurrency test chỉ chạy trên **bookverse_ai_test** hoặc database rehearsal tạm có tên allowlist rõ ràng; không ghi **bookverse_ai**.
 7. Git cũ không có HEAD/config/refs/logs/objects để phục hồi. Sau khi được duyệt, repository local mới đã được khởi tạo và loại secret, dump, output runtime, dataset/ebook lớn khỏi index.
 
 ## 3. Lượt 1 - Dataset và chống oversell
@@ -154,6 +155,8 @@ Không bắt đầu UI polish cho một luồng khi contract/error state của l
 ## 9. Checkpoint
 
 ### CHECKPOINT: A — Listing stock và chống oversell
+
+Trạng thái thực thi ngày 13/07/2026: schema/migration, backup, stock backfill, atomic checkout, idempotency, cancel/restock, unit test, PostgreSQL concurrency, Category regression, build và stock smoke trên clone đều PASS. Toàn Checkpoint A vẫn **CHƯA HOÀN THÀNH** vì Category backfill trên clone demo fail-closed: 24 Category legacy không cùng taxonomy/mapping với 2.200 Category đã duyệt. Không có migration hoặc backfill nào được ghi vào database demo.
 
 1. **Vấn đề hiện tại**
    - Model Listing chưa có stock/soldAt. Quantity chỉ bị chặn 1–9, không dựa trên tồn kho.

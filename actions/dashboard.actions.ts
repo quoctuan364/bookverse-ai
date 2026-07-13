@@ -17,6 +17,10 @@ import { refreshRecommendationsForUser } from "@/actions/recommendation.actions"
 import { recordAuditLog } from "@/lib/audit";
 import { generateBookEmbedding } from "@/lib/book-embeddings";
 import { createNotification, createNotifications } from "@/lib/notifications";
+import {
+  cancelOrderWithRestock,
+  OrderCancellationError,
+} from "@/lib/order-cancellation-service";
 import { checkOrderTransition } from "@/lib/order-workflow";
 import {
   PermissionError,
@@ -1229,15 +1233,30 @@ export async function updateOrderStatus(
       return { success: false, message: transition.message };
     }
 
+    if (targetStatus === OrderStatus.CANCELLED) {
+      const receipt = await cancelOrderWithRestock({
+        orderId: order.id,
+        actorId: actor.id,
+        actor: actorType,
+        note,
+        source: "admin",
+      });
+      return {
+        success: true,
+        message: `Đã hủy đơn và hoàn ${receipt.restoredQuantity} sản phẩm vào tồn kho.`,
+      };
+    }
+
     await prisma.$transaction(async (tx) => {
-      await tx.order.update({
-        where: {
-          id: order.id,
-        },
+      const claimed = await tx.order.updateMany({
+        where: { id: order.id, status: order.status, paymentMethod: { not: null } },
         data: {
           status: targetStatus,
         },
       });
+      if (claimed.count !== 1) {
+        throw new Error("ORDER_STATUS_CONFLICT");
+      }
 
       await tx.orderTimelineEvent.create({
         data: {
@@ -1293,6 +1312,9 @@ export async function updateOrderStatus(
 
     return { success: true, message: "Đã cập nhật trạng thái đơn hàng." };
   } catch (error: unknown) {
+    if (error instanceof OrderCancellationError) {
+      return { success: false, message: error.publicMessage };
+    }
     return handleAdminError(error, "Không thể cập nhật trạng thái đơn hàng.");
   }
 }

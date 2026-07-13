@@ -139,6 +139,7 @@ interface SeedListing {
   view_count: number;
   cart_count: number;
   purchase_count: number;
+  stock: number;
   created_at: string;
 }
 
@@ -908,6 +909,7 @@ async function importDataset(
       views: listing.view_count,
       cartAdds: listing.cart_count,
       purchases: listing.purchase_count,
+      stock: listing.stock,
       tags: [],
       hasCover: Boolean(bookById.get(listing.book_id)?.cover_url),
       targetAudience: `Độc giả quan tâm ${bookById.get(listing.book_id)?.reading_level ?? "sách"}`,

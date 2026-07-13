@@ -12,6 +12,7 @@ import {
 import { recordAuditLog } from "@/lib/audit";
 import { createNotification, createNotifications } from "@/lib/notifications";
 import { checkOrderTransition, getAllowedOrderNextStatuses } from "@/lib/order-workflow";
+import { filterSellerOwnedItems } from "@/lib/order-ownership";
 import { getCurrentUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
 import { calculateSellerTrustScore, type SellerTrustScoreResult } from "@/lib/seller-score";
@@ -578,7 +579,7 @@ function serializeSellerOrder(order: {
     listing: { title: string; sellerId: string } | null;
   }>;
 }, sellerId: string): SellerOrderListItem {
-  const sellerItems = order.items.filter((item) => item.listing?.sellerId === sellerId);
+  const sellerItems = filterSellerOwnedItems(order.items, sellerId);
 
   return {
     id: order.id,
@@ -1607,14 +1608,15 @@ export async function updateSellerOrderStatus(
     }
 
     await prisma.$transaction(async (tx) => {
-      await tx.order.update({
-        where: {
-          id: order.id,
-        },
+      const claimed = await tx.order.updateMany({
+        where: { id: order.id, status: order.status, paymentMethod: { not: null } },
         data: {
           status: nextStatus,
         },
       });
+      if (claimed.count !== 1) {
+        throw new Error("ORDER_STATUS_CONFLICT");
+      }
 
       await tx.orderTimelineEvent.create({
         data: {

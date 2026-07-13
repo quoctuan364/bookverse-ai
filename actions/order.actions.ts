@@ -1,10 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { NotificationType, OrderStatus, Prisma, UserRole } from "@prisma/client";
-import { recordAuditLog } from "@/lib/audit";
-import { createNotifications } from "@/lib/notifications";
-import { checkOrderTransition } from "@/lib/order-workflow";
+import { OrderStatus, UserRole } from "@prisma/client";
+import {
+  cancelOrderWithRestock,
+  OrderCancellationError,
+} from "@/lib/order-cancellation-service";
 import prisma from "@/lib/prisma";
 import { PermissionError, requireAuthenticatedUser } from "@/lib/permissions";
 
@@ -242,115 +243,36 @@ export async function cancelPendingOrder(orderId: string): Promise<OrderActionRe
   try {
     const user = await requireAuthenticatedUser();
     const cleanOrderId = orderId.trim();
-
-    const order = await prisma.order.findFirst({
-      where: {
-        id: cleanOrderId,
-        buyerId: user.id,
-        status: OrderStatus.PENDING,
-        paymentMethod: {
-          not: null,
-        },
-      },
-      include: {
-        items: {
-          include: {
-            listing: {
-              select: {
-                sellerId: true,
-              },
-            },
-          },
-        },
-      },
+    const receipt = await cancelOrderWithRestock({
+      orderId: cleanOrderId,
+      actorId: user.id,
+      actor: "BUYER",
+      source: "buyer_order_detail",
     });
 
-    if (!order) {
-      return {
-        success: false,
-        message: "Không tìm thấy đơn PENDING có thể hủy.",
-        reason: "NOT_FOUND",
-      };
-    }
-
-    const transition = checkOrderTransition(order.status, OrderStatus.CANCELLED, "BUYER");
-    if (!transition.allowed) {
-      return {
-        success: false,
-        message: transition.message,
-        reason: "VALIDATION_ERROR",
-      };
-    }
-
-    const sellerIds = Array.from(
-      new Set(order.items.map((item) => item.listing?.sellerId).filter(Boolean) as string[]),
-    );
-
-    await prisma.$transaction(async (tx) => {
-      await tx.order.update({
-        where: {
-          id: order.id,
-        },
-        data: {
-          status: OrderStatus.CANCELLED,
-        },
-      });
-
-      await tx.orderTimelineEvent.create({
-        data: {
-          orderId: order.id,
-          actorId: user.id,
-          status: OrderStatus.CANCELLED,
-          note: "Buyer hủy đơn khi đơn còn PENDING.",
-          metadata: {
-            source: "buyer_order_detail",
-          },
-        },
-      });
-
-      await createNotifications(
-        [
-          {
-            userId: user.id,
-            title: "Đơn hàng đã hủy",
-            message: `Đơn ${order.id} đã được hủy theo yêu cầu của bạn.`,
-            type: NotificationType.ORDER,
-            href: `/orders/${order.id}`,
-          },
-          ...sellerIds.map((sellerId) => ({
-            userId: sellerId,
-            title: "Đơn hàng đã bị hủy",
-            message: `Buyer đã hủy đơn ${order.id} khi đơn còn PENDING.`,
-            type: NotificationType.ORDER,
-            href: `/seller/orders/${order.id}`,
-          })),
-        ],
-        tx,
-      );
-
-      await recordAuditLog(
-        {
-          actorId: user.id,
-          action: "BUYER_ORDER_CANCEL",
-          entityType: "ORDER",
-          entityId: order.id,
-          metadata: {
-            previousStatus: OrderStatus.PENDING,
-          } satisfies Prisma.InputJsonObject,
-        },
-        tx,
-      );
-    });
-
-    revalidatePath(`/orders/${order.id}`);
+    revalidatePath(`/orders/${receipt.orderId}`);
     revalidatePath("/profile");
     revalidatePath("/notifications");
 
     return {
       success: true,
-      message: "Đã hủy đơn hàng.",
+      message: `Đã hủy đơn hàng và hoàn ${receipt.restoredQuantity} sản phẩm vào tồn kho.`,
     };
   } catch (error: unknown) {
+    if (error instanceof OrderCancellationError) {
+      return {
+        success: false,
+        message: error.publicMessage,
+        reason:
+          error.code === "AUTH_REQUIRED" || error.code === "ACCOUNT_LOCKED"
+            ? "AUTH_REQUIRED"
+            : error.code === "FORBIDDEN"
+              ? "FORBIDDEN"
+              : error.code === "NOT_FOUND"
+                ? "NOT_FOUND"
+                : "VALIDATION_ERROR",
+      };
+    }
     return handleOrderError(error, "Không thể hủy đơn hàng.");
   }
 }

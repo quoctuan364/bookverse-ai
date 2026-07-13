@@ -1,19 +1,15 @@
 "use server";
 
 import {
-  InteractionType,
   ListingCondition,
   ListingStatus,
-  NotificationType,
   OrderStatus,
   PaymentMethod,
-  Prisma,
-  TargetType,
 } from "@prisma/client";
-import { recordAuditLog } from "@/lib/audit";
-import { createNotifications } from "@/lib/notifications";
+import { checkoutOrder, CheckoutDomainError } from "@/lib/checkout-service";
 import { getCurrentUser, PermissionError, requireAuthenticatedUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
+import { validateRequestedQuantity } from "@/lib/stock-policy";
 
 type DecimalLike = {
   toNumber: () => number;
@@ -27,6 +23,7 @@ export interface CartItem {
   listingId: string | null;
   listingTitle: string | null;
   listingStatus: ListingStatus | null;
+  stock: number;
   condition: ListingCondition | null;
   book: {
     id: string;
@@ -72,13 +69,6 @@ export interface CartActionResult {
   message: string;
   orderId?: string;
   reason?: "AUTH_REQUIRED" | "VALIDATION_ERROR" | "NOT_FOUND" | "DATABASE_ERROR";
-}
-
-class CheckoutValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "CheckoutValidationError";
-  }
 }
 
 function decimalToNumber(value: DecimalLike | number | string): number {
@@ -139,11 +129,13 @@ function getAvailabilityMessage(item: {
   unitPrice: DecimalLike | number | string;
   totalPrice: DecimalLike | number | string;
   bookId: string;
+  quantity: number;
   listing: {
     bookId: string | null;
     sellerId: string;
     status: ListingStatus;
     price: DecimalLike | number | string;
+    stock: number;
   } | null;
 }, userId: string): string | null {
   if (!item.listingId || !item.listing) {
@@ -152,6 +144,11 @@ function getAvailabilityMessage(item: {
 
   if (item.listing.status !== ListingStatus.APPROVED) {
     return "Listing không còn ở trạng thái đã duyệt.";
+  }
+
+  const quantityError = validateRequestedQuantity(item.quantity, item.listing.stock);
+  if (quantityError) {
+    return quantityError;
   }
 
   if (item.listing.bookId !== item.bookId) {
@@ -273,6 +270,7 @@ export async function getCartPageData(): Promise<CartPageData> {
                   condition: true,
                   price: true,
                   status: true,
+                  stock: true,
                   sellerId: true,
                   seller: {
                     select: {
@@ -324,6 +322,7 @@ export async function getCartPageData(): Promise<CartPageData> {
       listingId: item.listingId,
       listingTitle: item.listing?.title ?? null,
       listingStatus: item.listing?.status ?? null,
+      stock: item.listing?.stock ?? 0,
       condition: item.listing?.condition ?? null,
       book: {
         id: item.book.id,
@@ -365,7 +364,14 @@ export async function updateCartItemQuantity(
   try {
     const userId = await requireCurrentUserId();
 
-    const safeQuantity = Math.min(Math.max(Math.floor(quantity), 1), 9);
+    const safeQuantity = Math.floor(quantity);
+    if (!Number.isInteger(safeQuantity) || safeQuantity < 1 || safeQuantity > 999) {
+      return {
+        success: false,
+        message: "Số lượng phải là số nguyên từ 1 đến 999.",
+        reason: "VALIDATION_ERROR",
+      };
+    }
     const item = await prisma.orderItem.findFirst({
       where: {
         id: orderItemId.trim(),
@@ -387,6 +393,7 @@ export async function updateCartItemQuantity(
             sellerId: true,
             status: true,
             price: true,
+            stock: true,
           },
         },
       },
@@ -400,7 +407,7 @@ export async function updateCartItemQuantity(
       };
     }
 
-    const availabilityMessage = getAvailabilityMessage(item, userId);
+    const availabilityMessage = getAvailabilityMessage({ ...item, quantity: safeQuantity }, userId);
     if (availabilityMessage) {
       return {
         success: false,
@@ -514,6 +521,7 @@ export async function removeCartItem(orderItemId: string): Promise<CartActionRes
 export async function checkoutCart(
   shippingAddressId: string,
   paymentMethodValue: string,
+  checkoutKeyValue: string,
 ): Promise<CartActionResult> {
   try {
     const userId = await requireCurrentUserId();
@@ -537,240 +545,29 @@ export async function checkoutCart(
       };
     }
 
-    const checkoutOrderId = await prisma.$transaction(async (tx) => {
-      const [order, shippingAddress] = await Promise.all([
-        tx.order.findFirst({
-          where: {
-            buyerId: userId,
-            status: OrderStatus.PENDING,
-            paymentMethod: null,
-          },
-          include: {
-            items: {
-              include: {
-                listing: {
-                  select: {
-                    id: true,
-                    bookId: true,
-                    sellerId: true,
-                    status: true,
-                    price: true,
-                  },
-                },
-              },
-            },
-          },
-        }),
-        tx.shippingAddress.findFirst({
-          where: {
-            id: cleanShippingAddressId,
-            userId,
-          },
-          select: {
-            id: true,
-            fullName: true,
-            phone: true,
-            province: true,
-            district: true,
-            ward: true,
-            addressLine: true,
-            note: true,
-          },
-        }),
-      ]);
-
-      if (!order || order.items.length === 0) {
-        throw new CheckoutValidationError("Giỏ hàng đang trống.");
-      }
-
-      if (!shippingAddress) {
-        throw new CheckoutValidationError("Địa chỉ giao hàng không thuộc tài khoản của bạn.");
-      }
-
-      const invalidMessages = order.items
-        .map((item) => getAvailabilityMessage(item, userId))
-        .filter((message): message is string => Boolean(message));
-
-      if (invalidMessages.length > 0) {
-        throw new CheckoutValidationError(`Giỏ hàng có item không hợp lệ: ${invalidMessages[0]}`);
-      }
-
-      const sellerIds = Array.from(
-        new Set(order.items.map((item) => item.listing?.sellerId).filter(Boolean) as string[]),
-      );
-
-      if (sellerIds.length !== 1) {
-        throw new CheckoutValidationError("Demo Phase 4 chỉ cho checkout một seller mỗi đơn. Vui lòng xóa bớt item khác seller.");
-      }
-
-      const totalAmount = order.items.reduce((total, item) => {
-        const unitPrice = decimalToNumber(item.listing?.price ?? item.unitPrice);
-        return total + unitPrice * item.quantity;
-      }, 0);
-
-      if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
-        throw new CheckoutValidationError("Tổng tiền không hợp lệ.");
-      }
-
-      const checkoutStatus =
-        paymentMethod === PaymentMethod.COD ? OrderStatus.PENDING : OrderStatus.PAID_DEMO;
-      const shippingSnapshot = {
-        addressId: shippingAddress.id,
-        fullName: shippingAddress.fullName,
-        phone: shippingAddress.phone,
-        province: shippingAddress.province,
-        district: shippingAddress.district,
-        ward: shippingAddress.ward,
-        addressLine: shippingAddress.addressLine,
-        note: shippingAddress.note,
-      } satisfies Prisma.InputJsonObject;
-
-      await tx.order.update({
-        where: {
-          id: order.id,
-        },
-        data: {
-          paymentMethod,
-          status: checkoutStatus,
-          shippingSnapshot,
-          shippingFullName: shippingAddress.fullName,
-          shippingPhone: shippingAddress.phone,
-          shippingProvince: shippingAddress.province,
-          shippingDistrict: shippingAddress.district,
-          shippingWard: shippingAddress.ward,
-          shippingAddressLine: shippingAddress.addressLine,
-          shippingNote: shippingAddress.note,
-          totalAmount,
-        },
-      });
-
-      await tx.orderTimelineEvent.create({
-        data: {
-          orderId: order.id,
-          actorId: userId,
-          status: checkoutStatus,
-          note:
-            checkoutStatus === OrderStatus.PAID_DEMO
-              ? "Buyer tạo đơn và thanh toán demo thành công."
-              : "Buyer tạo đơn COD từ checkout và chờ xử lý.",
-          metadata: {
-            source: "cart_checkout",
-            paymentMethod,
-            shippingAddressId: shippingAddress.id,
-            checkoutStatus,
-          },
-        },
-      });
-
-      for (const item of order.items) {
-        const unitPrice = decimalToNumber(item.listing?.price ?? item.unitPrice);
-        const totalPrice = unitPrice * item.quantity;
-
-        await tx.orderItem.update({
-          where: {
-            id: item.id,
-          },
-          data: {
-            unitPrice,
-            totalPrice,
-          },
-        });
-
-        if (item.listingId) {
-          await tx.listing.update({
-            where: {
-              id: item.listingId,
-            },
-            data: {
-              purchases: {
-                increment: item.quantity,
-              },
-            },
-          });
-        }
-
-        await tx.interactionEvent.create({
-          data: {
-            userId,
-            bookId: item.bookId,
-            actionType: "PURCHASE",
-            metadata: {
-              orderId: order.id,
-              listingId: item.listingId,
-              quantity: item.quantity,
-              source: "cart_checkout",
-            },
-          },
-        });
-
-        await tx.interaction.create({
-          data: {
-            id: `CHECKOUT-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`,
-            userId,
-            bookId: item.bookId,
-            type: InteractionType.PURCHASE,
-            targetType: item.listingId ? TargetType.LISTING : TargetType.BOOK,
-            targetId: item.listingId ?? item.bookId,
-            value: totalPrice,
-            metadata: {
-              orderId: order.id,
-              quantity: item.quantity,
-              source: "cart_checkout",
-            },
-          },
-        });
-      }
-
-      await createNotifications(
-        [
-          {
-            userId,
-            title: "Đơn hàng đã được tạo",
-            message: `Đơn ${order.id} đã được tạo với phương thức ${paymentMethod}.`,
-            type: NotificationType.ORDER,
-            href: `/orders/${order.id}`,
-          },
-          ...sellerIds.map((sellerId) => ({
-            userId: sellerId,
-            title: "Bạn có đơn hàng mới",
-            message: `Đơn ${order.id} có sản phẩm thuộc listing của bạn.`,
-            type: NotificationType.ORDER,
-            href: `/seller/orders/${order.id}`,
-          })),
-        ],
-        tx,
-      );
-
-      await recordAuditLog(
-        {
-          actorId: userId,
-          action: "BUYER_CHECKOUT_ORDER_CREATE",
-          entityType: "ORDER",
-          entityId: order.id,
-          metadata: {
-            paymentMethod,
-            checkoutStatus,
-            itemCount: order.items.length,
-            shippingAddressId: shippingAddress.id,
-          } satisfies Prisma.InputJsonObject,
-        },
-        tx,
-      );
-
-      return order.id;
+    const receipt = await checkoutOrder({
+      buyerId: userId,
+      shippingAddressId: cleanShippingAddressId,
+      paymentMethod,
+      checkoutKey: checkoutKeyValue,
     });
 
     return {
       success: true,
-      message: `Đã tạo đơn hàng. Mã đơn: ${checkoutOrderId}`,
-      orderId: checkoutOrderId,
+      message: receipt.replayed
+        ? `Checkout đã được xử lý trước đó. Mã đơn: ${receipt.orderId}`
+        : `Đã tạo đơn hàng. Mã đơn: ${receipt.orderId}`,
+      orderId: receipt.orderId,
     };
   } catch (error: unknown) {
-    if (error instanceof CheckoutValidationError) {
+    if (error instanceof CheckoutDomainError) {
       return {
         success: false,
-        message: error.message,
-        reason: "VALIDATION_ERROR",
+        message: error.publicMessage,
+        reason:
+          error.code === "AUTH_REQUIRED" || error.code === "ACCOUNT_LOCKED"
+            ? "AUTH_REQUIRED"
+            : "VALIDATION_ERROR",
       };
     }
 

@@ -34,6 +34,7 @@ export interface MarketplaceListingItem {
   views: number;
   cartAdds: number;
   purchases: number;
+  stock: number;
   targetAudience: string | null;
   seller: {
     id: string;
@@ -173,6 +174,7 @@ function permissionReason(error: PermissionError): ActionResult["reason"] {
 function buildMarketplaceWhere(filters: MarketplacePageFilters = {}): Prisma.ListingWhereInput {
   const where: Prisma.ListingWhereInput = {
     status: ListingStatus.APPROVED,
+    stock: { gt: 0 },
   };
   const condition = parseOptionalCondition(filters.condition);
   const query = filters.query?.trim();
@@ -282,6 +284,7 @@ export async function getMarketplacePageData(
       prisma.listing.count({
         where: {
           status: ListingStatus.APPROVED,
+          stock: { gt: 0 },
         },
       }),
     ]);
@@ -297,6 +300,7 @@ export async function getMarketplacePageData(
         views: listing.views,
         cartAdds: listing.cartAdds,
         purchases: listing.purchases,
+        stock: listing.stock,
         targetAudience: listing.targetAudience,
         seller: listing.seller,
         sellerAiScore: buildMockSellerAiScore(listing.seller.id, listing.cartAdds, listing.purchases),
@@ -427,6 +431,7 @@ export async function addListingToCart(listingId: string): Promise<ActionResult>
         price: true,
         sellerId: true,
         status: true,
+        stock: true,
       },
     });
 
@@ -442,6 +447,14 @@ export async function addListingToCart(listingId: string): Promise<ActionResult>
       return {
         success: false,
         message: "Listing này chưa được duyệt nên chưa thể thêm vào giỏ.",
+        reason: "VALIDATION_ERROR",
+      };
+    }
+
+    if (listing.stock <= 0) {
+      return {
+        success: false,
+        message: "Listing này đã hết hàng.",
         reason: "VALIDATION_ERROR",
       };
     }
@@ -486,6 +499,16 @@ export async function addListingToCart(listingId: string): Promise<ActionResult>
     const currentSellerIds = new Set(
       currentCart?.items.map((item) => item.listing?.sellerId).filter(Boolean) as string[] | undefined,
     );
+
+    const currentListingQuantity =
+      currentCart?.items.find((item) => item.listingId === listing.id)?.quantity ?? 0;
+    if (currentListingQuantity + 1 > listing.stock) {
+      return {
+        success: false,
+        message: `Listing chỉ còn ${listing.stock} sản phẩm.`,
+        reason: "VALIDATION_ERROR",
+      };
+    }
 
     if (currentSellerIds.size > 0 && !currentSellerIds.has(listing.sellerId)) {
       return {

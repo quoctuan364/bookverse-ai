@@ -9,6 +9,7 @@ import {
 } from "@/actions/cart.actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SubmitButton } from "@/components/shared/SubmitButton";
 import { getCurrentUser } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
@@ -122,6 +123,7 @@ async function checkoutAction(formData: FormData) {
   const result = await checkoutCart(
     String(formData.get("shippingAddressId") ?? ""),
     String(formData.get("paymentMethod") ?? ""),
+    String(formData.get("checkoutKey") ?? ""),
   );
 
   if (!result.success) {
@@ -241,6 +243,7 @@ export default async function CartPage({ searchParams }: CartPageProps) {
                       <p className="mt-3 text-base font-black text-[#E76F51]">
                         {formatPrice(item.totalPrice)}
                       </p>
+                      <p className="mt-1 text-xs font-bold text-[#66706B]">Còn lại: {item.stock}</p>
                     </div>
 
                     <div className="grid gap-3 sm:w-44">
@@ -261,7 +264,7 @@ export default async function CartPage({ searchParams }: CartPageProps) {
                         <Input
                           aria-label="Số lượng"
                           className="text-center"
-                          max={9}
+                          max={Math.max(1, item.stock)}
                           min={1}
                           name="quantity"
                           type="number"
@@ -270,11 +273,11 @@ export default async function CartPage({ searchParams }: CartPageProps) {
                         <Button
                           aria-label="Tăng số lượng"
                           className="shrink-0"
-                          disabled={item.quantity >= 9}
+                          disabled={item.quantity >= item.stock}
                           name="nextQuantity"
                           size="icon"
                           type="submit"
-                          value={Math.min(9, item.quantity + 1)}
+                          value={Math.min(item.stock, item.quantity + 1)}
                           variant="outline"
                         >
                           <Plus className="h-4 w-4" aria-hidden="true" />
@@ -327,6 +330,7 @@ export default async function CartPage({ searchParams }: CartPageProps) {
           ) : null}
 
           <form action={checkoutAction} className="mt-5 grid gap-4">
+            <input name="checkoutKey" type="hidden" value={`checkout-${cart.orderId ?? "empty"}`} />
             <section>
               <div className="flex items-center justify-between gap-3">
                 <h3 className="inline-flex items-center gap-2 text-sm font-black text-[#17202A]">
@@ -400,14 +404,14 @@ export default async function CartPage({ searchParams }: CartPageProps) {
               </select>
             </section>
 
-            <Button
+            <SubmitButton
               className="h-11 w-full gap-2"
               disabled={!cart.canCheckout}
-              type="submit"
+              pendingLabel="Đang giữ tồn kho..."
             >
               <CreditCard className="h-4 w-4" aria-hidden="true" />
               Tạo đơn hàng
-            </Button>
+            </SubmitButton>
           </form>
 
           <p className="mt-4 rounded-lg bg-[#EAF2EF] px-3 py-2 text-xs leading-5 text-[#42524D]">

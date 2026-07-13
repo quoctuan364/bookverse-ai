@@ -26,7 +26,7 @@ BookVerse AI là đồ án tốt nghiệp xây dựng nền tảng sách điện
 - Chợ sách cũ cho người bán đăng tin, quản trị viên duyệt/từ chối, người mua thêm giỏ hoặc mua ngay.
 - Seller Dashboard tại `/seller` cho SELLER/ADMIN quản lý listing, tạo/sửa/ẩn/hiện listing, theo dõi đơn của chính mình, cập nhật trạng thái giao hàng hợp lệ, xem doanh thu và điểm uy tín.
 - Giỏ hàng dùng bảng `Order PENDING` chưa có `paymentMethod`, hỗ trợ đổi số lượng, xóa sách, chọn địa chỉ giao hàng và tạo đơn thật có timeline.
-- Checkout đã harden: validate địa chỉ thuộc buyer, payment method hợp lệ, listing còn `APPROVED`, không tự mua listing của mình và chỉ checkout một seller mỗi đơn.
+- Checkout đã harden: giữ tồn kho bằng conditional update trong transaction, chống oversell/self-purchase/double submit và chỉ checkout một seller mỗi đơn.
 - Trình đọc online đọc ebook HTML trong `public/ebooks/html`, lưu tiến độ, phiên đọc, bookmark và highlight theo `blockId`.
 - Diễn đàn cộng đồng hỗ trợ bài viết, bình luận, thích/báo cáo và quản trị viên xử lý bài bị báo cáo.
 - Trang hồ sơ hiển thị lịch sử đọc, đơn hàng, tin bán, highlight, mục tiêu đọc và gợi ý đã lưu.
@@ -200,11 +200,14 @@ Quy tắc checkout:
 - User bị khóa hoặc bị hạ quyền sẽ bị chặn khỏi Admin/Seller/action nhạy cảm ở request kế tiếp; middleware chỉ làm lớp điều hướng nhanh.
 - Payment method hỗ trợ `COD`, `BANK_TRANSFER_DEMO`, `WALLET_DEMO`.
 - Listing trong cart phải tồn tại, còn `APPROVED`, đúng sách, giá hợp lệ và không thuộc chính buyer.
-- Marketplace public chỉ hiển thị listing `APPROVED`; seller/admin vẫn xem được listing `PENDING_REVIEW` trong khu vực quản lý.
+- Marketplace public chỉ hiển thị listing `APPROVED` có `stock > 0`; seller/admin vẫn xem được listing `PENDING_REVIEW` trong khu vực quản lý.
 - Demo Phase 4 giới hạn một seller mỗi checkout. Nếu cart có nhiều seller, UI báo lỗi và buyer cần xóa item khác seller.
 - Seller mở chi tiết đơn qua `/orders/[id]` chỉ thấy item và doanh thu thuộc seller đó; buyer/admin/moderator thấy toàn bộ đơn.
 - Order lưu snapshot địa chỉ bằng các field `shippingFullName`, `shippingPhone`, `shippingProvince`, `shippingDistrict`, `shippingWard`, `shippingAddressLine`, `shippingNote`.
 - COD tạo order `PENDING`; `BANK_TRANSFER_DEMO` và `WALLET_DEMO` tạo order `PAID_DEMO`.
+- `stock` là lượng còn có thể giữ cho checkout và luôn không âm. Khi đơn vị cuối được giữ, listing chuyển `SOLD` và `soldAt` được gắn; hủy hợp lệ mở lại listing và xóa `soldAt`.
+- UI gửi `checkoutKey` ổn định theo giỏ; unique `(buyerId, checkoutKey)` bảo đảm retry chỉ trả lại order cũ và không trừ stock/ghi side effect lần nữa.
+- Hủy đơn dùng conditional state update trong cùng transaction với hoàn kho, timeline, audit và notification nên retry/hủy đồng thời chỉ hoàn đúng một lần.
 
 Quy tắc chatbot:
 
@@ -319,6 +322,34 @@ Verifier kiểm tra 2.200 Category, 43 root, 2.157 child, 27 canonical group, Bo
 
 Backup trước migration được giữ ngoài Git tại `backups/database`. Quy trình restore rehearsal dùng database tạm `bookverse_ai_restore_test`: tạo database tạm, chạy `pg_restore`, đối chiếu count/schema, sau đó chỉ drop đúng database tạm. Tuyệt đối không restore đè hoặc apply migration Category lên `bookverse_ai` nếu chưa được duyệt riêng.
 
+## Tồn kho và checkout an toàn — Checkpoint A
+
+Migration `20260713161000_add_listing_stock_checkout_safety` thêm `Listing.stock`, `Listing.soldAt`, `Order.checkoutKey`, check constraint `stock >= 0`, index truy vấn marketplace và unique idempotency theo buyer. Migration additive, không xóa field hoặc dữ liệu cũ.
+
+Đặt database test và allowlist trước khi chạy migration/backfill:
+
+```powershell
+$env:DATABASE_URL="postgresql://YOUR_USER:YOUR_PASSWORD@localhost:5433/bookverse_ai_test?schema=public"
+$env:ALLOWED_DESTRUCTIVE_DATABASES="bookverse_ai_test,bookverse_ai_deploy_rehearsal"
+npx prisma migrate deploy
+npm run data:backfill-stock -- --dry-run
+npm run data:backfill-stock -- --execute
+npm run data:backfill-stock -- --execute
+```
+
+Lần execute thứ hai phải có `changed: 0`. Script chỉ đọc `data/json/bookverse_ultra_seed_2200.json`, fail-closed nếu target không phải test/rehearsal và tạo report mới trong `outputs/stock`.
+
+Chạy integration thật trên PostgreSQL test:
+
+```powershell
+$env:STOCK_INTEGRATION_DATABASE="bookverse_ai_test"
+npm run test:stock-integration
+```
+
+Test tự tạo fixture có prefix riêng, bao phủ tranh stock 1, retry cùng idempotency key, quantity lớn hơn 1, rollback nhiều item, self-purchase, listing không khả dụng, user bị khóa và hủy đồng thời; cleanup chỉ fixture của lượt test.
+
+Deployment rehearsal ngày 13/07/2026 đã xác minh migration/constraint/stock backfill/checkout trên clone demo, nhưng toàn bộ rehearsal vẫn **BLOCKED** vì 24 Category legacy của demo không tương thích mapping 2.200 Category đã duyệt. Không được ép mapping theo ID; cần checkpoint Category legacy riêng trước khi apply database demo. `bookverse_ai` chưa bị ghi và database rehearsal đã bị drop.
+
 ## Chạy bằng Docker Compose
 
 Chạy toàn bộ hệ thống:
@@ -379,9 +410,11 @@ npm run typecheck
 npm run data:analyze
 npm run data:import -- --dry-run
 npm run test:unit
+npm run test:category-integration
+npm run test:stock-integration
 npm run build
-python -m py_compile ai_service/main.py ai_service/evaluate.py scripts/refresh_real_book_data.py
-docker compose config
+python -m compileall -q ai_service
+docker compose config --quiet
 ```
 
 Lệnh `data:import` phải dùng biến `DATABASE_URL` của `bookverse_ai_test`; không chạy import để kiểm thử trên database demo.
@@ -398,8 +431,8 @@ Lệnh `data:import` phải dùng biến `DATABASE_URL` của `bookverse_ai_test
 
 ## Phase 4 Order/Checkout Hardening
 
-- Phase 4 không đổi Prisma schema, nên không có migration mới.
-- Code chính nằm ở `actions/cart.actions.ts`, `actions/order.actions.ts`, `actions/seller.actions.ts`, `actions/dashboard.actions.ts` và `lib/order-workflow.ts`.
+- Checkpoint A có migration stock/order safety riêng; schema hiện có stock thật và idempotency key.
+- Code chính nằm ở `actions/cart.actions.ts`, `actions/order.actions.ts`, `actions/seller.actions.ts`, `actions/dashboard.actions.ts`, `lib/checkout-service.ts`, `lib/order-cancellation-service.ts` và `lib/order-workflow.ts`.
 - Seed demo có đủ order `PENDING`, `PAID`, `PAID_DEMO`, `SHIPPED`, `COMPLETED`, `CANCELLED` cho seller dashboard và admin workflow.
 
 ## Ghi chú dữ liệu
