@@ -1,0 +1,56 @@
+{
+  "name": "bookverse-ai",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "tsx prisma/seed.ts",
+    "db:seed": "prisma db seed",
+    "seed:1200": "tsx scripts/import_seed_1200.ts",
+    "seed:2200": "tsx scripts/import_seed_1200.ts data/json/bookverse_ultra_seed_2200.json",
+    "data:analyze": "tsx scripts/analyze_dataset.ts",
+    "data:analyze-categories": "tsx scripts/analyze_categories.ts",
+    "data:backfill-categories": "tsx scripts/backfill_category_hierarchy.ts",
+    "data:import": "tsx scripts/import_seed_1200.ts",
+    "test:unit": "tsx --test tests/*.test.ts",
+    "embeddings:books": "tsx scripts/generate_book_embeddings.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.0.0",
+    "bcrypt": "^6.0.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "csv-parser": "^3.2.0",
+    "lucide-react": "^0.468.0",
+    "next": "^15.0.0",
+    "next-auth": "^5.0.0-beta.31",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "recharts": "^3.9.2",
+    "tailwind-merge": "^2.6.0",
+    "tailwindcss-animate": "^1.0.7",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.15.0",
+    "eslint-config-next": "^15.0.0",
+    "postcss": "^8.4.49",
+    "prisma": "^6.0.0",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.0"
+  }
+}

@@ -1,0 +1,54 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: bookverse-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: bookverse_ai
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - bookverse-network
+
+  web:
+    build:
+      context: .
+    container_name: bookverse-web
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/bookverse_ai?schema=public
+      AUTH_SECRET: bookverse-ai-local-auth-secret-change-before-production-20260704
+      AUTH_TRUST_HOST: "true"
+      AI_SERVICE_URL: http://ai_service:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+      - ai_service
+    networks:
+      - bookverse-network
+
+  ai_service:
+    build:
+      context: ./ai_service
+    container_name: bookverse-ai-service
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/bookverse_ai
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    networks:
+      - bookverse-network
+
+volumes:
+  pgdata:
+
+networks:
+  bookverse-network:
+    driver: bridge

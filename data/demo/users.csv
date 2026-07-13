@@ -1,0 +1,11 @@
+﻿user_id,name,role,persona,preferred_genres,level,budget
+U001,Tuấn,reader,Sinh viên công nghệ muốn học AI và làm đồ án,Trí tuệ nhân tạo;Lập trình;Dữ liệu,Cơ bản,150000
+U002,Vy,reader,Người đọc thích phát triển bản thân và quản lý tài chính,Kỹ năng;Tài chính;Tâm lý học,Cơ bản,120000
+U003,Nam,reader,Backend developer muốn nâng cấp kỹ năng hệ thống,Lập trình;Dữ liệu;Trí tuệ nhân tạo,Trung cấp,200000
+U004,An,reader,Người bán sách muốn tối ưu bài đăng và marketing,Kinh doanh;Marketing;Khởi nghiệp,Cơ bản,160000
+U005,Chi,reader,Designer quan tâm trải nghiệm đọc và cộng đồng,Thiết kế;Marketing;Tâm lý học,Trung cấp,130000
+U006,Huy,reader,Bạn đọc cần sách nhẹ nhàng sau giờ làm,Văn học;Kỹ năng;Tâm lý học,Cơ bản,100000
+U007,Trâm,reader,Giảng viên quan tâm giáo dục số và dữ liệu học tập,Giáo dục;Trí tuệ nhân tạo;Dữ liệu,Trung cấp,180000
+U008,Minh Bookstore,seller,Nhà bán sách giấy và ebook chuyên ngành,Lập trình;Dữ liệu;Kinh doanh,Trung cấp,0
+U009,Admin Demo,admin,Quản trị viên hệ thống,Dữ liệu;Kinh doanh,Trung cấp,0
+U010,Mod Demo,moderator,Kiểm duyệt viên cộng đồng,Văn học;Kỹ năng,Cơ bản,0

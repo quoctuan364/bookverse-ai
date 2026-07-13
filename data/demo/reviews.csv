@@ -1,0 +1,22 @@
+review_id,user_id,book_id,rating,review_text,created_at
+R0001,U001,B020,5,"Sách thật, nội dung có chiều sâu và phù hợp để đưa vào hệ thống gợi ý của BookVerse AI. Mình đánh dấu lại vài chương trong 'Clean Code'.",2026-06-20 10:30:00
+R0002,U001,B016,5,"Bìa và metadata rõ ràng hơn dữ liệu demo cũ, dễ dùng khi quay video báo cáo. Mình đánh dấu lại vài chương trong 'Hands-On Machine Learning with Scikit-Learn, Keras, and TensorFlow'.",2026-06-21 10:30:00
+R0003,U002,B012,5,"Phần nội dung có thể liên hệ tốt với lịch sử đọc, review và recommendation evidence. Mình đánh dấu lại vài chương trong 'Thinking, Fast and Slow'.",2026-06-22 10:30:00
+R0004,U002,B010,5,"Sách thật, nội dung có chiều sâu và phù hợp để đưa vào hệ thống gợi ý của BookVerse AI. Mình đánh dấu lại vài chương trong 'Atomic Habits'.",2026-06-23 10:30:00
+R0005,U002,B001,4,"Bìa và metadata rõ ràng hơn dữ liệu demo cũ, dễ dùng khi quay video báo cáo. Mình đánh dấu lại vài chương trong 'Artificial Intelligence: A Modern Approach'.",2026-06-24 10:30:00
+R0006,U003,B020,5,"Phần nội dung có thể liên hệ tốt với lịch sử đọc, review và recommendation evidence. Mình đánh dấu lại vài chương trong 'Clean Code'.",2026-06-25 10:30:00
+R0007,U003,B018,4,"Sách thật, nội dung có chiều sâu và phù hợp để đưa vào hệ thống gợi ý của BookVerse AI. Mình đánh dấu lại vài chương trong 'Database Design for Mere Mortals'.",2026-06-26 10:30:00
+R0008,U003,B017,5,"Bìa và metadata rõ ràng hơn dữ liệu demo cũ, dễ dùng khi quay video báo cáo. Mình đánh dấu lại vài chương trong 'Storytelling with Data'.",2026-06-27 10:30:00
+R0009,U004,B016,4,"Phần nội dung có thể liên hệ tốt với lịch sử đọc, review và recommendation evidence. Mình đánh dấu lại vài chương trong 'Hands-On Machine Learning with Scikit-Learn, Keras, and TensorFlow'.",2026-06-28 10:30:00
+R0010,U004,B011,4,"Sách thật, nội dung có chiều sâu và phù hợp để đưa vào hệ thống gợi ý của BookVerse AI. Mình đánh dấu lại vài chương trong 'The Psychology of Money'.",2026-06-29 10:30:00
+R0011,U005,B008,4,"Bìa và metadata rõ ràng hơn dữ liệu demo cũ, dễ dùng khi quay video báo cáo. Mình đánh dấu lại vài chương trong 'Contagious: Why Things Catch On'.",2026-06-30 10:30:00
+R0012,U005,B012,5,"Phần nội dung có thể liên hệ tốt với lịch sử đọc, review và recommendation evidence. Mình đánh dấu lại vài chương trong 'Thinking, Fast and Slow'.",2026-06-31 10:30:00
+R0013,U005,B019,5,"Sách thật, nội dung có chiều sâu và phù hợp để đưa vào hệ thống gợi ý của BookVerse AI. Mình đánh dấu lại vài chương trong 'Made to Stick'.",2026-06-20 10:30:00
+R0014,U005,B005,5,"Bìa và metadata rõ ràng hơn dữ liệu demo cũ, dễ dùng khi quay video báo cáo. Mình đánh dấu lại vài chương trong 'Designing Data-Intensive Applications'.",2026-06-21 10:30:00
+R0015,U006,B012,5,"Phần nội dung có thể liên hệ tốt với lịch sử đọc, review và recommendation evidence. Mình đánh dấu lại vài chương trong 'Thinking, Fast and Slow'.",2026-06-22 10:30:00
+R0016,U006,B015,4,"Sách thật, nội dung có chiều sâu và phù hợp để đưa vào hệ thống gợi ý của BookVerse AI. Mình đánh dấu lại vài chương trong 'Zero to One'.",2026-06-23 10:30:00
+R0017,U007,B018,5,"Bìa và metadata rõ ràng hơn dữ liệu demo cũ, dễ dùng khi quay video báo cáo. Mình đánh dấu lại vài chương trong 'Database Design for Mere Mortals'.",2026-06-24 10:30:00
+R0018,U007,B002,5,"Phần nội dung có thể liên hệ tốt với lịch sử đọc, review và recommendation evidence. Mình đánh dấu lại vài chương trong 'Recommender Systems: The Textbook'.",2026-06-25 10:30:00
+R0019,U007,B016,5,"Sách thật, nội dung có chiều sâu và phù hợp để đưa vào hệ thống gợi ý của BookVerse AI. Mình đánh dấu lại vài chương trong 'Hands-On Machine Learning with Scikit-Learn, Keras, and TensorFlow'.",2026-06-26 10:30:00
+R0020,U007,B005,5,"Bìa và metadata rõ ràng hơn dữ liệu demo cũ, dễ dùng khi quay video báo cáo. Mình đánh dấu lại vài chương trong 'Designing Data-Intensive Applications'.",2026-06-27 10:30:00
+R0021,U007,B013,5,"Phần nội dung có thể liên hệ tốt với lịch sử đọc, review và recommendation evidence. Mình đánh dấu lại vài chương trong 'The Alchemist'.",2026-06-28 10:30:00

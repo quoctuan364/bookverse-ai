@@ -1,0 +1,27 @@
+node_modules
+.next
+out
+dist
+.env
+.env*.local
+*.tsbuildinfo
+coverage
+prisma/dev.db
+__pycache__/
+*.pyc
+.venv/
+
+# Dữ liệu nhạy cảm, backup và output runtime không đưa vào Git.
+backups/
+*.dump
+*.log
+outputs/
+
+# Dataset/ebook lớn vẫn được giữ nguyên trên máy để import và demo.
+# Không stage vào baseline local theo yêu cầu an toàn dữ liệu.
+data/json/bookverse_ultra_seed_2200.json
+data/backups/
+public/ebooks/html/
+public/ebooks/json/
+public/covers/3d/
+public/covers/flat/
