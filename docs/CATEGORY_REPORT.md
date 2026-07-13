@@ -1,6 +1,6 @@
 # BookVerse AI Category Report
 
-Ngày cập nhật sau rehearsal: 13/07/2026
+Ngày tạo: 2026-07-13T15:42:36.518Z
 
 ## 1. Hiện trạng
 
@@ -72,6 +72,7 @@ Ngày cập nhật sau rehearsal: 13/07/2026
 | Category không có sách | 844 |
 | Chưa map canonical | 0 |
 
+<!-- CATEGORY_REHEARSAL_RESULTS -->
 ## 6. Migration
 
 Migration `20260712153000_add_category_hierarchy_and_canonical_fields` chỉ thêm field/FK/index nullable, không xóa column, không đổi primary key và không sửa `Book.categoryId`.

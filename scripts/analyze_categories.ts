@@ -41,6 +41,8 @@ interface CategoryMappingFile {
   entries: CategoryCanonicalEntry[];
 }
 
+const REHEARSAL_RESULTS_MARKER = "<!-- CATEGORY_REHEARSAL_RESULTS -->";
+
 function categoryId(value: number): string {
   return "C" + String(value).padStart(3, "0");
 }
@@ -69,7 +71,8 @@ function duplicateNameGroups(categories: DatasetCategory[]): Array<{ name: strin
   return [...groups.values()].filter((group) => group.ids.length > 1);
 }
 
-function buildReportMarkdown(analysis: {
+function buildReportMarkdown(
+  analysis: {
   generatedAt: string;
   sourceChecksum: string;
   mappingChecksum: string;
@@ -88,8 +91,10 @@ function buildReportMarkdown(analysis: {
   canonicalGroups: Record<string, number>;
   booksByCanonicalGroup: Record<string, number>;
   confidence: Record<string, number>;
-  unmapped: number;
-}): string {
+    unmapped: number;
+  },
+  preservedRehearsalSection?: string,
+): string {
   const canonicalRows = Object.keys(analysis.canonicalGroups)
     .sort()
     .map(
@@ -103,6 +108,39 @@ function buildReportMarkdown(analysis: {
         " |",
     )
     .join("\n");
+
+  const defaultRehearsalSection = [
+    REHEARSAL_RESULTS_MARKER,
+    "## 6. Migration",
+    "",
+    "Migration chỉ thêm field/FK/index nullable, không xóa column, không đổi primary key và không sửa Book.categoryId.",
+    "",
+    "## 7. Backfill",
+    "",
+    "Backfill đọc data/derived/category-canonical-map.json, kiểm tra checksum nguồn, orphan/cycle/self-parent/level trước transaction và có dry-run/execute riêng.",
+    "",
+    "## 8. Test",
+    "",
+    "Unit test bao phủ mapping, unmapped, orphan, self-parent, cycle, depth và deterministic output. Integration test phải chạy trên bookverse_ai_test.",
+    "",
+    "## 9. Limitations",
+    "",
+    "- 2.157 tên child là synthetic; canonical signal chỉ dựa trên root đã review.",
+    "- Canonical group là taxonomy phục vụ kỹ thuật, không thay thế category gốc.",
+    "- Không công bố metric recommendation mới trong lượt này.",
+    "",
+    "## 10. Rollback",
+    "",
+    "Rollback ứng dụng trước; các field mới nullable nên code cũ vẫn hoạt động. Chỉ drop field/index/FK bằng migration riêng sau khi xác minh.",
+    "",
+    "## 11. Demo database status",
+    "",
+    "Database bookverse_ai chưa được apply migration hoặc backfill trong Lượt 1B.",
+    "",
+    "Source SHA-256: " + analysis.sourceChecksum,
+    "",
+    "Mapping SHA-256: " + analysis.mappingChecksum,
+  ].join("\n");
 
   return [
     "# BookVerse AI Category Report",
@@ -153,35 +191,7 @@ function buildReportMarkdown(analysis: {
     "| Category không có sách | " + analysis.categoriesWithoutBooks + " |",
     "| Chưa map canonical | " + analysis.unmapped + " |",
     "",
-    "## 6. Migration",
-    "",
-    "Migration chỉ thêm field/FK/index nullable, không xóa column, không đổi primary key và không sửa Book.categoryId.",
-    "",
-    "## 7. Backfill",
-    "",
-    "Backfill đọc data/derived/category-canonical-map.json, kiểm tra checksum nguồn, orphan/cycle/self-parent/level trước transaction và có dry-run/execute riêng.",
-    "",
-    "## 8. Test",
-    "",
-    "Unit test bao phủ mapping, unmapped, orphan, self-parent, cycle, depth và deterministic output. Integration test chạy trên bookverse_ai_test.",
-    "",
-    "## 9. Limitations",
-    "",
-    "- 2.157 tên child là synthetic; canonical signal chỉ dựa trên root đã review.",
-    "- Canonical group là taxonomy phục vụ kỹ thuật, không thay thế category gốc.",
-    "- Không công bố metric recommendation mới trong lượt này.",
-    "",
-    "## 10. Rollback",
-    "",
-    "Rollback ứng dụng trước; các field mới nullable nên code cũ vẫn hoạt động. Chỉ drop field/index/FK bằng migration riêng sau khi xác minh. Backup test DB phải restore được trước khi xem xét database demo.",
-    "",
-    "## 11. Demo database status",
-    "",
-    "Database bookverse_ai chưa được apply migration hoặc backfill trong Lượt 1B.",
-    "",
-    "Source SHA-256: " + analysis.sourceChecksum,
-    "",
-    "Mapping SHA-256: " + analysis.mappingChecksum,
+    preservedRehearsalSection ?? defaultRehearsalSection,
     "",
   ].join("\n");
 }
@@ -300,6 +310,23 @@ async function main(): Promise<void> {
     .filter(([, value]) => typeof value !== "object" || value === null)
     .map(([key, value]) => [csvEscape(key), csvEscape(value)].join(","));
 
+  let preservedRehearsalSection: string | undefined;
+  try {
+    const currentReport = await readFile(docsPath, "utf-8");
+    const markerIndex = currentReport.indexOf(REHEARSAL_RESULTS_MARKER);
+    if (markerIndex >= 0) {
+      preservedRehearsalSection = currentReport.slice(markerIndex).trimEnd();
+    }
+  } catch (error) {
+    const code =
+      error && typeof error === "object" && "code" in error
+        ? String((error as { code?: unknown }).code)
+        : "";
+    if (code !== "ENOENT") {
+      throw error;
+    }
+  }
+
   await Promise.all([
     writeFile(path.join(derivedDirectory, "category-canonical-map.json"), mappingText, "utf-8"),
     writeFile(
@@ -317,7 +344,7 @@ async function main(): Promise<void> {
       [reviewHeader.join(","), ...reviewRows].join("\n") + "\n",
       "utf-8",
     ),
-    writeFile(docsPath, buildReportMarkdown(analysis), "utf-8"),
+    writeFile(docsPath, buildReportMarkdown(analysis, preservedRehearsalSection), "utf-8"),
   ]);
 
   console.log(
