@@ -466,6 +466,20 @@ Trạng thái thực thi ngày 14/07/2026: **ĐÃ HOÀN THÀNH** trên `bookvers
    - Thu impression/exposure/click log thật.
    - Tạo validation window riêng trước khi thử learned ranking hoặc trọng số mới.
 
+### CHECKPOINT: F1 — Interaction Taxonomy và Recommendation Telemetry — ĐÃ HOÀN THÀNH
+
+Trạng thái thực thi ngày 15/07/2026: **ĐÃ HOÀN THÀNH** trên branch `checkpoint-f1-recommendation-telemetry`; database demo không được migrate hoặc ghi dữ liệu.
+
+1. Taxonomy versioned dùng chung gồm 22 canonical event và 38 alias; audit 18.000 legacy event có unknown = 0, không rewrite lịch sử.
+2. Request snapshot do server lưu owner, algorithm/taxonomy version, surface, profile, Book/rank/score/evidence. Client chỉ gửi requestId, Book và impression/click.
+3. Impression cần 50% viewport trong 1 giây; click bất đồng bộ không chặn navigation. Ownership, locked account, item membership, rate/body limit và database idempotency đều có test.
+4. Conversion dùng last-click, fallback last-impression trong 7 ngày; chỉ nhận strong-positive đã xác minh, loại order cancelled/refunded và event trước exposure.
+5. Migration additive đã rehearsal fresh/clone và apply trên test; telemetry cleanup về 0. Demo giữ 300 User, 24 Category, 1.200 Book, 1.200 Listing, 1.500 Order, 2.570 OrderItem và không có bảng F1.
+6. Split train/validation/final có checksum và leakage = 0. Final cũ được ghi rõ không còn unseen; F1 không tune hoặc tính final metric.
+7. Toàn bộ unit/integration/browser/regression/build/Compose pass. CTR vẫn `NOT_AVAILABLE` vì chưa có log instrumented thật.
+
+Checkpoint F2 đề xuất chỉ bắt đầu sau thời gian thu log thật: giám sát data quality, retention/privacy, dashboard CTR theo surface và tuning trên validation. Khóa model trước khi tạo một final-test mới hoàn toàn sau F1.
+
 ## 10. Acceptance criteria
 
 ### Lượt 1

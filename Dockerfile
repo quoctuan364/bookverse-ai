@@ -15,6 +15,7 @@ COPY app ./app
 COPY actions ./actions
 COPY components ./components
 COPY lib ./lib
+COPY shared ./shared
 COPY public ./public
 COPY auth.ts ./
 COPY middleware.ts* ./

@@ -1,5 +1,6 @@
 import { InteractionType, TargetType } from "@prisma/client";
 import { NextResponse } from "next/server";
+import { TAXONOMY_VERSION } from "@/lib/interaction-taxonomy";
 import { getCurrentUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
 
@@ -237,13 +238,14 @@ export async function POST(request: Request) {
         data: {
           userId,
           bookId,
-          actionType: "HIGHLIGHT",
+          actionType: "READING_HIGHLIGHT",
           metadata: {
             blockId,
             pageNumber,
             startOffset,
             endOffset,
             source: "highlight_engine",
+            taxonomyVersion: TAXONOMY_VERSION,
           },
         },
       });

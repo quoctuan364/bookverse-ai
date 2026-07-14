@@ -1,6 +1,7 @@
 "use server";
 
 import { InteractionType, ListingStatus, TargetType } from "@prisma/client";
+import { TAXONOMY_VERSION } from "@/lib/interaction-taxonomy";
 import { getCurrentUser, PermissionError, requireAuthenticatedUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
 
@@ -283,10 +284,11 @@ export async function createBookReview(
         data: {
           userId,
           bookId: cleanBookId,
-          actionType: "REVIEW",
+          actionType: "REVIEW_CREATE",
           metadata: {
             rating: safeRating,
             source: "book_detail",
+            taxonomyVersion: TAXONOMY_VERSION,
           },
         },
       }),

@@ -1,7 +1,11 @@
-import { TargetType } from "@prisma/client";
+import { RecommendationSurface, TargetType } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
+import {
+  createRecommendationRequestSnapshot,
+  syncRecommendationConversionsForUser,
+} from "@/lib/recommendation-telemetry";
 
 type DecimalLike = {
   toNumber: () => number;
@@ -41,6 +45,26 @@ function parseLimit(value: string | null): number {
   return Math.min(limit, 40);
 }
 
+async function createApiRequestSafely(
+  userId: string,
+  algorithmVersion: string,
+  items: Array<{ bookId: string; position: number; score: number; evidence?: string | null }>,
+): Promise<string | null> {
+  try {
+    return await createRecommendationRequestSnapshot({
+      userId,
+      algorithmVersion,
+      surface: RecommendationSurface.RECOMMENDATION_API,
+      candidateProfile: "persisted-recommendation-catalog",
+      filterProfile: "active-user-owned-request",
+      items,
+    });
+  } catch {
+    console.error("[api/recommendations] Không thể tạo request telemetry.");
+    return null;
+  }
+}
+
 export async function GET(request: Request) {
   try {
     const currentUser = await getCurrentUser();
@@ -73,6 +97,11 @@ export async function GET(request: Request) {
     const requestUrl = new URL(request.url);
     const limit = parseLimit(requestUrl.searchParams.get("limit"));
     const now = new Date();
+    try {
+      await syncRecommendationConversionsForUser(userId, now);
+    } catch {
+      console.error("[api/recommendations] Bỏ qua lỗi đồng bộ conversion telemetry.");
+    }
 
     const dailyRecommendations = await prisma.dailyRecommendation.findMany({
       where: {
@@ -132,10 +161,21 @@ export async function GET(request: Request) {
     });
 
     if (dailyRecommendations.length > 0) {
+      const requestId = await createApiRequestSafely(
+        userId,
+        dailyRecommendations[0]?.algorithm ?? "daily_hybrid_v1",
+        dailyRecommendations.map((item) => ({
+          bookId: item.book.id,
+          position: item.rank,
+          score: item.score,
+          evidence: item.reason ?? item.evidence[0]?.label ?? null,
+        })),
+      );
       return NextResponse.json(
         {
           success: true,
           source: "daily_recommendations",
+          requestId,
           data: dailyRecommendations.map((recommendation) => ({
             id: recommendation.id,
             rank: recommendation.rank,
@@ -228,12 +268,24 @@ export async function GET(request: Request) {
       },
     });
     const bookById = new Map(books.map((book) => [book.id, book]));
+    const validFallback = fallbackRecommendations.filter((item) => bookById.has(item.targetId));
+    const requestId = await createApiRequestSafely(
+      userId,
+      validFallback[0]?.algorithm ?? "fastapi_hybrid_v2",
+      validFallback.map((item) => ({
+        bookId: item.targetId,
+        position: item.rank,
+        score: item.score,
+        evidence: item.reason ?? item.evidence[0]?.label ?? null,
+      })),
+    );
 
     return NextResponse.json(
       {
         success: true,
         source: "recommendations",
-        data: fallbackRecommendations
+        requestId,
+        data: validFallback
           .map((recommendation) => {
             const book = bookById.get(recommendation.targetId);
 

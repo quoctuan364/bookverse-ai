@@ -1,6 +1,7 @@
 "use server";
 
 import { PostStatus, ReactionType, TargetType } from "@prisma/client";
+import { TAXONOMY_VERSION } from "@/lib/interaction-taxonomy";
 import { PermissionError, requireAuthenticatedUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
 
@@ -277,10 +278,11 @@ export async function createComment(data: CreateCommentInput): Promise<CreatePos
               data: {
                 userId,
                 bookId: post.bookId,
-                actionType: "COMMENT",
+                actionType: "COMMUNITY_COMMENT",
                 metadata: {
                   postId,
                   source: "community",
+                  taxonomyVersion: TAXONOMY_VERSION,
                 },
               },
             }),
@@ -393,11 +395,12 @@ export async function reactToPost(
               data: {
                 userId,
                 bookId: post.bookId,
-                actionType: type === ReactionType.REPORT ? "REPORT" : "REACTION",
+                actionType: type === ReactionType.REPORT ? "COMMUNITY_REPORT" : "REACTION",
                 metadata: {
                   postId: cleanPostId,
                   reactionType: type,
                   source: "community",
+                  taxonomyVersion: TAXONOMY_VERSION,
                 },
               },
             }),

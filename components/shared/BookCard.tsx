@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { BookOpen, Info, Sparkles } from "lucide-react";
+import { RecommendationTrackedLink } from "@/components/recommendation/RecommendationTrackedLink";
 import { Badge } from "@/components/ui/badge";
 
 export interface BookCardData {
@@ -14,6 +14,7 @@ export interface BookCardData {
 
 interface BookCardProps {
   book: BookCardData;
+  recommendationRequestId?: string | null;
 }
 
 const fallbackCover =
@@ -39,12 +40,18 @@ function buildMockEvidence(book: BookCardData): string {
   return reasons[seed % reasons.length];
 }
 
-export function BookCard({ book }: BookCardProps) {
+export function BookCard({ book, recommendationRequestId }: BookCardProps) {
   const evidence = book.recommendationEvidence ?? buildMockEvidence(book);
   const badgeLabel = book.recommendationEvidence || book.recommendationScore ? "AI Gợi ý" : "Sách phù hợp";
 
   return (
-    <Link aria-label={`Xem chi tiết sách ${book.title}`} className="block" href={`/book/${book.id}`}>
+    <RecommendationTrackedLink
+      aria-label={`Xem chi tiết sách ${book.title}`}
+      bookId={book.id}
+      className="block"
+      href={`/book/${book.id}`}
+      requestId={recommendationRequestId}
+    >
       <article className="group overflow-hidden rounded-2xl border border-white/10 bg-slate-950/72 text-zinc-100 shadow-[0_24px_70px_rgba(0,0,0,0.26)] backdrop-blur-2xl transition-all duration-300 hover:-translate-y-1 hover:border-[#0F766E]/45 hover:shadow-[0_28px_90px_rgba(0,0,0,0.36)]">
         <div className="relative aspect-[2/3] overflow-hidden bg-zinc-900">
           <img
@@ -86,6 +93,6 @@ export function BookCard({ book }: BookCardProps) {
           </span>
         </div>
       </article>
-    </Link>
+    </RecommendationTrackedLink>
   );
 }

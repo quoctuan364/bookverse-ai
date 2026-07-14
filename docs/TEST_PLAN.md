@@ -112,3 +112,34 @@ Category integration được đọc legacy demo nhưng không ghi. Assistant v�
 - `ai_service/main.py`, production weight, API, Prisma schema/migration và database demo không đổi.
 
 Chỉ khi mọi điều kiện trên đạt mới ghi Checkpoint E hoàn thành. Metric thấp không phải lý do sửa trọng số trên test; phải được báo cáo như hạn chế và đầu vào cho checkpoint sau.
+
+## 8. Kế hoạch kiểm thử Checkpoint F1 — Interaction Taxonomy và Telemetry
+
+### 8.1. Unit và parity
+
+- Taxonomy TypeScript/Python cùng version, checksum, event và alias.
+- Alias đúng, unknown fail/report, required field được kiểm tra.
+- Ownership, locked user, Book ngoài request và client payload giả bị từ chối.
+- Impression/click idempotent; conversion theo last-click/fallback last-impression, đúng cửa sổ và không nhận conversion trước exposure.
+- `CANCELLED`/`REFUNDED` không tạo conversion; CTR chỉ dùng impression thật.
+- Train/validation/final không overlap hoặc dùng future event.
+
+### 8.2. PostgreSQL integration
+
+Chỉ dùng `bookverse_ai_test`: tạo user/request/item cô lập; ghi impression/click/conversion; thử non-owner, locked user, arbitrary Book và concurrency; sau đó cleanup và đối chiếu count trước/sau. Có backup/checksum, fresh migration và clone rehearsal trước khi apply test. Tuyệt đối không migrate database demo.
+
+### 8.3. Browser
+
+- Card ngoài viewport không tạo impression.
+- Card ≥50% liên tục ≥1 giây tạo đúng một impression.
+- Scroll ra/vào hoặc rerender không ghi trùng.
+- Click tạo event và vẫn điều hướng.
+- Xóa request fixture để ép API trả lỗi; UI vẫn điều hướng và không có console error.
+
+### 8.4. Regression và cổng phát hành
+
+Chạy Prisma validate/generate, migration rehearsal, TypeScript unit/typecheck, Python compile/pytest, taxonomy parity, telemetry integration, production parity, tái lập Checkpoint E, Assistant/Category/Stock integration, browser, Next production build, Docker Compose config và build image. Chỉ ghi PASS khi exit code 0.
+
+### 8.5. Tiêu chí kết luận F1
+
+Telemetry phải phân biệt request/impression/click/conversion, server giữ ownership/rank/score/version, idempotency qua database, split ba cửa sổ không leakage, production ranking không đổi và dữ liệu test được cleanup. CTR giữ `NOT_AVAILABLE` cho tới khi có log instrumented thật.

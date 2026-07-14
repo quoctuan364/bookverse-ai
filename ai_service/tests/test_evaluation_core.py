@@ -15,6 +15,7 @@ from ai_service.evaluation.core import (
     rank_behavior_candidates,
     seeded_random_rank,
     stable_temporal_split,
+    stable_three_way_temporal_split,
     validate_event_frame,
 )
 
@@ -150,3 +151,27 @@ def test_behavior_neighbors_are_built_only_from_train_pairs() -> None:
     )
     neighbors = build_behavior_neighbors(source)
     assert neighbors["B1"]["B2"] == pytest.approx(1.0)
+
+
+def test_three_way_temporal_split_has_no_leakage() -> None:
+    source = events(
+        [
+            ("T1", "U1", "B1", "BOOKMARK", "2026-05-31T05:00:00"),
+            ("V1", "U1", "B2", "FAVORITE", "2026-06-01T05:00:00"),
+            ("V2", "U2", "B3", "PURCHASE", "2026-06-19T05:00:00"),
+            ("F1", "U2", "B4", "POSITIVE_REVIEW", "2026-06-20T05:00:00"),
+        ]
+    )
+    train, validation, final_test = stable_three_way_temporal_split(
+        source, "2026-06-01", "2026-06-20"
+    )
+    assert train["eventId"].tolist() == ["T1"]
+    assert validation["eventId"].tolist() == ["V1", "V2"]
+    assert final_test["eventId"].tolist() == ["F1"]
+    assert set(train["eventId"]).isdisjoint(validation["eventId"])
+    assert set(validation["eventId"]).isdisjoint(final_test["eventId"])
+
+
+def test_three_way_split_rejects_invalid_cutoff_order() -> None:
+    with pytest.raises(ValueError, match="validation_start"):
+        stable_three_way_temporal_split(events([]), "2026-06-20", "2026-06-01")

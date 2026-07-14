@@ -141,6 +141,20 @@ npm run evaluation:ai
 
 Mỗi run tạo JSON, CSV và Markdown mới trong `outputs/evaluation/<run-id>`; thư mục này không được commit. Hai lượt kiểm chứng ngày 14/07/2026 cho cùng checksum chuẩn hóa `ef61b3fc02a4d18735fa3d446815d910bbadb989fdfd7d6286dca6b4fc8c568e`. Kết quả hiện còn thấp: Behavior có HitRate@10 cao nhất `0,021008`, còn Hybrid production là `0,008403`; không được chỉnh trọng số theo test để làm metric đẹp hơn. Xem phân tích, công thức và giới hạn tại `docs/AI_EVALUATION.md`.
 
+## Interaction taxonomy và recommendation telemetry — Checkpoint F1
+
+Taxonomy dùng chung nằm tại `shared/interaction-taxonomy.v1.json`; tài liệu chi tiết ở `docs/INTERACTION_TAXONOMY.md`. Recommendation engine ghi bốn giai đoạn riêng: request do server tạo, impression khi card thấy ít nhất 50% trong 1 giây, click không chặn điều hướng và conversion được server xác minh. Contract, attribution 7 ngày, idempotency và privacy nằm tại `docs/RECOMMENDATION_TRACKING.md`.
+
+```powershell
+npm run data:analyze-interactions
+npm run test:taxonomy-parity
+npm run test:telemetry-integration
+python -m pytest ai_service/tests -q
+python ai_service/prepare_temporal_split.py
+```
+
+Integration và split chỉ dùng `bookverse_ai_test`. Ba cửa sổ hiện tại là train trước 01/06/2026, validation từ 01/06 đến trước 20/06 và final từ 20/06. Final hiện không còn unseen vì đã được xem ở Checkpoint E; không dùng nó để tune. CTR production vẫn là `NOT_AVAILABLE` vì dữ liệu cũ synthetic và chưa có kỳ thu thập impression/click instrumented thật.
+
 ## Cấu hình pgvector và RAG Chatbot
 
 Database trong `docker-compose.yml` đã pin image `pgvector/pgvector:0.8.5-pg16`. Nếu đang dùng container PostgreSQL cũ, chỉ recreate service `db` sau khi đã backup và đi đúng `docs/DEPLOYMENT.md`; luôn giữ nguyên volume:

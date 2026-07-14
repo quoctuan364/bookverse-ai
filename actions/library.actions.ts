@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { InteractionType, OrderStatus, TargetType } from "@prisma/client";
+import { TAXONOMY_VERSION } from "@/lib/interaction-taxonomy";
 import prisma from "@/lib/prisma";
 import { PermissionError, requireAuthenticatedUser } from "@/lib/permissions";
 
@@ -322,11 +323,24 @@ export async function toggleFavoriteBook(bookId: string): Promise<FavoriteAction
     });
 
     if (existingFavorite) {
-      await prisma.favoriteBook.delete({
-        where: {
-          id: existingFavorite.id,
-        },
-      });
+      await prisma.$transaction([
+        prisma.favoriteBook.delete({
+          where: {
+            id: existingFavorite.id,
+          },
+        }),
+        prisma.interactionEvent.create({
+          data: {
+            userId: user.id,
+            bookId: cleanBookId,
+            actionType: "FAVORITE_REMOVE",
+            metadata: {
+              source: "book_detail",
+              taxonomyVersion: TAXONOMY_VERSION,
+            },
+          },
+        }),
+      ]);
 
       revalidatePath("/library");
       revalidatePath(`/book/${cleanBookId}`);
@@ -349,9 +363,10 @@ export async function toggleFavoriteBook(bookId: string): Promise<FavoriteAction
         data: {
           userId: user.id,
           bookId: cleanBookId,
-          actionType: "FAVORITE",
+          actionType: "FAVORITE_ADD",
           metadata: {
             source: "book_detail",
+            taxonomyVersion: TAXONOMY_VERSION,
           },
         },
       }),

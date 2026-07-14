@@ -33,11 +33,12 @@ from ai_service.evaluation.core import (
     validate_event_frame,
 )
 from ai_service.evaluation.database import EvaluationData
+from ai_service.evaluation.taxonomy import map_legacy_interaction_event
 
 
 VALID_PURCHASE_STATUSES = frozenset({"PAID", "PAID_DEMO", "SHIPPED", "COMPLETED"})
 CANCELLED_PURCHASE_STATUSES = frozenset({"CANCELLED", "REFUNDED"})
-PRODUCTION_INTERACTION_TYPES = frozenset({"READ", "BOOKMARK", "VIEW"})
+PRODUCTION_INTERACTION_TYPES = frozenset({"READING_START", "BOOKMARK_ADD", "BOOK_VIEW"})
 READING_TIME_THRESHOLD_SECONDS = 300
 READING_PROGRESS_THRESHOLD_PERCENT = 50.0
 DEFAULT_CUTOFF = "2026-06-01T00:00:00"
@@ -112,15 +113,21 @@ def build_positive_events(data: EvaluationData) -> pd.DataFrame:
     return validate_event_frame(events, POSITIVE_EVENT_TYPES)
 
 
+def _canonical_production_interactions(
+    interactions: pd.DataFrame,
+    cutoff: pd.Timestamp,
+) -> pd.DataFrame:
+    train = interactions[interactions["createdAt"] < cutoff].copy()
+    train["actionType"] = train["actionType"].astype(str).map(map_legacy_interaction_event)
+    return train[train["actionType"].isin(PRODUCTION_INTERACTION_TYPES)].copy()
+
+
 def _build_train_feature_events(
     data: EvaluationData,
     positive_train: pd.DataFrame,
     cutoff: pd.Timestamp,
 ) -> pd.DataFrame:
-    interaction_train = data.interactions[
-        (data.interactions["createdAt"] < cutoff)
-        & data.interactions["actionType"].isin(PRODUCTION_INTERACTION_TYPES)
-    ]
+    interaction_train = _canonical_production_interactions(data.interactions, cutoff)
     interaction_events = pd.DataFrame(
         {
             "eventId": "interaction:" + interaction_train["eventId"].astype(str),
@@ -253,10 +260,9 @@ def _production_feature_groups(
         .agg(bookmarkCount=("bookmarkId", "size"))
     )
 
-    interaction_rows = data.interactions[
-        (data.interactions["createdAt"] < cutoff)
-        & data.interactions["actionType"].isin(PRODUCTION_INTERACTION_TYPES)
-    ].merge(metadata, on="bookId", how="inner")
+    interaction_rows = _canonical_production_interactions(data.interactions, cutoff).merge(
+        metadata, on="bookId", how="inner"
+    )
     interactions = (
         interaction_rows.groupby(
             [

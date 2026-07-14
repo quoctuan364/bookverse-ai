@@ -289,3 +289,23 @@ Không dùng URL database demo. Loader sẽ từ chối trước khi đọc nế
 - Thử learned ranking hoặc calibrated hybrid sau khi đủ log thật.
 - Theo dõi metric theo cohort với cỡ mẫu tối thiểu và confidence interval.
 - Không triển khai trọng số mới chỉ vì một run test có số đẹp hơn.
+
+## 19. Bổ sung Checkpoint F1 — taxonomy và ba cửa sổ temporal
+
+Checkpoint F1 không tune model, không thay production weight và không quảng cáo metric mới. Loader dùng taxonomy version `interaction-taxonomy.v1`; alias legacy được chuẩn hóa khi đọc và unknown event phải xuất hiện trong report hoặc làm validation fail.
+
+Ba cửa sổ được khóa theo phân bố thời gian, không dựa trên metric:
+
+| Window | Khoảng thời gian | Positive events | Users | Books |
+|---|---|---:|---:|---:|
+| Train | `< 2026-06-01` | 12.206 | 1.100 | 2.189 |
+| Validation | `2026-06-01` đến `< 2026-06-20` | 1.405 | 759 | 1.032 |
+| Final test | `>= 2026-06-20` | 1.188 | 687 | 883 |
+
+Manifest checksum: `545b12103c6f3c058363cc4249c6c7e419b4ed848a29e456d6c572e5f3e39df8`. Assertion xác nhận event overlap bằng 0, train không lọt sang validation, validation không lọt sang final và thứ tự thời gian hợp lệ.
+
+Validation là cửa sổ duy nhất được phép dùng để chọn model/weight trong checkpoint sau. Final test hiện **không còn unseen**, vì khoảng thời gian đó đã được quan sát trong Checkpoint E. Test cuối thực sự unseen phải lấy từ telemetry instrumented phát sinh sau F1; F1 không tính final-test metric.
+
+Ba lượt chạy lại Checkpoint E sau F1 cùng checksum `5805f444ca12a74f4d4aba2da35685a6bca4f99360ec6993c10ae3a336a76332`. Checksum artifact đổi do config/source provenance có thêm F1, nhưng `metrics`, `stats` và `leakage` bằng đúng artifact E cũ. Production parity giữ 30/30 row của ba user, max score delta = 0.
+
+CTR tiếp tục là `NOT_AVAILABLE`: 18.000 event cũ là synthetic và không có impression thật; request hoặc `BOOK_VIEW` không được dùng thay mẫu số impression.

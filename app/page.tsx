@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Bot, BookOpen, Search, Sparkles, Store } from "lucide-react";
 import { getRecommendedBooks } from "@/actions/recommendation.actions";
+import { RecommendationTrackedLink } from "@/components/recommendation/RecommendationTrackedLink";
 import { BookCard } from "@/components/shared/BookCard";
 import { getCurrentUser } from "@/lib/permissions";
 
@@ -10,7 +11,8 @@ export default async function HomePage() {
   const currentUser = await getCurrentUser();
   const userId = currentUser && !currentUser.isLocked ? currentUser.id : undefined;
   const userName = currentUser && !currentUser.isLocked ? currentUser.name ?? "bạn" : "bạn";
-  const recommendedBooks = await getRecommendedBooks(userId);
+  const recommendationBatch = await getRecommendedBooks();
+  const recommendedBooks = recommendationBatch.books;
   const sectionTitle = userId ? `Gợi ý dành riêng cho bạn, ${userName}` : "Sách nổi bật hôm nay";
   const heroBooks = recommendedBooks.slice(0, 5);
 
@@ -74,10 +76,12 @@ export default async function HomePage() {
             <div className="absolute inset-0 overflow-hidden rounded-lg border border-white/15 bg-white/10 p-5 shadow-[0_24px_70px_rgba(0,0,0,0.22)] backdrop-blur">
               <div className="grid h-full grid-cols-5 items-end gap-3">
                 {heroBooks.map((book, index) => (
-                  <Link
+                  <RecommendationTrackedLink
+                    bookId={book.id}
                     className="group block"
                     href={`/book/${book.id}`}
                     key={book.id}
+                    requestId={recommendationBatch.requestId}
                     style={{ transform: `translateY(${index % 2 === 0 ? "18px" : "-10px"})` }}
                   >
                     <img
@@ -85,7 +89,7 @@ export default async function HomePage() {
                       className="aspect-[2/3] w-full rounded-lg object-cover shadow-[0_18px_34px_rgba(0,0,0,0.28)] transition duration-300 group-hover:-translate-y-2"
                       src={book.coverImage ?? "/covers/flat/book-0001.svg"}
                     />
-                  </Link>
+                  </RecommendationTrackedLink>
                 ))}
               </div>
             </div>
@@ -118,7 +122,11 @@ export default async function HomePage() {
         {recommendedBooks.length > 0 ? (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {recommendedBooks.map((book) => (
-              <BookCard book={book} key={book.id} />
+              <BookCard
+                book={book}
+                key={book.id}
+                recommendationRequestId={recommendationBatch.requestId}
+              />
             ))}
           </div>
         ) : (

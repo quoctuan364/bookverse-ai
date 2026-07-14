@@ -34,7 +34,8 @@ services:
 
   ai_service:
     build:
-      context: ./ai_service
+      context: .
+      dockerfile: ai_service/Dockerfile
     container_name: bookverse-ai-service
     restart: unless-stopped
     environment:

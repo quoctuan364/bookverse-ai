@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { InteractionType, TargetType } from "@prisma/client";
+import { TAXONOMY_VERSION } from "@/lib/interaction-taxonomy";
 import { getCurrentUser, requireAuthenticatedUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
 
@@ -402,11 +403,25 @@ export async function toggleBookmark(
     });
 
     if (existingBookmark) {
-      await prisma.bookmark.delete({
-        where: {
-          id: existingBookmark.id,
-        },
-      });
+      await prisma.$transaction([
+        prisma.bookmark.delete({
+          where: {
+            id: existingBookmark.id,
+          },
+        }),
+        prisma.interactionEvent.create({
+          data: {
+            userId,
+            bookId: cleanBookId,
+            actionType: "BOOKMARK_REMOVE",
+            metadata: {
+              pageNumber: safePageNumber,
+              source: "online_reader",
+              taxonomyVersion: TAXONOMY_VERSION,
+            },
+          },
+        }),
+      ]);
 
       return { success: true, message: "Đã bỏ đánh dấu trang." };
     }
@@ -463,11 +478,12 @@ export async function saveHighlight(
         data: {
           userId,
           bookId: cleanBookId,
-          actionType: "HIGHLIGHT",
+          actionType: "READING_HIGHLIGHT",
           metadata: {
             pageNumber: safePageNumber,
             note: cleanNote,
             source: "online_reader",
+            taxonomyVersion: TAXONOMY_VERSION,
           },
         },
       }),
@@ -515,9 +531,11 @@ export async function logInteraction(
         data: {
           userId,
           bookId: cleanBookId,
-          actionType,
+          actionType: actionType === "READ" ? "READING_START" : "BOOKMARK_ADD",
           metadata: {
+            legacyEvent: actionType,
             source: "online_reader",
+            taxonomyVersion: TAXONOMY_VERSION,
           },
         },
       }),

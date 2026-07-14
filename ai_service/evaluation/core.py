@@ -83,6 +83,38 @@ def stable_temporal_split(
     return train.reset_index(drop=True), test.reset_index(drop=True)
 
 
+def stable_three_way_temporal_split(
+    events: pd.DataFrame,
+    validation_start: str | pd.Timestamp,
+    final_test_start: str | pd.Timestamp,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Tách train/validation/final-test theo hai cutoff cố định."""
+    validated = validate_event_frame(events)
+    validation_cutoff = normalize_cutoff(validation_start)
+    final_cutoff = normalize_cutoff(final_test_start)
+    if validation_cutoff >= final_cutoff:
+        raise ValueError("validation_start phải trước final_test_start.")
+
+    train = validated[validated["timestamp"] < validation_cutoff].copy()
+    validation = validated[
+        (validated["timestamp"] >= validation_cutoff)
+        & (validated["timestamp"] < final_cutoff)
+    ].copy()
+    final_test = validated[validated["timestamp"] >= final_cutoff].copy()
+    frames = [train, validation, final_test]
+    names = ["train", "validation", "final_test"]
+    for index, left in enumerate(frames):
+        for right in frames[index + 1 :]:
+            if set(left["eventId"]) & set(right["eventId"]):
+                raise AssertionError("Event xuất hiện trong nhiều temporal window.")
+    for left_index in range(2):
+        left = frames[left_index]
+        right = frames[left_index + 1]
+        if not left.empty and not right.empty and not left["timestamp"].max() < right["timestamp"].min():
+            raise AssertionError(f"Temporal window {names[left_index]} chồng {names[left_index + 1]}.")
+    return tuple(frame.reset_index(drop=True) for frame in frames)  # type: ignore[return-value]
+
+
 def deduplicate_user_book_events(events: pd.DataFrame) -> pd.DataFrame:
     """Giữ positive sớm nhất; eventId là tie-breaker khi timestamp bằng nhau."""
     if events.empty:

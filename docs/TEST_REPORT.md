@@ -298,3 +298,118 @@ Thêm module evaluator thuần, loader read-only, runner, pytest/fixture, dev re
 ## E.8. Hạn chế và hành động tiếp theo
 
 Dataset synthetic, taxonomy interaction chưa đồng nhất, thiếu lịch sử trạng thái catalog, thiếu impression log và cohort sparse quá nhỏ. Checkpoint tiếp theo cần chuẩn hóa event taxonomy, thu log exposure thật và tạo validation window riêng trước khi thử trọng số/model mới; không tune trên test Checkpoint E.
+
+---
+
+# Báo cáo kiểm thử Checkpoint F1 — Interaction Taxonomy và Recommendation Telemetry
+
+Ngày chạy cuối: 15/07/2026.
+
+## F1.1. Kết luận
+
+Checkpoint F1 hoàn thành đủ cổng. Taxonomy được dùng chung giữa TypeScript/Python; request, impression, click và conversion có contract riêng; split ba cửa sổ không leakage. Không đổi production recommendation weight, không sửa dataset gốc và không migrate database demo.
+
+## F1.2. Git
+
+- Baseline xác minh: `3a22912c677d2ff393dad3180f04951f1351adc9`.
+- Branch: `checkpoint-f1-recommendation-telemetry`.
+- Không có remote, không push, không commit dump/output/runtime fixture.
+
+## F1.3. Inventory interaction
+
+| Event/nguồn cũ | Nơi lưu hoặc phát sinh | Field/thời gian chính | Vấn đề trước F1 | Canonical |
+|---|---|---|---|---|
+| VIEW/BOOK_VIEW | `InteractionEvent`, tracking action | user, Book, createdAt | Hai tên | `BOOK_VIEW` |
+| SEARCH | `InteractionEvent` | user, query/target, createdAt | Query có thể nhạy cảm | `SEARCH` |
+| READ/READING | `InteractionEvent`, `ReadingSession` | user, Book, progress/time | Tên và ngưỡng chưa thống nhất | `READING_START/PROGRESS/COMPLETE` |
+| BOOKMARK | `Bookmark`, `InteractionEvent` | user, Book, page, createdAt | Add/remove chưa tách | `BOOKMARK_ADD/REMOVE` |
+| FAVORITE | `FavoriteBook` | user, Book, createdAt | Add/remove chưa tách | `FAVORITE_ADD/REMOVE` |
+| CART_ADD | Order/cart flow, `InteractionEvent` | user, Book/listing, time | Chưa phải purchase | `CART_ADD` |
+| PURCHASE | `Order` + `OrderItem`, `InteractionEvent` | buyer, Book, status, createdAt | Legacy event thiếu orderId | `PURCHASE` sau xác minh order |
+| REVIEW | `Review`, `InteractionEvent` | user, Book, rating, createdAt | Legacy event thiếu rating | `REVIEW_CREATE` |
+| COMMENT | Community action | user, post/Book, createdAt | Tên chung | `COMMUNITY_COMMENT` |
+| REACTION/LIKE | Community action, `InteractionEvent` | user, target, createdAt | Alias và legacy thiếu target | `REACTION` |
+| Recommendation | `Recommendation`, `DailyRecommendation`, `RecommendationEvidence` | user, Book, score/evidence/time | Record không chứng minh exposure | `RECOMMENDATION_REQUEST` khi server snapshot |
+| Assistant Book link | Assistant response/UI | session/user, validated Book | Không thuộc recommendation engine | Không ghi recommendation click |
+
+## F1.4. Canonical taxonomy và legacy audit
+
+Taxonomy có 22 canonical event, 38 alias, checksum `e3931aa11d58e19b5f125dfbf3c32afc2a9f28193b753f691df4b0cd367b7c47`. Audit read-only: 18.000/18.000 event map được; unknown 0; duplicate 0; thiếu user/Book/timestamp 0; toàn bộ là synthetic. Required field legacy còn thiếu ở 1.587 purchase, 1.587 reaction và 1.664 review; chỉ report, không rewrite.
+
+## F1.5. Request, impression, click và conversion
+
+- Request do server tạo và lưu owner/version/taxonomy/surface/profile cùng Book/rank/score/evidence.
+- Impression chỉ ghi sau 50% viewport liên tục 1 giây, không ghi lúc API response/render.
+- Click xác minh owner và Book membership, dùng server timestamp, gửi bất đồng bộ nên không chặn navigation.
+- Conversion dùng last-click, fallback last-impression, mặc định 7 ngày; cùng user/Book, sau exposure; loại cancelled/refunded và chống đếm trùng nguồn.
+
+## F1.6. Security và idempotency
+
+Session cung cấp userId; server đọc lại user và `isLocked`, không hỗ trợ anonymous F1. Body tối đa 2.048 byte, rate limit 120/phút/user, payload chỉ nhận requestId/Book/event type. Unique constraint bảo vệ request–Book, request–position và deduplication key; lỗi telemetry không làm hỏng UI.
+
+## F1.7. Migration rehearsal
+
+Backup test trước migration: `backups/checkpoint-f1/bookverse_ai_test_pre_f1_20260715T005944.dump`, SHA-256 `1ae75f765817d5d3a889514f23f7fc902e6f47156c40a877c6217c04443d5099`; `pg_restore --list` đọc được.
+
+- Fresh database: chạy đủ 12 migration từ rỗng, chạy lần hai báo không còn migration.
+- Clone từ backup: apply migration F1, count User/Category/Book 2.200, InteractionEvent 18.000, Recommendation 4.200 giữ nguyên; chạy lần hai idempotent.
+- `bookverse_ai_test`: apply thành công; chạy lần hai không còn migration.
+- Hai database rehearsal tạm đã được xóa; backup không commit. Migration chỉ additive và không backfill.
+
+## F1.8. Temporal split
+
+| Window | Positive events | Users | Books |
+|---|---:|---:|---:|
+| Train `< 01/06` | 12.206 | 1.100 | 2.189 |
+| Validation `01/06–<20/06` | 1.405 | 759 | 1.032 |
+| Final `>=20/06` | 1.188 | 687 | 883 |
+
+Manifest checksum `545b12103c6f3c058363cc4249c6c7e419b4ed848a29e456d6c572e5f3e39df8`; overlap và event sai cửa sổ đều 0. Final hiện không còn unseen do Checkpoint E đã xem khoảng này; F1 không tính final metric và không tune.
+
+## F1.9. CTR
+
+Policy là click hợp lệ chia impression hợp lệ trong cùng surface/thời gian. Không dùng request làm impression hoặc BOOK_VIEW làm click. **CTR production = `NOT_AVAILABLE`** vì lịch sử synthetic, còn fixture instrumented đã cleanup và không đại diện người dùng thật.
+
+## F1.10. Unit, integration và browser
+
+- TypeScript: 74/74 test pass.
+- Python: 21 pass, 1 skip; PostgreSQL integration riêng 1 pass.
+- Telemetry integration trước/sau: User 2.200; request/item/event đều 0. Trong fixture: 3 request, 4 item, 5 event; non-owner, locked user, Book ngoài request, concurrency, attribution và cleanup đều pass.
+- Browser: 5 card đầu viewport ghi đúng một impression; 5 card ngoài viewport chưa ghi trước scroll, sau dwell ghi đúng một lần; scroll ra/vào không trùng. Click ghi đúng một event và điều hướng. Khi request bị xóa để endpoint trả 404, click vẫn điều hướng và console không lỗi. Fixture user/request/event đã xóa hoàn toàn.
+
+## F1.11. Regression
+
+- Production recommendation parity: 3 user, 30 row, cùng Book/evidence, max score delta 0.
+- Ba lượt E mới cùng checksum `5805f444ca12a74f4d4aba2da35685a6bca4f99360ec6993c10ae3a336a76332`; metrics/stats/leakage bằng artifact E cũ.
+- Category: 2.200 category, 43 root, 2.157 child, 27 group; legacy demo chỉ đọc.
+- Stock 11/11 pass và cleanup; Assistant contract d1 pass và cleanup.
+- Next build, web image, AI image import/smoke và Compose config pass.
+
+## F1.12. Command và exit code
+
+| Command/nhóm lệnh | Exit code | Kết quả |
+|---|---:|---|
+| `npx prisma validate` / `npx prisma generate` | 0/0 | PASS |
+| Fresh/clone/test `prisma migrate deploy` và lượt idempotent | 0 | PASS |
+| `npm run typecheck` | 0 | PASS |
+| `npm run test:unit` | 0 | PASS, 74/74 |
+| `python -m compileall -q ai_service` | 0 | PASS |
+| `python -m pytest ai_service/tests -q` | 0 | PASS, 21 pass/1 skip |
+| Python PostgreSQL integration | 0 | PASS, 1/1 |
+| `npm run test:taxonomy-parity` | 0 | PASS |
+| `npm run test:telemetry-integration` | 0 | PASS, cleanup 0 |
+| Browser tracking bằng in-app browser | N/A | ĐẠT; browser assertions và DB query đều đúng, công cụ không trả process exit code |
+| Ba lượt `python ai_service/evaluate.py` và parity | 0 | PASS |
+| Category/Assistant/Stock integration | 0 | PASS |
+| `npm run build` | 0 | PASS |
+| `docker compose config --quiet` | 0 | PASS |
+| `docker compose build web ai_service` | 0 | PASS |
+| AI image taxonomy/import smoke | 0 | PASS |
+
+## F1.13. Database demo
+
+Đối chiếu cuối bằng query read-only: 300 User, 24 Category, 1.200 Book, 1.200 Listing, 1.500 Order, 2.570 OrderItem; đúng số trước F1. Cả ba bảng `recommendation_*` F1 đều không tồn tại. Không chạy migration, backfill, seed hoặc telemetry write trên `bookverse_ai`.
+
+## F1.14. Hạn chế và F2
+
+Dữ liệu lịch sử synthetic, required field legacy chưa đầy đủ, chưa có telemetry người dùng thật và final window cũ không unseen. F2 nên thu log thật đủ thời gian, thêm data-quality/retention monitoring và dashboard theo surface; chỉ tune trên validation. Sau khi khóa model mới tạo final test post-F1 hoàn toàn chưa xem.

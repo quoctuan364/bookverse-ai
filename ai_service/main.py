@@ -11,6 +11,8 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
 
+from ai_service.evaluation.taxonomy import map_legacy_interaction_event
+
 
 DEFAULT_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/bookverse_ai"
 MAX_RECOMMENDATIONS = 10
@@ -178,7 +180,7 @@ def get_user_bookmarks(user_id: str) -> pd.DataFrame:
 
 
 def get_user_interaction_events(user_id: str) -> pd.DataFrame:
-    return read_dataframe(
+    interactions = read_dataframe(
         f"""
         SELECT
           ie."bookId" AS "bookId",
@@ -193,13 +195,33 @@ def get_user_interaction_events(user_id: str) -> pd.DataFrame:
         JOIN "Category" c ON c.id = b."categoryId"
         {CATEGORY_PARENT_JOIN_SQL}
         WHERE ie."userId" = :user_id
-          AND ie."actionType" IN ('READ', 'BOOKMARK', 'VIEW')
         GROUP BY
           ie."bookId", ie."actionType", b.title, b."authorName",
           {CATEGORY_FEATURE_SQL}, {CATEGORY_NAME_SQL}
         """,
         {"user_id": user_id},
     )
+    if interactions.empty:
+        return interactions
+
+    interactions["actionType"] = interactions["actionType"].astype(str).map(
+        map_legacy_interaction_event
+    )
+    interactions = interactions[
+        interactions["actionType"].isin({"READING_START", "BOOKMARK_ADD", "BOOK_VIEW"})
+    ]
+    if interactions.empty:
+        return interactions
+
+    group_columns = [
+        "bookId",
+        "actionType",
+        "title",
+        "authorName",
+        "categoryId",
+        "categoryName",
+    ]
+    return interactions.groupby(group_columns, as_index=False).agg(eventCount=("eventCount", "sum"))
 
 
 def get_user_purchases(user_id: str) -> pd.DataFrame:
@@ -297,7 +319,7 @@ def build_reading_preference_scores(
             add_score(author_scores, str(getattr(row, "authorName")), score * 0.6)
 
     if not interaction_events.empty:
-        event_weights = {"READ": 3.0, "BOOKMARK": 4.0, "VIEW": 1.0}
+        event_weights = {"READING_START": 3.0, "BOOKMARK_ADD": 4.0, "BOOK_VIEW": 1.0}
         for row in interaction_events.itertuples(index=False):
             action_type = str(getattr(row, "actionType"))
             event_count = float(getattr(row, "eventCount") or 0)
@@ -360,7 +382,7 @@ def build_excluded_book_ids(
 
     if not interaction_events.empty:
         read_or_bookmarked = interaction_events[
-            interaction_events["actionType"].isin(["READ", "BOOKMARK"])
+            interaction_events["actionType"].isin(["READING_START", "BOOKMARK_ADD"])
         ]
         excluded_book_ids.update(read_or_bookmarked["bookId"].dropna().astype(str).tolist())
 

@@ -2,6 +2,11 @@
 
 import { getCurrentUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
+import {
+  TAXONOMY_VERSION,
+  mapLegacyInteractionEvent,
+  validateCanonicalEventFields,
+} from "@/lib/interaction-taxonomy";
 
 export type TrackingInteractionType =
   | "VIEW"
@@ -28,14 +33,31 @@ export async function logInteraction(
       return;
     }
 
+    const canonicalEvent = mapLegacyInteractionEvent(type);
+    if (!canonicalEvent) {
+      throw new Error(`Interaction type không thuộc taxonomy: ${type}.`);
+    }
+    const createdAt = new Date();
+    const validation = validateCanonicalEventFields(canonicalEvent, {
+      userId,
+      bookId: cleanBookId,
+      timestamp: createdAt,
+    });
+    if (!validation.valid) {
+      throw new Error(`Interaction thiếu field: ${validation.missingFields.join(", ")}.`);
+    }
+
     await prisma.interactionEvent.create({
       data: {
         userId,
         bookId: cleanBookId,
-        actionType: type,
+        actionType: canonicalEvent,
         metadata: {
+          legacyEvent: type,
           source: "next_app",
+          taxonomyVersion: TAXONOMY_VERSION,
         },
+        createdAt,
       },
     });
   } catch (error: unknown) {

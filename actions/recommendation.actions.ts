@@ -1,8 +1,16 @@
 "use server";
 
-import { RecommendationEvidenceType, TargetType } from "@prisma/client";
+import {
+  RecommendationEvidenceType,
+  RecommendationSurface,
+  TargetType,
+} from "@prisma/client";
 import { getCurrentUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
+import {
+  createRecommendationRequestSnapshot,
+  syncRecommendationConversionsForUser,
+} from "@/lib/recommendation-telemetry";
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL ?? "http://127.0.0.1:8000";
 const AI_TIMEOUT_MS = 4_000;
@@ -26,6 +34,12 @@ export interface RecommendedBook {
   price: number;
   recommendationScore?: number;
   recommendationEvidence?: string;
+}
+
+export interface RecommendationBatch {
+  books: RecommendedBook[];
+  requestId: string | null;
+  source: "fastapi_hybrid_v2" | "fallback";
 }
 
 function decimalToNumber(value: DecimalLike | number | string): number {
@@ -247,28 +261,71 @@ async function getFallbackBooksSafely(context: string): Promise<RecommendedBook[
   }
 }
 
-export async function getRecommendedBooks(userId?: string): Promise<RecommendedBook[]> {
-  const currentUser = userId ? null : await getCurrentUser();
-  const resolvedUserId = userId ?? (currentUser && !currentUser.isLocked ? currentUser.id : undefined);
+async function syncConversionsSafely(userId: string): Promise<void> {
+  try {
+    await syncRecommendationConversionsForUser(userId);
+  } catch {
+    console.error("[getRecommendedBooks] Bỏ qua lỗi đồng bộ conversion telemetry.");
+  }
+}
+
+async function createRequestSnapshotSafely(
+  userId: string,
+  books: RecommendedBook[],
+): Promise<string | null> {
+  try {
+    return await createRecommendationRequestSnapshot({
+      userId,
+      algorithmVersion: "fastapi_hybrid_v2",
+      surface: RecommendationSurface.HOME,
+      candidateProfile: "active-not-deleted-current-catalog",
+      filterProfile: "exclude-user-history-production",
+      items: books.map((book, index) => ({
+        bookId: book.id,
+        position: index + 1,
+        score: book.recommendationScore ?? 0,
+        evidence: book.recommendationEvidence ?? null,
+      })),
+    });
+  } catch {
+    // Recommendation vẫn hiển thị khi telemetry tạm lỗi.
+    console.error("[getRecommendedBooks] Không thể tạo recommendation request telemetry.");
+    return null;
+  }
+}
+
+export async function getRecommendedBooks(): Promise<RecommendationBatch> {
+  const currentUser = await getCurrentUser();
+  const resolvedUserId = currentUser && !currentUser.isLocked ? currentUser.id : undefined;
 
   if (!resolvedUserId) {
-    return getFallbackBooksSafely("guest");
+    return {
+      books: await getFallbackBooksSafely("guest"),
+      requestId: null,
+      source: "fallback",
+    };
   }
 
   try {
+    await syncConversionsSafely(resolvedUserId);
     const recommendations = await fetchAIRecommendations(resolvedUserId);
     await persistRecommendations(resolvedUserId, recommendations);
     const recommendedBooks = await getBooksByRecommendations(recommendations);
 
     if (recommendedBooks.length === 0) {
-      return getFallbackBooks();
+      return { books: await getFallbackBooks(), requestId: null, source: "fallback" };
     }
 
-    return recommendedBooks;
+    const requestId = await createRequestSnapshotSafely(resolvedUserId, recommendedBooks);
+    return { books: recommendedBooks, requestId, source: "fastapi_hybrid_v2" };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Lỗi không xác định.";
     console.error(`[getRecommendedBooks] Fallback vì AI service lỗi: ${message}`);
-    return getFallbackBooksSafely("ai_error");
+    return {
+      books: await getFallbackBooksSafely("ai_error"),
+      requestId: null,
+      source: "fallback",
+    };
   }
 }
 

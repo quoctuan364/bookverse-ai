@@ -1,0 +1,10 @@
+.git
+.next
+node_modules
+outputs
+backups
+.pytest_cache
+**/__pycache__
+*.pyc
+*.pyo
+npm-debug.log*
