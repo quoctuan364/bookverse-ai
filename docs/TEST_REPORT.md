@@ -206,3 +206,95 @@ Mỗi bước phải lưu command, exit code, report và người phê duyệt. 
 Không còn blocker kỹ thuật trong phạm vi Checkpoint A.2. Đề xuất người dùng/giảng viên review commit A.2, bảng 45 metadata và runbook; nếu đồng ý triển khai demo, cấp một phê duyệt riêng nêu rõ maintenance window, commit, backup path/checksum, hai migration được phép resolve sau audit lại và quyền mở guard đúng `bookverse_ai`.
 
 Chưa có phê duyệt đó nên không tự triển khai demo và không bắt đầu Checkpoint D.
+
+---
+
+# Phụ lục báo cáo kiểm thử Checkpoint E — Temporal AI Evaluation
+
+Ngày chạy: 14/07/2026.
+
+## E.1. Kết luận
+
+**Checkpoint E đã hoàn thành. Recommendation được đánh giá bằng temporal split không leakage, có baseline, metric và output tái lập. Không thay đổi production weight hoặc database demo.**
+
+Nhận định chất lượng không được làm đẹp: Behavior có HitRate@10 cao nhất `0,021008`; Content có Recall@10 `0,010812`; Hybrid production có HitRate@10 `0,008403` và thấp hơn nhiều baseline. Dataset synthetic và metric thấp chưa cho phép kết luận model tốt.
+
+## E.2. Evaluation thực tế
+
+- Cutoff: `2026-06-01T00:00:00`.
+- Positive train/test: 12.206/2.593.
+- Train feature: 14.473.
+- Candidate Book: 2.000.
+- User trước eligibility/đủ điều kiện/bị loại: 986/952/34.
+- Ground-truth user–Book: 2.349.
+- Cohort: cold 12, sparse 1, warm 939.
+- CTR: `NOT_AVAILABLE` vì không có impression/exposure log đáng tin cậy.
+
+Leakage assertions: train trước test, event overlap 0, future feature 0, cancelled/refunded positive 0, held-out Book trong train của cùng user 0, future popularity 0, current rating không được dùng.
+
+## E.3. Reproducibility
+
+Hai run độc lập:
+
+```text
+outputs/evaluation/20260714T171642323910Z-ef61b3fc02a4
+outputs/evaluation/20260714T171642335284Z-ef61b3fc02a4
+```
+
+Cùng dataset fingerprint:
+
+```text
+e96d9c4db04455bf88800c0b7035ae25ac19870a4775f3dc5b4d94a0a459e2b3
+```
+
+Cùng normalized checksum:
+
+```text
+ef61b3fc02a4d18735fa3d446815d910bbadb989fdfd7d6286dca6b4fc8c568e
+```
+
+Mỗi thư mục có `evaluation.json`, `metrics.csv`, `summary.md`; output runtime nằm trong `.gitignore` và không được commit.
+
+## E.4. Production parity
+
+Fixture ba user `U0792`, `U1734`, `U0864` được chụp từ baseline commit `eb881a7c01b3e5f59009a715a85f451981184f46`. Kết quả sau Checkpoint E: 30/30 row giữ nguyên Book ID và evidence, score tolerance `1e-6`, max delta `0`.
+
+## E.5. Bảng command/exit code
+
+Chỉ lượt command cuối có exit code 0 được ghi PASS.
+
+| Command/nhóm lệnh | Exit code | Trạng thái | Bằng chứng |
+|---|---:|---|---|
+| `python -m compileall -q ai_service` | 0 | PASS | Toàn bộ Python compile |
+| `python -m pytest ai_service/tests -q` với integration flag | 0 | PASS | 17/17 |
+| Evaluation integration trên test DB | 0 | PASS | Read-only, parity và cancelled filter |
+| Evaluation thật lượt 1/lượt 2 | 0/0 | PASS | Cùng checksum `ef61…568e` |
+| `python ai_service/evaluate.py --parity-only` | 0 | PASS | 3 user, 30 row, delta 0 |
+| `python ai_service/evaluate.py --no-write` | 0 | PASS | 952 user, 2.000 candidate |
+| Uvicorn `/health` + `/recommend/U0792` | 0 | PASS | health ok, 10 recommendation |
+| `npx prisma validate` | 0 | PASS | Schema hợp lệ |
+| `npx prisma generate` | 0 | PASS | Prisma Client 6.19.3 |
+| `npm run typecheck` | 0 | PASS | Không lỗi TypeScript |
+| `npm test` | 0 | PASS | 63/63 |
+| `npm run test:category-integration` | 0 | PASS | 2.200 Category, 27 canonical, legacy read-only |
+| `npm run test:assistant-integration` | 0 | PASS | Contract d1, ownership; cleanup về 0 |
+| `npm run test:stock-integration` | 0 | PASS | 11/11; cleanup fixture |
+| `npm run build` | 0 | PASS | Next.js production build |
+| `docker compose config --quiet` | 0 | PASS | Compose chính hợp lệ |
+| Rehearsal Compose config với biến bắt buộc | 0 | PASS | Override hợp lệ |
+
+Smoke bằng Starlette `TestClient` không được dùng làm cổng cuối vì môi trường hiện tại thiếu package test-harness `httpx2`. Cổng startup được thay bằng Uvicorn thật trên cổng tạm, gọi HTTP thành công rồi dừng tiến trình. Lần parse rehearsal Compose đầu thiếu hai biến bắt buộc và bị từ chối đúng thiết kế; chạy lại với `REHEARSAL_POSTGRES_USER/PASSWORD` đã PASS.
+
+## E.6. Database trước/sau
+
+`bookverse_ai_test` trước và sau integration cùng có 2.200 User, 2.200 Category, 2.200 Book, 18.000 InteractionEvent, 6.200 ReadingSession, 2.799 Bookmark, 48 Favorite, 3.600 Review, 4.714 OrderItem và 4.200 Recommendation. Chatbot session/message/feedback đều về 0.
+
+Database demo `bookverse_ai` trước và sau cùng có 300 User, 24 Category, 1.200 Book, 1.200 Listing, 1.500 Order và 2.570 OrderItem. Không chạy migration, backfill hoặc evaluation write trên demo.
+
+## E.7. Phạm vi thay đổi
+
+Thêm module evaluator thuần, loader read-only, runner, pytest/fixture, dev requirements và tài liệu. Thêm wrapper npm và ignore output. Không sửa `ai_service/main.py`, Prisma schema/migration, chatbot contract, Category mapping, stock/checkout, dataset gốc hoặc production weight.
+
+## E.8. Hạn chế và hành động tiếp theo
+
+Dataset synthetic, taxonomy interaction chưa đồng nhất, thiếu lịch sử trạng thái catalog, thiếu impression log và cohort sparse quá nhỏ. Checkpoint tiếp theo cần chuẩn hóa event taxonomy, thu log exposure thật và tạo validation window riêng trước khi thử trọng số/model mới; không tune trên test Checkpoint E.

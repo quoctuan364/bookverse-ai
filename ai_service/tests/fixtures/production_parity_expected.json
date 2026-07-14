@@ -1,0 +1,168 @@
+{
+  "capturedFromCommit": "eb881a7c01b3e5f59009a715a85f451981184f46",
+  "databaseProfile": "bookverse_ai_test-ultra-2200",
+  "fixtureVersion": "production-parity-v1",
+  "recommendations": {
+    "U0792": [
+      {
+        "bookId": "B1414",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Lê Gia Uyên 1458",
+        "score": 23.2302
+      },
+      {
+        "bookId": "B0749",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Trần Bảo Linh 0289",
+        "score": 22.8889
+      },
+      {
+        "bookId": "B1843",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Phan Minh Giang 1740",
+        "score": 22.3333
+      },
+      {
+        "bookId": "B1555",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Tạ Hoài Nhi 0911",
+        "score": 22.3333
+      },
+      {
+        "bookId": "B0062",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Tạ Hoài Nhi 0799, Lý Gia Châu 0398, Lý Gia Châu 2014",
+        "score": 22.2778
+      },
+      {
+        "bookId": "B0651",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Trần Bảo Linh 1745",
+        "score": 22.2778
+      },
+      {
+        "bookId": "B0563",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Lê Gia Uyên 1314, Phạm Hoài Hân 2115, Nguyễn Minh An 0096",
+        "score": 22.1667
+      },
+      {
+        "bookId": "B0226",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Tạ Hoài Nhi 0015",
+        "score": 22.1667
+      },
+      {
+        "bookId": "B0472",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Tạ Hoài Nhi 0191, Vũ Bảo Duy 1237",
+        "score": 22.0556
+      },
+      {
+        "bookId": "B0031",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Võ Bảo Quân 2061",
+        "score": 22.0
+      }
+    ],
+    "U0864": [
+      {
+        "bookId": "B1843",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Phan Minh Giang 1740",
+        "score": 22.3333
+      },
+      {
+        "bookId": "B1555",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Tạ Hoài Nhi 0911",
+        "score": 22.3333
+      },
+      {
+        "bookId": "B0062",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Tạ Hoài Nhi 0799, Lý Gia Châu 0398, Lý Gia Châu 2014",
+        "score": 22.2778
+      },
+      {
+        "bookId": "B0651",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Trần Bảo Linh 1745",
+        "score": 22.2778
+      },
+      {
+        "bookId": "B0563",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Lê Gia Uyên 1314, Phạm Hoài Hân 2115, Nguyễn Minh An 0096",
+        "score": 22.1667
+      },
+      {
+        "bookId": "B0226",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Tạ Hoài Nhi 0015",
+        "score": 22.1667
+      },
+      {
+        "bookId": "B0472",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Tạ Hoài Nhi 0191, Vũ Bảo Duy 1237",
+        "score": 22.0556
+      },
+      {
+        "bookId": "B0031",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Võ Bảo Quân 2061",
+        "score": 22.0
+      },
+      {
+        "bookId": "B1428",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Vũ Bảo Duy 0421",
+        "score": 22.0
+      },
+      {
+        "bookId": "B0765",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Đặng Gia Phong 0534",
+        "score": 22.0
+      }
+    ],
+    "U1734": [
+      {
+        "bookId": "B0749",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Trần Bảo Linh 0289",
+        "score": 22.8889
+      },
+      {
+        "bookId": "B1843",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Phan Minh Giang 1740",
+        "score": 22.3333
+      },
+      {
+        "bookId": "B1555",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Tạ Hoài Nhi 0911",
+        "score": 22.3333
+      },
+      {
+        "bookId": "B0062",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Tạ Hoài Nhi 0799, Lý Gia Châu 0398, Lý Gia Châu 2014",
+        "score": 22.2778
+      },
+      {
+        "bookId": "B0651",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Trần Bảo Linh 1745",
+        "score": 22.2778
+      },
+      {
+        "bookId": "B0563",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Lê Gia Uyên 1314, Phạm Hoài Hân 2115, Nguyễn Minh An 0096",
+        "score": 22.1667
+      },
+      {
+        "bookId": "B0226",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Tạ Hoài Nhi 0015",
+        "score": 22.1667
+      },
+      {
+        "bookId": "B0472",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Tạ Hoài Nhi 0191, Vũ Bảo Duy 1237",
+        "score": 22.0556
+      },
+      {
+        "bookId": "B0031",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Võ Bảo Quân 2061",
+        "score": 22.0
+      },
+      {
+        "bookId": "B1428",
+        "evidence": "Gợi ý vì bạn đã đọc hoặc bookmark nhiều sách thể loại Công nghệ / tác giả Vũ Bảo Duy 0421",
+        "score": 22.0
+      }
+    ]
+  },
+  "users": [
+    "U0792",
+    "U1734",
+    "U0864"
+  ]
+}

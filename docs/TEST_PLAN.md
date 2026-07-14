@@ -50,3 +50,65 @@ Chứng minh bằng test tự động và PostgreSQL thật rằng BookVerse kh�
 ## 6. Tiêu chí kết luận
 
 Chỉ kết luận Checkpoint A hoàn thành khi mọi cổng có exit code 0, bao gồm Category backfill trên clone demo. Nếu mapping Category legacy không tương thích và bị fail-closed thì Checkpoint A phải ghi **chưa hoàn thành**, dù riêng phần stock đã PASS.
+
+## 7. Kế hoạch kiểm thử Checkpoint E — Temporal AI Evaluation
+
+### 7.1. Mục tiêu
+
+Chứng minh evaluator tách dữ liệu theo thời gian, không đưa event tương lai vào feature, so sánh các phương pháp trên cùng policy và tạo output có thể tái lập. Mọi query evaluation chỉ chạy trên `bookverse_ai_test` trong transaction PostgreSQL read-only.
+
+### 7.2. Unit test Python
+
+| Nhóm | Trường hợp bắt buộc |
+|---|---|
+| Temporal | Train trước test; ID không giao nhau; future event không vào feature |
+| Ground truth | Strong-positive, duplicate user–Book, timestamp tie, candidate/seen filtering |
+| Order | Chỉ status hợp lệ; CANCELLED/REFUNDED không là positive |
+| Metric | Fixture biết trước cho Precision, Recall, Hit Rate, NDCG, MRR, Coverage |
+| Cohort | 0, 1–2, >=3 interaction; empty trả NOT_AVAILABLE, không chia 0 |
+| Determinism | Tie-break theo Book ID/eventId và random seed tái lập |
+| Validation | Event type/timestamp/ID không hợp lệ bị từ chối |
+| Parity | Hybrid snapshot khớp công thức production và fixture production không đổi |
+
+### 7.3. Integration và evaluation thật
+
+1. Guard từ chối database demo và chỉ nhận đúng `bookverse_ai_test`.
+2. Loader xác minh `transaction_read_only=on`.
+3. Có dữ liệu positive và candidate trước cutoff.
+4. Purchase CANCELLED/REFUNDED không xuất hiện trong positive.
+5. Chạy evaluation hai lần với cutoff/seed/K giống nhau.
+6. Metric và normalized checksum hai lượt phải giống nhau; timestamp/path/timing được loại khỏi checksum.
+7. Mỗi lượt tạo run directory mới gồm JSON, CSV và Markdown; không ghi đè.
+8. Parity ba user cố định phải giữ Book ID, evidence và score trong tolerance `1e-6`.
+
+### 7.4. Regression bắt buộc
+
+```powershell
+python -m compileall -q ai_service
+python -m pytest ai_service/tests -q
+python ai_service/evaluate.py --parity-only
+python ai_service/evaluate.py
+npx prisma validate
+npx prisma generate
+npm run typecheck
+npm test
+npm run test:category-integration
+npm run test:assistant-integration
+npm run test:stock-integration
+npm run build
+docker compose config --quiet
+```
+
+Category integration được đọc legacy demo nhưng không ghi. Assistant và Stock integration chỉ tạo fixture có prefix/ID riêng trên `bookverse_ai_test` và phải cleanup về count ban đầu.
+
+### 7.5. Tiêu chí kết luận Checkpoint E
+
+- Tất cả leakage assertion bằng `true` hoặc count `0` đúng policy.
+- Có Popularity, Content, Behavior và Hybrid trên cùng split/candidate/cohort.
+- Có Precision, Recall, Hit Rate, NDCG, MRR, Coverage, runtime trung bình/p95.
+- CTR chỉ là `NOT_AVAILABLE` khi chưa có impression log.
+- Hai run cho cùng normalized checksum.
+- Production parity, Python, Prisma, TypeScript, unit/integration, build và Compose đều exit code 0.
+- `ai_service/main.py`, production weight, API, Prisma schema/migration và database demo không đổi.
+
+Chỉ khi mọi điều kiện trên đạt mới ghi Checkpoint E hoàn thành. Metric thấp không phải lý do sửa trọng số trên test; phải được báo cáo như hạn chế và đầu vào cho checkpoint sau.

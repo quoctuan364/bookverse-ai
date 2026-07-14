@@ -123,6 +123,24 @@ Health: http://127.0.0.1:8000/health
 Recommend: http://127.0.0.1:8000/recommend/U001
 ```
 
+## Đánh giá recommendation theo thời gian — Checkpoint E
+
+Evaluator chỉ đọc `bookverse_ai_test`, tách strong-positive theo cutoff, dựng toàn bộ user feature và popularity từ train snapshot rồi so sánh Popularity, Content, Behavior và Hybrid production tại K=5/10. CTR được ghi `NOT_AVAILABLE` vì chưa có impression log đáng tin cậy. Evaluator không ghi database, không dùng bảng Recommendation làm ground truth và fail-closed nếu URL trỏ sang database demo.
+
+```powershell
+cd D:\Doantotnghiep
+ai_service\.venv\Scripts\Activate.ps1
+pip install -r ai_service\requirements-dev.txt
+
+$env:DATABASE_URL="postgresql://USER:PASSWORD@localhost:5433/bookverse_ai_test?schema=public"
+$env:RUN_EVALUATION_INTEGRATION="1"
+
+npm run test:python
+npm run evaluation:ai
+```
+
+Mỗi run tạo JSON, CSV và Markdown mới trong `outputs/evaluation/<run-id>`; thư mục này không được commit. Hai lượt kiểm chứng ngày 14/07/2026 cho cùng checksum chuẩn hóa `ef61b3fc02a4d18735fa3d446815d910bbadb989fdfd7d6286dca6b4fc8c568e`. Kết quả hiện còn thấp: Behavior có HitRate@10 cao nhất `0,021008`, còn Hybrid production là `0,008403`; không được chỉnh trọng số theo test để làm metric đẹp hơn. Xem phân tích, công thức và giới hạn tại `docs/AI_EVALUATION.md`.
+
 ## Cấu hình pgvector và RAG Chatbot
 
 Database trong `docker-compose.yml` đã pin image `pgvector/pgvector:0.8.5-pg16`. Nếu đang dùng container PostgreSQL cũ, chỉ recreate service `db` sau khi đã backup và đi đúng `docs/DEPLOYMENT.md`; luôn giữ nguyên volume:
@@ -406,6 +424,8 @@ Checkpoint A.2 ngày 14/07/2026 đã thay rehearsal cũ bằng quy trình đầy
 Compose nguồn đã pin `pgvector/pgvector:0.8.5-pg16` và có `docker-compose.rehearsal.yml` tách project/volume/port. Container demo đang chạy vẫn là `postgres:16-alpine`, thiếu extension `vector` và chỉ có 5 migration history row vì A.2 không restart/recreate hoặc ghi demo. Triển khai thật phải đi đúng runbook 15 bước trong `docs/DEPLOYMENT.md` và cần phê duyệt riêng.
 
 Checkpoint D ngày 14/07/2026 đã thống nhất `/assistant` và chatbot nổi theo contract `d1`, thêm timeout/local fallback minh bạch, chặn mock production, chuẩn hóa session ownership/feedback ownership và safe error. Checkpoint này không sửa Prisma schema, migration, FastAPI hay database demo. Unit 63/63, integration database test, production API/UI smoke, build và database-unavailable smoke đều PASS; xem `docs/CHECKPOINT_D_TEST_REPORT.md`.
+
+Checkpoint E ngày 14/07/2026 đã thêm temporal split, strong-positive policy, leakage assertion, bốn phương pháp so sánh, sáu metric, cohort cold-start và output tái lập. Python 17/17, parity production 30/30, toàn bộ regression Category/Assistant/Stock, build và Compose đều PASS. Production weight, API, schema, migration và database demo giữ nguyên.
 
 Ba mapping MEDIUM (`C013`, `C023`, `C024`) đã được review bằng 15 Book metadata mỗi Category. Nội dung ủng hộ mapping hiện tại nhưng taxonomy đích chưa đủ chi tiết và tag synthetic bị nhiễu, nên mapping/profile/checksum được giữ nguyên với confidence MEDIUM. Bảng 45 mẫu nằm trong `docs/CATEGORY_LEGACY_COMPATIBILITY.md`.
 

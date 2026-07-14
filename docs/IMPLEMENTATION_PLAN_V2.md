@@ -10,7 +10,8 @@ Trạng thái ngày 14/07/2026:
 - **Checkpoint B: ĐÃ DUYỆT và đã hoàn thành Lượt 1B trên `bookverse_ai_test`.** Migration, backfill, idempotency, ba chế độ import, integration verifier, FastAPI compatibility và restore rehearsal đều PASS.
 - **Checkpoint A.2: ĐÃ HOÀN THÀNH deployment readiness.** Fresh migration, full clone, pgvector, migration reconciliation, Category/stock idempotency, smoke và rollback rehearsal đều PASS. Database demo chưa được thay đổi.
 - **Checkpoint D: ĐÃ DUYỆT VÀ HOÀN THÀNH.** Giữ RAG tại Next.js, thống nhất contract `d1`, session/feedback ownership, safe error, degraded fallback và khóa mock production; không đổi schema, migration, FastAPI hoặc database demo.
-- Git local đã được khởi tạo an toàn; baseline A.2 trước Checkpoint D là commit `f4532d3`. Branch hiện tại là `checkpoint-d-assistant-boundary`; không push remote trong checkpoint này.
+- **Checkpoint E: ĐÃ DUYỆT VÀ HOÀN THÀNH.** Temporal split, strong-positive policy, baseline/metric, cold-start, leakage assertion, production parity và output tái lập đều PASS; không đổi production weight hoặc database demo.
+- Git local đã được khởi tạo an toàn; baseline Checkpoint E là commit `eb881a7c`. Branch thực thi là `checkpoint-e-ai-evaluation`; không push remote trong checkpoint này.
 
 ## 1. Mục tiêu
 
@@ -434,6 +435,36 @@ Trạng thái thực thi ngày 14/07/2026: **ĐÃ HOÀN THÀNH theo phương án
 
 14. **Yêu cầu duyệt: YES/NO**
     - Người dùng đã duyệt phương án giữ RAG trong Next.js và cho phép triển khai Checkpoint D. Không mở checkpoint chuyển chatbot sang FastAPI.
+
+### CHECKPOINT: E — Temporal AI Evaluation — ĐÃ HOÀN THÀNH
+
+Trạng thái thực thi ngày 14/07/2026: **ĐÃ HOÀN THÀNH** trên `bookverse_ai_test` bằng query read-only. Evaluator dùng global cutoff `2026-06-01`, tạo strong-positive từ purchase hợp lệ/reading đủ ngưỡng/bookmark/favorite/review tích cực, loại cancelled/refunded và không dùng bảng Recommendation làm ground truth.
+
+1. **Split và leakage**
+   - 12.206 positive train, 2.593 positive test; train max nhỏ hơn test min.
+   - 0 event ID overlap, 0 future feature, 0 future popularity, 0 cancelled/refunded positive.
+   - Candidate 2.000 Book; 952 user đủ điều kiện; 2.349 ground-truth pair.
+
+2. **So sánh cùng policy**
+   - Popularity, Content, Behavior và Hybrid production dùng cùng split/candidate/K/cohort.
+   - Random seeded chỉ là sanity check, không được gọi là AI baseline.
+   - Behavior HitRate@10 `0,021008`; Content Recall@10 `0,010812`; Hybrid HitRate@10 `0,008403`.
+   - Metric thấp được báo cáo đúng; không thay trọng số production theo test.
+
+3. **Reproducibility và parity**
+   - Hai run JSON/CSV/Markdown có cùng checksum chuẩn hóa `ef61b3fc02a4d18735fa3d446815d910bbadb989fdfd7d6286dca6b4fc8c568e`.
+   - Production parity 3 user/30 row, max score delta 0, evidence không đổi.
+   - CTR là `NOT_AVAILABLE` vì chưa có impression/exposure log.
+
+4. **Cổng hoàn thành**
+   - Python 17/17, TypeScript 63/63, Prisma, Category, Assistant, Stock 11/11, Uvicorn smoke, Next build và Compose đều PASS.
+   - Database demo, schema, migration, `ai_service/main.py`, API contract và trọng số giữ nguyên.
+   - Báo cáo chi tiết tại `docs/AI_EVALUATION.md` và phụ lục Checkpoint E trong `docs/TEST_REPORT.md`.
+
+5. **Bước tiếp theo**
+   - Chuẩn hóa interaction taxonomy giữa tracking/FastAPI/dataset.
+   - Thu impression/exposure/click log thật.
+   - Tạo validation window riêng trước khi thử learned ranking hoặc trọng số mới.
 
 ## 10. Acceptance criteria
 

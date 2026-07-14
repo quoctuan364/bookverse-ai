@@ -16,6 +16,8 @@ backups/
 *.dump
 *.log
 outputs/
+# Temporal evaluation tạo JSON/CSV/Markdown theo run ID; không commit artifact runtime lớn.
+outputs/evaluation/
 
 # Dataset/ebook lớn vẫn được giữ nguyên trên máy để import và demo.
 # Không stage vào baseline local theo yêu cầu an toàn dữ liệu.

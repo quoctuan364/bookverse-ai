@@ -1,121 +1,92 @@
-"""Đánh giá nhanh chất lượng recommendation từ dữ liệu PostgreSQL.
+"""CLI đánh giá recommendation theo temporal split, không ghi database.
 
-Chạy:
+Ví dụ PowerShell:
+    $env:DATABASE_URL="postgresql://.../bookverse_ai_test"
     python ai_service/evaluate.py
-
-Script này dùng dữ liệu đã lưu trong bảng Recommendation và interaction_events.
-Positive interaction gồm READ, BOOKMARK, PURCHASE, REVIEW.
 """
 
 from __future__ import annotations
 
-import os
-from dataclasses import dataclass
+import argparse
+import json
+import sys
+from pathlib import Path
 
-import pandas as pd
-from sqlalchemy import create_engine, text
 
+# Khi chạy trực tiếp file, thêm project root để import package ai_service ổn định.
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://postgres:postgres@localhost:5432/bookverse_ai",
+from ai_service.evaluation.database import load_evaluation_data  # noqa: E402
+from ai_service.evaluation.runner import (  # noqa: E402
+    DEFAULT_CUTOFF,
+    DEFAULT_K_VALUES,
+    EvaluationConfig,
+    check_production_parity,
+    database_url_from_environment,
+    run_evaluation,
+    write_evaluation_outputs,
 )
-K = int(os.getenv("RECOMMENDATION_K", "10"))
-POSITIVE_ACTIONS = ("READ", "BOOKMARK", "PURCHASE", "REVIEW")
 
 
-@dataclass(frozen=True)
-class EvaluationResult:
-    users: int
-    precision_at_k: float
-    hit_rate_at_k: float
-    total_recommendations: int
-    total_positive_events: int
+DEFAULT_PARITY_FIXTURE = (
+    PROJECT_ROOT / "ai_service" / "tests" / "fixtures" / "production_parity_expected.json"
+)
 
 
-def load_data() -> tuple[pd.DataFrame, pd.DataFrame]:
-    engine = create_engine(DATABASE_URL)
-
-    with engine.connect() as connection:
-        recommendations = pd.read_sql(
-            text(
-                """
-                SELECT "userId", "targetId" AS "bookId", "rank", "score"
-                FROM "Recommendation"
-                WHERE "targetType" = 'BOOK'
-                ORDER BY "userId", "rank" ASC
-                """
-            ),
-            connection,
-        )
-        positives = pd.read_sql(
-            text(
-                """
-                SELECT "userId", "bookId", "actionType", "createdAt"
-                FROM interaction_events
-                WHERE "actionType" IN ('READ', 'BOOKMARK', 'PURCHASE', 'REVIEW')
-                """
-            ),
-            connection,
-        )
-
-    return recommendations, positives
-
-
-def evaluate(recommendations: pd.DataFrame, positives: pd.DataFrame) -> EvaluationResult:
-    if recommendations.empty or positives.empty:
-        return EvaluationResult(
-            users=0,
-            precision_at_k=0.0,
-            hit_rate_at_k=0.0,
-            total_recommendations=int(len(recommendations)),
-            total_positive_events=int(len(positives)),
-        )
-
-    user_scores: list[float] = []
-    user_hits: list[int] = []
-
-    positive_by_user = positives.groupby("userId")["bookId"].apply(set).to_dict()
-
-    for user_id, group in recommendations.groupby("userId"):
-        recommended_books = list(group.sort_values("rank").head(K)["bookId"])
-        positive_books = positive_by_user.get(user_id, set())
-
-        if not recommended_books or not positive_books:
-            continue
-
-        hits = len(set(recommended_books) & positive_books)
-        user_scores.append(hits / min(K, len(recommended_books)))
-        user_hits.append(1 if hits > 0 else 0)
-
-    if not user_scores:
-        return EvaluationResult(
-            users=0,
-            precision_at_k=0.0,
-            hit_rate_at_k=0.0,
-            total_recommendations=int(len(recommendations)),
-            total_positive_events=int(len(positives)),
-        )
-
-    return EvaluationResult(
-        users=len(user_scores),
-        precision_at_k=float(sum(user_scores) / len(user_scores)),
-        hit_rate_at_k=float(sum(user_hits) / len(user_hits)),
-        total_recommendations=int(len(recommendations)),
-        total_positive_events=int(len(positives)),
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Temporal evaluation read-only cho BookVerse AI recommendation."
     )
+    parser.add_argument("--cutoff", default=DEFAULT_CUTOFF)
+    parser.add_argument("--k", nargs="+", type=int, default=list(DEFAULT_K_VALUES))
+    parser.add_argument("--seed", type=int, default=20260714)
+    parser.add_argument("--output-root", type=Path, default=Path("outputs/evaluation"))
+    parser.add_argument("--parity-fixture", type=Path, default=DEFAULT_PARITY_FIXTURE)
+    parser.add_argument(
+        "--parity-only",
+        action="store_true",
+        help="Chỉ so sánh endpoint production với fixture trước Checkpoint E.",
+    )
+    parser.add_argument(
+        "--no-write",
+        action="store_true",
+        help="Chạy evaluation nhưng không tạo JSON/CSV/Markdown.",
+    )
+    return parser.parse_args()
 
 
 def main() -> None:
-    recommendations, positives = load_data()
-    result = evaluate(recommendations, positives)
+    args = parse_args()
+    database_url = database_url_from_environment()
+    # Loader xác nhận đúng bookverse_ai_test và mở transaction READ ONLY.
+    data = load_evaluation_data(database_url)
 
-    print("=== BookVerse AI Recommendation Evaluation ===")
-    print(f"Users evaluated: {result.users}")
-    print(f"Precision@{K}: {result.precision_at_k:.4f}")
-    print(f"HitRate@{K}: {result.hit_rate_at_k:.4f}")
-    print(f"Total recommendations: {result.total_recommendations}")
-    print(f"Total positive events: {result.total_positive_events}")
+    if args.parity_only:
+        result = check_production_parity(args.parity_fixture)
+        print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+        return
+
+    config = EvaluationConfig(
+        cutoff=args.cutoff,
+        k_values=tuple(args.k),
+        seed=args.seed,
+        output_root=args.output_root,
+        parity_fixture=args.parity_fixture,
+    )
+    report = run_evaluation(data, config)
+    outputs = None if args.no_write else write_evaluation_outputs(report, args.output_root)
+    summary = {
+        "status": "PASS",
+        "database": data.database_name,
+        "eligibleUsers": report["statistics"]["eligibleUsers"],
+        "candidateBooks": report["statistics"]["candidateBooks"],
+        "reproducibilityChecksum": report["reproducibilityChecksum"],
+        "productionParity": report["productionParity"],
+        "outputs": outputs,
+    }
+    print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":
