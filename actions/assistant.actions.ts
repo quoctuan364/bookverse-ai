@@ -59,6 +59,10 @@ function buildReason(query: string, category: string, rating: number | null): st
   return `Phù hợp với nhu cầu "${query}" nhờ chủ đề ${category} và metadata trong catalog.`;
 }
 
+/**
+ * Adapter của UI /assistant cũ, chỉ giữ lại cho feature flag rollback trong Checkpoint D.
+ * Luồng mặc định dùng contract chung qua /api/chat.
+ */
 export async function askBookAssistant(query: string): Promise<AssistantResponse> {
   const cleanQuery = query.trim();
 

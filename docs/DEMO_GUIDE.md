@@ -33,6 +33,7 @@ BookVerse AI được demo như một hệ thống có 4 vai trò:
 - `/orders/[id]`: Chi tiết đơn hàng, timeline và snapshot địa chỉ giao hàng.
 - `/notifications`: Trung tâm thông báo.
 - `/admin`: Admin Center.
+- `/assistant`: Trợ lý dùng contract `d1`, RAG/keyword fallback và sách đã xác minh.
 - `/forgot-password`: Quên mật khẩu.
 - `/reset-password`: Đặt lại mật khẩu.
 
@@ -61,8 +62,24 @@ BookVerse AI được demo như một hệ thống có 4 vai trò:
    - Cập nhật trạng thái order để tạo timeline và notification.
    - Xử lý bài viết/comment bị report.
    - Xem chatbot feedback và audit log.
-18. Mở chatbot, hỏi gợi ý sách, sau đó bấm hữu ích/không hữu ích.
+18. Mở `/assistant` hoặc chatbot nổi, hỏi gợi ý sách, kiểm tra nhãn provider/fallback và các link `/book/{id}`, sau đó bấm hữu ích/không hữu ích khi đã đăng nhập.
 19. Quay lại Admin Center để xem feedback AI.
+
+## Luồng Demo Assistant — Checkpoint D
+
+1. Mở `/assistant` và hỏi: `Gợi ý sách trí tuệ nhân tạo cho người mới`.
+2. Nếu OpenAI/Gemini và pgvector sẵn sàng, UI hiển thị provider/source thật. Nếu một dịch vụ chưa sẵn sàng, UI phải hiện `Chế độ dự phòng từ catalog đã xác minh; không phải phản hồi giả`.
+3. Kiểm tra mỗi sách có tiêu đề, tác giả, điểm phù hợp và link đúng dạng `/book/{id}`. Mở một card để chứng minh ID tồn tại trong catalog.
+4. Gửi câu hỏi thứ hai trong cùng giao diện. Với user đăng nhập, hai lượt phải tiếp tục cùng session của chính user.
+5. Bấm hữu ích/không hữu ích. User đăng nhập được lưu feedback cho assistant message của mình; khách ẩn danh thấy thông báo yêu cầu đăng nhập.
+6. Mở chatbot nổi ở góc phải, gửi `Sách UX cho sinh viên` và kiểm tra contract/trạng thái giống trang `/assistant`.
+
+Điểm cần nói rõ với giảng viên:
+
+- FastAPI hiện phục vụ recommendation, không phục vụ chat. Checkpoint D chủ động giữ RAG tại Next.js để tránh thêm network hop khi chưa có benchmark.
+- `mocked=true` không được xuất hiện ở production. Development mock chỉ bật bằng cờ rõ ràng và câu trả lời có nhãn `[DEV MOCK]`.
+- Khi provider, embedding hoặc database lỗi, hệ thống không bịa trạng thái thành công: provider/vector hạ về catalog; database trả lỗi 503 an toàn.
+- Rollback một release: đặt `BOOKVERSE_ASSISTANT_LEGACY_UI=true` để quay lại UI adapter cũ; không cần rollback database vì Checkpoint D không có migration.
 
 ## Luồng Demo Marketplace Và Order Phase 4
 
@@ -152,7 +169,10 @@ npm run embeddings:books
 ```powershell
 npx prisma validate
 npm run typecheck
+npm test
+npm run test:assistant-integration
 npm run build
+docker compose config
 ```
 
 ## Ghi Chú Hiện Trạng
@@ -161,6 +181,7 @@ npm run build
 - Regenerate embedding trong Admin Books gọi trực tiếp provider embedding đang cấu hình và cập nhật bảng `book_embeddings`.
 - Rerun AI trong Admin Users gọi FastAPI recommendation, lưu lại recommendation/evidence và tạo notification cho user.
 - Chatbot feedback đã lưu vào database và hiển thị ở Admin AI Management.
+- `/assistant` và chatbot nổi đã dùng chung contract `d1`; production mock bị khóa, local/keyword fallback có nhãn degraded rõ ràng.
 - Checkout hiện bắt buộc chọn địa chỉ giao hàng; order lưu snapshot nên thay đổi địa chỉ sau đó không làm thay đổi lịch sử đơn.
 - Giỏ hàng vẫn dùng `Order PENDING`, nhưng chỉ những order PENDING chưa có `paymentMethod` được xem là cart tạm.
 - Seller Dashboard đã có phân quyền DB: BUYER phải vào `/seller/apply`, SELLER/ADMIN mới xem dashboard và server action luôn kiểm tra listing/order thuộc seller hiện tại.

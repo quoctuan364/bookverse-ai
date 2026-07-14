@@ -125,7 +125,7 @@ Recommend: http://127.0.0.1:8000/recommend/U001
 
 ## Cấu hình pgvector và RAG Chatbot
 
-Database trong `docker-compose.yml` dùng image `pgvector/pgvector:pg16`. Nếu đang dùng container PostgreSQL cũ, hãy recreate service `db` nhưng giữ nguyên volume:
+Database trong `docker-compose.yml` đã pin image `pgvector/pgvector:0.8.5-pg16`. Nếu đang dùng container PostgreSQL cũ, chỉ recreate service `db` sau khi đã backup và đi đúng `docs/DEPLOYMENT.md`; luôn giữ nguyên volume:
 
 ```powershell
 docker compose up -d db
@@ -137,6 +137,9 @@ Thiết lập khóa LLM/Embedding trong `.env`:
 ```env
 BOOKVERSE_LLM_PROVIDER="openai"
 BOOKVERSE_EMBEDDING_PROVIDER="openai"
+BOOKVERSE_CHAT_TIMEOUT_MS="8000"
+BOOKVERSE_CHAT_MOCK_ENABLED="false"
+BOOKVERSE_ASSISTANT_LEGACY_UI="false"
 OPENAI_API_KEY="sk-..."
 OPENAI_MODEL="gpt-4o-mini"
 OPENAI_EMBEDDING_MODEL="text-embedding-3-small"
@@ -154,7 +157,33 @@ Tạo embedding cho toàn bộ kho sách:
 npm run embeddings:books
 ```
 
-Nếu chưa có pgvector hoặc chưa seed embedding, chatbot vẫn hoạt động bằng keyword fallback để demo không bị gián đoạn.
+Nếu chưa có pgvector, embedding hoặc khóa provider, chatbot vẫn hoạt động bằng keyword/local catalog fallback và trả `degraded=true`. UI phải hiển thị rõ đây là dữ liệu dự phòng đã xác minh, không giả thành phản hồi AI.
+
+## Assistant contract — Checkpoint D
+
+`/assistant` và chatbot nổi dùng chung `/api/chat` cùng contract `d1`. Phản hồi thành công luôn có các field chính: `answer`, `validatedBooks`, `provider`, `source`, `mocked`, `degraded`, `sessionId`, `assistantMessageId` và `errorCode`. Mọi link sách do assistant trả về phải có dạng `/book/{id}` và ID phải được đọc lại từ database.
+
+Quy tắc vận hành:
+
+- RAG chatbot tiếp tục nằm ở Next.js; FastAPI hiện chỉ phục vụ recommendation. Chưa chuyển chat sang FastAPI vì chưa có benchmark chứng minh lợi ích.
+- OpenAI/Gemini có timeout cấu hình bằng `BOOKVERSE_CHAT_TIMEOUT_MS`; khi provider, embedding hoặc vector lỗi, hệ thống hạ về catalog thật và gắn trạng thái degraded.
+- `BOOKVERSE_CHAT_MOCK_ENABLED=true` chỉ có hiệu lực trong development/test. Production luôn vô hiệu mock, kể cả khi `BOOKVERSE_LLM_PROVIDER=mock`.
+- Khách ẩn danh không được tiếp tục session do client cung cấp. User đăng nhập chỉ tiếp tục session thuộc chính mình; user bị khóa bị chặn.
+- Feedback chỉ nhận cho assistant message thuộc session của user đăng nhập. API không trả raw database/provider error cho client.
+- Có thể rollback UI trong một release bằng `BOOKVERSE_ASSISTANT_LEGACY_UI=true`; adapter cũ không phải đường chạy mặc định.
+
+Kiểm thử riêng Checkpoint D trên database test:
+
+```powershell
+$env:DATABASE_URL="postgresql://USER:PASSWORD@localhost:5433/bookverse_ai_test?schema=public"
+$env:ALLOWED_DESTRUCTIVE_DATABASES="bookverse_ai_test"
+$env:BOOKVERSE_LLM_PROVIDER="local"
+$env:BOOKVERSE_CHAT_MOCK_ENABLED="false"
+npm test
+npm run test:assistant-integration
+```
+
+Sau khi chạy `npm run build` và mở bản production ở cổng riêng, đặt `ASSISTANT_API_URL` rồi chạy `npm run test:assistant-api`. Script chỉ cho phép cleanup trên đúng `bookverse_ai_test`. Kết quả và tình huống lỗi đã kiểm tra nằm tại `docs/CHECKPOINT_D_TEST_REPORT.md`.
 
 ## Tài khoản demo sau khi seed nhỏ
 
@@ -213,7 +242,8 @@ Quy tắc chatbot:
 
 - User đã đăng nhập chỉ được tiếp tục session chatbot thuộc chính tài khoản đó.
 - Khách ẩn danh không được tái sử dụng `sessionId` do client gửi; mỗi lượt sẽ tạo session ẩn danh mới.
-- Feedback chatbot yêu cầu đăng nhập và chỉ ghi nhận cho session/message thuộc user hiện tại.
+- Feedback chatbot yêu cầu đăng nhập, chỉ ghi nhận assistant message thuộc session của user hiện tại và từ chối user message/cross-session.
+- Production không dùng mock. Khi provider/vector không sẵn sàng, UI ghi rõ fallback từ catalog đã xác minh.
 
 Transition order hiện tại:
 
@@ -375,6 +405,8 @@ Checkpoint A.2 ngày 14/07/2026 đã thay rehearsal cũ bằng quy trình đầy
 
 Compose nguồn đã pin `pgvector/pgvector:0.8.5-pg16` và có `docker-compose.rehearsal.yml` tách project/volume/port. Container demo đang chạy vẫn là `postgres:16-alpine`, thiếu extension `vector` và chỉ có 5 migration history row vì A.2 không restart/recreate hoặc ghi demo. Triển khai thật phải đi đúng runbook 15 bước trong `docs/DEPLOYMENT.md` và cần phê duyệt riêng.
 
+Checkpoint D ngày 14/07/2026 đã thống nhất `/assistant` và chatbot nổi theo contract `d1`, thêm timeout/local fallback minh bạch, chặn mock production, chuẩn hóa session ownership/feedback ownership và safe error. Checkpoint này không sửa Prisma schema, migration, FastAPI hay database demo. Unit 63/63, integration database test, production API/UI smoke, build và database-unavailable smoke đều PASS; xem `docs/CHECKPOINT_D_TEST_REPORT.md`.
+
 Ba mapping MEDIUM (`C013`, `C023`, `C024`) đã được review bằng 15 Book metadata mỗi Category. Nội dung ủng hộ mapping hiện tại nhưng taxonomy đích chưa đủ chi tiết và tag synthetic bị nhiễu, nên mapping/profile/checksum được giữ nguyên với confidence MEDIUM. Bảng 45 mẫu nằm trong `docs/CATEGORY_LEGACY_COMPATIBILITY.md`.
 
 ## Chạy bằng Docker Compose
@@ -419,7 +451,7 @@ docker compose up -d --build web
 18. Vào Notification Center để lọc thông báo tất cả/chưa đọc và mở notification có href.
 19. Đăng nhập Quản trị viên/Kiểm duyệt, vào Admin Center để quản lý user, sách, listing, order, report, AI feedback và audit log.
 20. Vào Cộng đồng để tạo bài, bình luận, thích và báo cáo.
-21. Vào Trợ lý AI để hỏi gợi ý sách theo nhu cầu và bấm đánh giá câu trả lời.
+21. Vào `/assistant`, hỏi gợi ý sách và kiểm tra provider/source hoặc nhãn fallback; mọi card phải mở `/book/{id}` thật. Đăng nhập để bấm đánh giá câu trả lời.
 
 Tài liệu demo chi tiết hơn nằm tại:
 
@@ -437,6 +469,7 @@ npm run typecheck
 npm run data:analyze
 npm run data:import -- --dry-run
 npm run test:unit
+npm run test:assistant-integration
 npm run test:category-integration
 npm run test:stock-integration
 npm run build

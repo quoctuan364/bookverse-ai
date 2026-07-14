@@ -9,8 +9,8 @@ Trạng thái ngày 14/07/2026:
 - Rehearsal đã chạy trên database độc lập `bookverse_ai_test`; database demo `bookverse_ai` chỉ được đọc để xác minh guard.
 - **Checkpoint B: ĐÃ DUYỆT và đã hoàn thành Lượt 1B trên `bookverse_ai_test`.** Migration, backfill, idempotency, ba chế độ import, integration verifier, FastAPI compatibility và restore rehearsal đều PASS.
 - **Checkpoint A.2: ĐÃ HOÀN THÀNH deployment readiness.** Fresh migration, full clone, pgvector, migration reconciliation, Category/stock idempotency, smoke và rollback rehearsal đều PASS. Database demo chưa được thay đổi.
-- **Checkpoint D: CHƯA DUYỆT.** Chưa thay đổi service boundary/chatbot.
-- Git local đã được khởi tạo an toàn; baseline A.2 là commit `ae7f4b801744034860ba2eca7da36f308628811d`. Branch hiện tại là `checkpoint-a-deployment-readiness`; không có remote và chưa push.
+- **Checkpoint D: ĐÃ DUYỆT VÀ HOÀN THÀNH.** Giữ RAG tại Next.js, thống nhất contract `d1`, session/feedback ownership, safe error, degraded fallback và khóa mock production; không đổi schema, migration, FastAPI hoặc database demo.
+- Git local đã được khởi tạo an toàn; baseline A.2 trước Checkpoint D là commit `f4532d3`. Branch hiện tại là `checkpoint-d-assistant-boundary`; không push remote trong checkpoint này.
 
 ## 1. Mục tiêu
 
@@ -374,7 +374,9 @@ Kết quả thực thi ngày 13/07/2026:
 
 ### CHECKPOINT: D — Assistant service boundary
 
-1. **Vấn đề hiện tại**
+Trạng thái thực thi ngày 14/07/2026: **ĐÃ HOÀN THÀNH theo phương án 1**. `/assistant` và FloatingChatbot cùng gọi contract `d1` qua `/api/chat`; RAG/keyword retrieval, OpenAI/Gemini và local catalog fallback nằm tại service Next.js dùng chung. FastAPI recommendation, Prisma schema, migration, embedding hiện có và database demo không bị sửa.
+
+1. **Vấn đề trước Checkpoint D**
    - /assistant và FloatingChatbot là hai trải nghiệm, contract và error handling khác nhau.
    - Chat route có fallback mock production-visible; FastAPI chưa phục vụ chatbot.
 
@@ -417,17 +419,21 @@ Kết quả thực thi ngày 13/07/2026:
     - UI: loading/error/degraded, keyboard/accessibility, chatbot không che CTA.
     - Nếu FastAPI: regression parity, timeout/retry, service auth và benchmark latency.
 
+    **Kết quả thực tế:** 63/63 unit test PASS; integration thật trên `bookverse_ai_test` PASS cho owner/non-owner/locked/anonymous và cleanup về 0; production API smoke PASS với `mocked=false` dù cờ mock được bật; UI browser smoke PASS cho `/assistant`, chatbot nổi, validated link và anonymous feedback; database-unavailable trả safe 503; Prisma validate/generate, typecheck, build, Python compile và Docker Compose config đều PASS. Chi tiết tại `docs/CHECKPOINT_D_TEST_REPORT.md`.
+
 11. **Rollback**
     - Giữ feature flag adapter/UI cũ trong một release. Phương án FastAPI phải có flag quay về Next.js RAG mà không mất session.
 
 12. **Rủi ro còn lại**
     - Giữ Next.js tập trung nhiều trách nhiệm ở route; chuyển FastAPI tạo thêm network hop, deployment và service-auth failure mode.
+    - Chưa benchmark OpenAI/Gemini thật trong CI vì không đưa API key vào repository; timeout/fallback đã được unit test và production local smoke.
+    - Prisma báo cấu hình `package.json#prisma` sẽ deprecated ở Prisma 7; hiện dự án vẫn dùng Prisma 6.19.3 và schema hợp lệ.
 
 13. **Khuyến nghị**
     - Chọn phương án 1: giữ RAG trong Next.js, thống nhất contract/UI/error/auth và loại mock trước. Chỉ mở checkpoint chuyển FastAPI khi có lợi ích đo được.
 
 14. **Yêu cầu duyệt: YES/NO**
-    - Bạn có duyệt Checkpoint D theo khuyến nghị giữ RAG trong Next.js ở lượt đầu và chưa chuyển chatbot sang FastAPI không? Trả lời **YES D** hoặc **NO D + phương án mong muốn**.
+    - Người dùng đã duyệt phương án giữ RAG trong Next.js và cho phép triển khai Checkpoint D. Không mở checkpoint chuyển chatbot sang FastAPI.
 
 ## 10. Acceptance criteria
 

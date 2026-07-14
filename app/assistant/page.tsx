@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Bot, Search, Sparkles } from "lucide-react";
 import { askBookAssistant } from "@/actions/assistant.actions";
+import { AssistantPageClient } from "@/components/assistant/AssistantPageClient";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,12 @@ function formatPrice(price: number): string {
 export default async function AssistantPage({ searchParams }: AssistantPageProps) {
   const params = await searchParams;
   const query = params?.q ?? "";
+
+  // Feature flag rollback giữ UI tìm kiếm cũ trong một release, không đổi database.
+  if (process.env.BOOKVERSE_ASSISTANT_LEGACY_UI !== "true") {
+    return <AssistantPageClient initialQuery={query} />;
+  }
+
   const response = await askBookAssistant(query);
 
   return (

@@ -1,115 +1,110 @@
 import { FeedbackValue } from "@prisma/client";
 import { NextResponse } from "next/server";
+
+import {
+  createAssistantError,
+  parseAssistantFeedbackPayload,
+  type AssistantFailureCode,
+} from "@/lib/assistant-contract";
+import { evaluateFeedbackAccess } from "@/lib/assistant-policy";
+import { sanitizeAssistantLog } from "@/lib/assistant-runtime";
 import { getCurrentUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
 
-interface ChatFeedbackBody {
-  sessionId?: string;
-  messageId?: string;
-  value?: string;
-  note?: string;
-}
-
-function parseValue(value?: string): FeedbackValue | null {
-  switch (value) {
-    case "HELPFUL":
-    case "helpful":
-      return FeedbackValue.HELPFUL;
-    case "NOT_HELPFUL":
-    case "not_helpful":
-      return FeedbackValue.NOT_HELPFUL;
-    case "IRRELEVANT":
-    case "irrelevant":
-      return FeedbackValue.IRRELEVANT;
+function failureDetails(code: AssistantFailureCode) {
+  switch (code) {
+    case "FEEDBACK_UNAUTHORIZED":
+      return { status: 401, message: "Bạn cần đăng nhập để đánh giá chatbot." };
+    case "ACCOUNT_LOCKED":
+      return {
+        status: 403,
+        message: "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.",
+      };
+    case "FEEDBACK_FORBIDDEN":
+      return { status: 403, message: "Bạn không có quyền đánh giá phiên chat này." };
+    case "SESSION_NOT_FOUND":
+      return { status: 404, message: "Không tìm thấy phiên chat." };
+    case "MESSAGE_NOT_FOUND":
+      return { status: 404, message: "Không tìm thấy phản hồi của trợ lý trong phiên chat." };
     default:
-      return null;
+      return { status: 400, message: "Feedback không hợp lệ." };
   }
 }
 
-function isFeedbackBody(value: unknown): value is ChatFeedbackBody {
-  return Boolean(value && typeof value === "object");
+function toFeedbackValue(value: "HELPFUL" | "NOT_HELPFUL" | "IRRELEVANT"): FeedbackValue {
+  if (value === "HELPFUL") return FeedbackValue.HELPFUL;
+  if (value === "NOT_HELPFUL") return FeedbackValue.NOT_HELPFUL;
+  return FeedbackValue.IRRELEVANT;
 }
 
 export async function POST(request: Request) {
   try {
-    const payload: unknown = await request.json().catch(() => null);
-
-    if (!isFeedbackBody(payload)) {
-      return NextResponse.json({ success: false, error: "Payload không hợp lệ." }, { status: 400 });
-    }
-
-    const sessionId = payload.sessionId?.trim();
-    const messageId = payload.messageId?.trim() || null;
-    const feedbackValue = parseValue(payload.value);
-
-    if (!sessionId || !feedbackValue) {
-      return NextResponse.json({ success: false, error: "Thiếu sessionId hoặc giá trị feedback." }, { status: 400 });
-    }
+    const rawPayload: unknown = await request.json().catch(() => null);
+    const parsed = parseAssistantFeedbackPayload(rawPayload);
+    if (!parsed.ok) return NextResponse.json(parsed.error, { status: 400 });
 
     const currentUser = await getCurrentUser();
-
     if (!currentUser) {
+      const details = failureDetails("FEEDBACK_UNAUTHORIZED");
       return NextResponse.json(
-        { success: false, error: "Bạn cần đăng nhập để đánh giá chatbot." },
-        { status: 401 },
+        createAssistantError("FEEDBACK_UNAUTHORIZED", details.message),
+        { status: details.status },
       );
     }
-
     if (currentUser.isLocked) {
-      return NextResponse.json(
-        { success: false, error: "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên." },
-        { status: 403 },
-      );
-    }
-
-    const chatSession = await prisma.chatbotSession.findFirst({
-      where: {
-        id: sessionId,
-        userId: currentUser.id,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!chatSession) {
-      return NextResponse.json({ success: false, error: "Không tìm thấy phiên chat." }, { status: 404 });
-    }
-
-    if (messageId) {
-      const message = await prisma.chatbotMessage.findFirst({
-        where: {
-          id: messageId,
-          sessionId,
-        },
-        select: {
-          id: true,
-        },
+      const details = failureDetails("ACCOUNT_LOCKED");
+      return NextResponse.json(createAssistantError("ACCOUNT_LOCKED", details.message), {
+        status: details.status,
       });
+    }
 
-      if (!message) {
-        return NextResponse.json({ success: false, error: "Không tìm thấy tin nhắn chatbot." }, { status: 404 });
-      }
+    const [session, message] = await Promise.all([
+      prisma.chatbotSession.findUnique({
+        where: { id: parsed.value.sessionId },
+        select: { id: true, userId: true },
+      }),
+      prisma.chatbotMessage.findUnique({
+        where: { id: parsed.value.messageId },
+        select: { id: true, sessionId: true, role: true },
+      }),
+    ]);
+    const accessCode = evaluateFeedbackAccess({
+      currentUserId: currentUser.id,
+      currentUserLocked: false,
+      sessionExists: Boolean(session),
+      sessionUserId: session?.userId ?? null,
+      messageExists: Boolean(message),
+      messageSessionId: message?.sessionId ?? null,
+      requestedSessionId: parsed.value.sessionId,
+      messageRole: message?.role ?? null,
+    });
+    if (accessCode) {
+      const details = failureDetails(accessCode);
+      return NextResponse.json(createAssistantError(accessCode, details.message), {
+        status: details.status,
+      });
     }
 
     await prisma.chatbotFeedback.create({
       data: {
-        userId: currentUser.id,
-        sessionId,
-        messageId,
-        value: feedbackValue,
-        note: payload.note?.trim() || null,
-        metadata: {
-          source: "floating_chatbot",
-        },
+        userId: currentUser!.id,
+        sessionId: parsed.value.sessionId,
+        messageId: parsed.value.messageId,
+        value: toFeedbackValue(parsed.value.value),
+        note: parsed.value.note,
+        metadata: { source: "assistant_contract", contractVersion: "d1" },
       },
     });
-
     return NextResponse.json({ success: true }, { status: 201 });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Lỗi không xác định.";
-    console.error(`[api/chat/feedback] ${message}`);
-
-    return NextResponse.json({ success: false, error: "Không thể lưu feedback chatbot." }, { status: 500 });
+    console.error(`[api/chat/feedback] ${sanitizeAssistantLog(error)}`);
+    return NextResponse.json(
+      createAssistantError(
+        "SERVICE_UNAVAILABLE",
+        "Chưa thể lưu feedback chatbot lúc này. Vui lòng thử lại sau.",
+        true,
+      ),
+      { status: 503 },
+    );
   }
 }
