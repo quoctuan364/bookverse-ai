@@ -1,29 +1,30 @@
-# Runbook triển khai Checkpoint A.2
+# Runbook triển khai và biên bản Deployment R1
 
-Ngày xác minh: 14/07/2026. Runbook này mô tả quy trình triển khai thật trong tương lai; **không phải quyền chạy migration/backfill lên `bookverse_ai`**. Lượt A.2 chỉ chạy write trên database fresh, full clone và rollback riêng rồi đã drop cả ba.
+Ngày xác minh gần nhất: 15/07/2026. Deployment R1 lên `bookverse_ai` đã được phê duyệt riêng và hoàn tất theo [biên bản Deployment R1](DEPLOYMENT_R1_REPORT.md). Các lệnh ghi trong tài liệu này vẫn phải có phê duyệt theo từng deployment; kết quả R1 không phải quyền ghi mặc định cho lần sau.
 
 ## 1. Trạng thái readiness đã chứng minh
 
-- PostgreSQL demo đang chạy `16.14`, container thực tế `postgres:16-alpine` và chưa có extension `vector`.
+- PostgreSQL demo đang chạy `16.14` trên image `pgvector/pgvector:0.8.5-pg16`, dùng lại đúng volume `doantotnghiep_pgdata` và có extension `vector` 0.8.5.
 - Compose nguồn đã pin `pgvector/pgvector:0.8.5-pg16`; image đã pull có digest `sha256:1d533553fefe4f12e5d80c7b80622ba0c382abb5758856f52983d8789179f0fb`.
 - Rehearsal riêng dùng `docker-compose.rehearsal.yml`, project `bookverse-a2`, port loopback `55432`; demo không bị restart/recreate.
-- Fresh database chạy đủ 11 migration, lần deploy hai không còn pending.
+- Rehearsal current HEAD và database demo chạy đủ 12 migration; lần deploy hai không còn pending.
 - Full clone từ demo đã audit, reconcile deterministic, deploy, backfill, smoke và deploy idempotency PASS.
 - Rollback từ backup pre-deployment có exit code 0 trong 1.931 ms; count và semantic schema checksum khớp nguồn.
-- Database demo vẫn có 5 migration history row và schema cũ; chưa có cột Category/stock mới, chưa có extension vector.
+- Database demo có 12/12 migration `APPLIED_VALID`, Category map 24/24, stock 1–120 và telemetry schema sạch sau smoke cleanup.
 
 ## 2. PostgreSQL và pgvector
 
-Migration `20260706133000_add_pgvector_rag_and_highlight_offsets` tự chạy `CREATE EXTENSION IF NOT EXISTS vector` rồi tạo `book_embeddings.embedding vector NOT NULL`. Extension binary phải có trong image trước khi Prisma chạy migration này. Bootstrap an toàn được thực hiện trước migration để fail sớm:
+Migration `20260706133000_add_pgvector_rag_and_highlight_offsets` tự chạy `CREATE EXTENSION IF NOT EXISTS vector` rồi tạo `book_embeddings.embedding vector NOT NULL`. Extension binary phải có trong image trước khi Prisma chạy migration này. Với database legacy đã có migration pending, chỉ chạy `--check` trước audit; để migration chính thức tạo extension, rồi chạy `--check` lần hai sau deploy:
 
 ```powershell
 $env:DATABASE_URL="postgresql://<USER>:<PASSWORD>@<HOST>:<PORT>/<TARGET>?schema=public"
 $env:EXPECTED_POSTGRES_MAJOR="16"
 npm run deployment:pgvector -- --check
-npm run deployment:pgvector -- --bootstrap
+npx prisma migrate deploy
+npm run deployment:pgvector -- --check
 ```
 
-`--bootstrap` chỉ được code hiện tại cho phép trên fresh/full rehearsal, không cho `bookverse_ai`. Khi có phê duyệt triển khai thật, phải review một thay đổi guard riêng cho đúng target; không gỡ toàn bộ guard.
+Không bootstrap extension trước migration audit trên clone legacy: làm vậy khiến audit đúng quy tắc phân loại migration pgvector thành `APPLIED_SCHEMA_INCOMPLETE` vì extension đã tồn tại nhưng table/cột chưa có. `--bootstrap` chỉ dùng cho fresh rehearsal phù hợp và code hiện tại vẫn cấm bootstrap trên `bookverse_ai`.
 
 Thiết kế vector hiện tại có giới hạn đã biết:
 
@@ -41,13 +42,13 @@ npm run deployment:audit-migrations
 npm run deployment:audit-migrations -- --require-clean
 ```
 
-Script kiểm tra checksum 11 file migration, `_prisma_migrations`, `prisma migrate status`, table, column/type/null/default, enum/value, index, FK, constraint và extension. Mỗi migration chỉ nhận một trạng thái: `APPLIED_VALID`, `APPLIED_HISTORY_MISSING`, `APPLIED_SCHEMA_INCOMPLETE`, `PENDING`, `FAILED`, `CHECKSUM_MISMATCH` hoặc `UNKNOWN`.
+Script kiểm tra checksum 12 file migration, `_prisma_migrations`, `prisma migrate status`, table, column/type/null/default, enum/value, index, FK, constraint và extension. Mỗi migration chỉ nhận một trạng thái: `APPLIED_VALID`, `APPLIED_HISTORY_MISSING`, `APPLIED_SCHEMA_INCOMPLETE`, `PENDING`, `FAILED`, `CHECKSUM_MISMATCH` hoặc `UNKNOWN`.
 
 Clone demo ban đầu có:
 
 - 5 `APPLIED_VALID`.
 - 2 `APPLIED_HISTORY_MISSING`: password reset và admin foundation. Toàn bộ object kỳ vọng của hai migration đều khớp, nên clone dùng `prisma migrate resolve --applied` qua audit script.
-- 4 `PENDING`: pgvector, profile/shipping, Category hierarchy và stock/checkout.
+- 5 `PENDING`: pgvector, profile/shipping, Category hierarchy, stock/checkout và recommendation telemetry.
 
 Không có migration `APPLIED_SCHEMA_INCOMPLETE`, `FAILED`, `CHECKSUM_MISMATCH` hoặc `UNKNOWN`. Script không update trực tiếp `_prisma_migrations`, không resolve theo tên table và luôn từ chối execute trên `bookverse_ai`. Nếu audit thật khác kết quả rehearsal, dừng triển khai và lập bằng chứng lại; không copy mù quyết định resolve của clone.
 
@@ -118,7 +119,7 @@ npx prisma migrate deploy
 npm run deployment:audit-migrations -- --require-clean
 ```
 
-Phải có 11/11 `APPLIED_VALID`, không pending/failed/checksum mismatch.
+Phải có 12/12 `APPLIED_VALID`, không pending/failed/checksum mismatch.
 
 ### 10. Category backfill
 
@@ -179,3 +180,13 @@ pg_restore --exit-on-error --no-owner --no-privileges --dbname="postgresql://<US
 ## 6. Artifact rehearsal
 
 Runtime artifact nằm trong `backups/` và `outputs/`, đều bị `.gitignore` loại khỏi commit. Backup A.2 có SHA-256 `a49a764157a88e141a3ca525a817bad0d7af7beed479ca70daeac1d30cb52094`. Fresh, full clone và rollback database đã được drop sau khi report/checksum được lưu.
+
+## 7. Kết quả Deployment R1
+
+- Maintenance: `2026-07-15T20:49:10+07:00` đến `2026-07-15T21:15:05+07:00`.
+- Backup maintenance custom-format SHA-256: `5EA8FAE1BE877F630AEF17B2FC64550900C825B50ACAF919A8E1C5430D5EE239`.
+- Schema-only SHA-256: `5B63B39CF62CE035433418A43D3A8E984419E5A6DD898A8FE98E54D443CA897E`.
+- Backup đã restore thử bằng đúng image pgvector; fingerprint nguồn và bản restore cùng là `77dd1f20bbb32cb31dd0e404244aadaa`.
+- Schema sau deploy có fingerprint cột `64f76fa4a691591a54cee2456c48cdeb` và migration audit checksum `465c2d7e5b93f385cb7052517a11bc942c4df22ef0059f416722448bcd9757cd`.
+- Business count trước/sau khớp tuyệt đối; telemetry và Assistant smoke đã cleanup về baseline.
+- Rủi ro còn lại: `/api/recommendations` có thể trả `requestId=null` khi batch trộn recommendation hiện tại và legacy có `rank` trùng. Trang chủ vẫn có requestId server và telemetry impression/click hoạt động. Sửa normalization vị trí trước khi mở rộng telemetry ở F2.
