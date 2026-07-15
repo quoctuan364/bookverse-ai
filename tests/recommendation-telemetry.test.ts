@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { RecommendationSurface } from "@prisma/client";
+
 import {
   TelemetryRateLimiter,
   calculateInstrumentedCtr,
@@ -9,6 +11,7 @@ import {
   qualifiesAsImpression,
   selectConversionAttributions,
 } from "@/lib/recommendation-telemetry-policy";
+import { createRecommendationRequestSnapshotResult } from "@/lib/recommendation-telemetry";
 
 test("client chỉ được gửi requestId/bookId/eventType, score/rank/userId giả bị bỏ", () => {
   const parsed = parseTelemetryPayload({
@@ -108,4 +111,34 @@ test("rate limiter chặn sau giới hạn và reset đúng window", () => {
   assert.equal(limiter.allow("U1", 10), true);
   assert.equal(limiter.allow("U1", 20), false);
   assert.equal(limiter.allow("U1", 1_000), true);
+});
+
+test("persistence failure trả degraded contract và không lộ raw error", async () => {
+  const logs: string[] = [];
+  const originalError = console.error;
+  console.error = (...values: unknown[]) => logs.push(values.map(String).join(" "));
+  try {
+    const result = await createRecommendationRequestSnapshotResult(
+      {
+        userId: "U1",
+        algorithmVersion: "unit-v1",
+        surface: RecommendationSurface.HOME,
+        candidateProfile: "unit",
+        filterProfile: "unit",
+        items: [{ bookId: "B1", position: 1, score: 9 }],
+      },
+      {
+        persist: async () => {
+          throw new Error("postgresql://secret-user:secret-password@database/private-sql");
+        },
+      },
+    );
+    assert.equal(result.requestId, null);
+    assert.equal(result.trackingStatus, "DEGRADED");
+    assert.equal(result.trackingReason, "PERSISTENCE_UNAVAILABLE");
+    assert.equal(logs.some((line) => line.includes("secret-password")), false);
+    assert.equal(logs.some((line) => line.includes("private-sql")), false);
+  } finally {
+    console.error = originalError;
+  }
 });

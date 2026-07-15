@@ -93,7 +93,7 @@ export default async function HomePage() {
                 ))}
               </div>
             </div>
-            <div className="absolute bottom-6 left-6 right-6 rounded-lg border border-white/18 bg-[#17191F]/72 px-4 py-3 text-[#FFFDF8] shadow-[0_18px_40px_rgba(0,0,0,0.18)] backdrop-blur">
+            <div className="pointer-events-none absolute bottom-6 left-6 right-6 rounded-lg border border-white/18 bg-[#17191F]/72 px-4 py-3 text-[#FFFDF8] shadow-[0_18px_40px_rgba(0,0,0,0.18)] backdrop-blur">
               <p className="text-sm font-bold">Kệ sách hôm nay</p>
               <p className="mt-1 text-xs leading-5 text-[#DCE8E4]">
                 Mở một sách để bắt đầu đọc, bookmark và ghi nhận tiến độ.

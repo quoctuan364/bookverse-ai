@@ -10,6 +10,13 @@ import {
 import { TAXONOMY_VERSION } from "@/lib/interaction-taxonomy";
 import prisma from "@/lib/prisma";
 import {
+  normalizeRecommendationCandidates,
+  type RecommendationCandidateSource,
+  type RecommendationNormalizationStats,
+  type RecommendationTrackingReason,
+  type RecommendationTrackingStatus,
+} from "@/lib/recommendation-position-policy";
+import {
   attributionWindowDays,
   selectConversionAttributions,
   type ClientTelemetryEvent,
@@ -26,9 +33,37 @@ const VALID_PURCHASE_STATUSES: OrderStatus[] = [
 
 export interface RecommendationSnapshotItem {
   bookId: string;
-  position: number;
+  position?: number | null;
   score: number;
   evidence?: string | null;
+  source?: RecommendationCandidateSource;
+  productionOrder?: number;
+}
+
+export interface RecommendationTrackingResult {
+  requestId: string | null;
+  trackingStatus: RecommendationTrackingStatus;
+  trackingReason: RecommendationTrackingReason;
+  itemCount: number;
+  normalization: RecommendationNormalizationStats;
+}
+
+interface NormalizedSnapshotPersistenceInput {
+  userId: string;
+  algorithmVersion: string;
+  surface: RecommendationSurface;
+  candidateProfile: string;
+  filterProfile: string;
+  items: Array<{ bookId: string; position: number; score: number; evidence: string | null }>;
+}
+
+export type RecommendationSnapshotPersistence = (
+  input: NormalizedSnapshotPersistenceInput,
+) => Promise<string>;
+
+export interface RecommendationSnapshotOptions {
+  /** Chỉ dùng để unit test nhánh persistence unavailable mà không cần database. */
+  persist?: RecommendationSnapshotPersistence;
 }
 
 export class RecommendationTelemetryError extends Error {
@@ -45,6 +80,111 @@ export class RecommendationTelemetryError extends Error {
   }
 }
 
+export function classifyRecommendationPersistenceFailure(
+  error: unknown,
+): Extract<
+  RecommendationTrackingReason,
+  "PERSISTENCE_UNAVAILABLE" | "DATABASE_UNAVAILABLE" | "REQUEST_VALIDATION_FAILED"
+> {
+  const details = error && typeof error === "object" ? (error as { code?: unknown; name?: unknown }) : {};
+  const code = typeof details.code === "string" ? details.code : "";
+  const name = typeof details.name === "string" ? details.name : "";
+  if (["P1001", "P1002", "P1008", "P1017"].includes(code) || name === "PrismaClientInitializationError") {
+    return "DATABASE_UNAVAILABLE";
+  }
+  if (name === "PrismaClientValidationError") return "REQUEST_VALIDATION_FAILED";
+  return "PERSISTENCE_UNAVAILABLE";
+}
+
+async function persistRecommendationSnapshot(input: NormalizedSnapshotPersistenceInput): Promise<string> {
+  const request = await prisma.$transaction(async (transaction) => {
+    return transaction.recommendationRequest.create({
+      data: {
+        userId: input.userId,
+        algorithmVersion: input.algorithmVersion,
+        taxonomyVersion: TAXONOMY_VERSION,
+        surface: input.surface,
+        candidateProfile: input.candidateProfile,
+        filterProfile: input.filterProfile,
+        items: {
+          create: input.items,
+        },
+      },
+      select: { id: true },
+    });
+  });
+  return request.id;
+}
+
+export async function createRecommendationRequestSnapshotResult(input: {
+  userId: string;
+  algorithmVersion: string;
+  surface: RecommendationSurface;
+  candidateProfile: string;
+  filterProfile: string;
+  items: RecommendationSnapshotItem[];
+}, options: RecommendationSnapshotOptions = {}): Promise<RecommendationTrackingResult> {
+  const normalized = normalizeRecommendationCandidates(
+    input.items.map((item, index) => ({
+      bookId: item.bookId,
+      score: item.score,
+      evidence: item.evidence,
+      rank: item.position,
+      source: item.source ?? "CURRENT",
+      productionOrder: item.productionOrder ?? index,
+      payload: null,
+    })),
+    Math.max(1, input.items.length),
+  );
+  if (normalized.items.length === 0) {
+    return {
+      requestId: null,
+      trackingStatus: "DEGRADED",
+      trackingReason: "REQUEST_VALIDATION_FAILED",
+      itemCount: 0,
+      normalization: normalized.stats,
+    };
+  }
+
+  const persistenceInput: NormalizedSnapshotPersistenceInput = {
+    userId: input.userId,
+    algorithmVersion: input.algorithmVersion,
+    surface: input.surface,
+    candidateProfile: input.candidateProfile,
+    filterProfile: input.filterProfile,
+    items: normalized.items.map((item) => ({
+      bookId: item.bookId,
+      position: item.position,
+      score: item.score,
+      evidence: item.evidence?.slice(0, 1_000) ?? null,
+    })),
+  };
+
+  try {
+    const requestId = await (options.persist ?? persistRecommendationSnapshot)(persistenceInput);
+    return {
+      requestId,
+      trackingStatus: "TRACKED",
+      trackingReason: normalized.reason,
+      itemCount: normalized.items.length,
+      normalization: normalized.stats,
+    };
+  } catch (error: unknown) {
+    const trackingReason = classifyRecommendationPersistenceFailure(error);
+    // Không log raw error vì Prisma có thể chứa SQL hoặc connection string.
+    console.error(
+      `[recommendation.telemetry] snapshot degraded reason=${trackingReason} surface=${input.surface}`,
+    );
+    return {
+      requestId: null,
+      trackingStatus: "DEGRADED",
+      trackingReason,
+      itemCount: normalized.items.length,
+      normalization: normalized.stats,
+    };
+  }
+}
+
 export async function createRecommendationRequestSnapshot(input: {
   userId: string;
   algorithmVersion: string;
@@ -53,42 +193,8 @@ export async function createRecommendationRequestSnapshot(input: {
   filterProfile: string;
   items: RecommendationSnapshotItem[];
 }): Promise<string | null> {
-  const uniqueBookIds = new Set<string>();
-  const items = input.items.filter((item) => {
-    if (
-      !item.bookId.trim() ||
-      uniqueBookIds.has(item.bookId) ||
-      !Number.isInteger(item.position) ||
-      item.position <= 0 ||
-      !Number.isFinite(item.score)
-    ) {
-      return false;
-    }
-    uniqueBookIds.add(item.bookId);
-    return true;
-  });
-  if (items.length === 0) return null;
-
-  const request = await prisma.recommendationRequest.create({
-    data: {
-      userId: input.userId,
-      algorithmVersion: input.algorithmVersion,
-      taxonomyVersion: TAXONOMY_VERSION,
-      surface: input.surface,
-      candidateProfile: input.candidateProfile,
-      filterProfile: input.filterProfile,
-      items: {
-        create: items.map((item) => ({
-          bookId: item.bookId,
-          position: item.position,
-          score: item.score,
-          evidence: item.evidence?.slice(0, 1_000) ?? null,
-        })),
-      },
-    },
-    select: { id: true },
-  });
-  return request.id;
+  const result = await createRecommendationRequestSnapshotResult(input);
+  return result.requestId;
 }
 
 function canonicalEventFor(type: ClientTelemetryEvent): string {

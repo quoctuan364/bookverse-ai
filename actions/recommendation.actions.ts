@@ -8,9 +8,16 @@ import {
 import { getCurrentUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
 import {
-  createRecommendationRequestSnapshot,
+  createRecommendationRequestSnapshotResult,
   syncRecommendationConversionsForUser,
+  type RecommendationTrackingResult,
 } from "@/lib/recommendation-telemetry";
+import {
+  normalizeRecommendationCandidates,
+  type RecommendationNormalizationStats,
+  type RecommendationTrackingReason,
+  type RecommendationTrackingStatus,
+} from "@/lib/recommendation-position-policy";
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL ?? "http://127.0.0.1:8000";
 const AI_TIMEOUT_MS = 4_000;
@@ -40,7 +47,20 @@ export interface RecommendationBatch {
   books: RecommendedBook[];
   requestId: string | null;
   source: "fastapi_hybrid_v2" | "fallback";
+  trackingStatus: RecommendationTrackingStatus;
+  trackingReason: RecommendationTrackingReason;
+  trackingNormalization: RecommendationNormalizationStats;
 }
+
+const EMPTY_NORMALIZATION: RecommendationNormalizationStats = {
+  inputCount: 0,
+  outputCount: 0,
+  duplicateBookCount: 0,
+  duplicateRankCount: 0,
+  invalidRankCount: 0,
+  invalidCandidateCount: 0,
+  truncatedCount: 0,
+};
 
 function decimalToNumber(value: DecimalLike | number | string): number {
   if (typeof value === "number") {
@@ -217,8 +237,8 @@ async function persistRecommendations(
       ]);
     }
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Lỗi không xác định.";
-    console.error(`[persistRecommendations] Không thể lưu evidence: ${message}`);
+    // Không log raw Prisma error vì có thể chứa SQL hoặc connection string.
+    console.error("[persistRecommendations] Không thể lưu recommendation/evidence.");
   }
 }
 
@@ -255,8 +275,7 @@ async function getFallbackBooksSafely(context: string): Promise<RecommendedBook[
   try {
     return await getFallbackBooks();
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Lỗi không xác định.";
-    console.error(`[getRecommendedBooks] Không thể lấy fallback (${context}): ${message}`);
+    console.error(`[getRecommendedBooks] Không thể lấy fallback (${context}).`);
     return [];
   }
 }
@@ -272,26 +291,22 @@ async function syncConversionsSafely(userId: string): Promise<void> {
 async function createRequestSnapshotSafely(
   userId: string,
   books: RecommendedBook[],
-): Promise<string | null> {
-  try {
-    return await createRecommendationRequestSnapshot({
-      userId,
-      algorithmVersion: "fastapi_hybrid_v2",
-      surface: RecommendationSurface.HOME,
-      candidateProfile: "active-not-deleted-current-catalog",
-      filterProfile: "exclude-user-history-production",
-      items: books.map((book, index) => ({
-        bookId: book.id,
-        position: index + 1,
-        score: book.recommendationScore ?? 0,
-        evidence: book.recommendationEvidence ?? null,
-      })),
-    });
-  } catch {
-    // Recommendation vẫn hiển thị khi telemetry tạm lỗi.
-    console.error("[getRecommendedBooks] Không thể tạo recommendation request telemetry.");
-    return null;
-  }
+): Promise<RecommendationTrackingResult> {
+  return createRecommendationRequestSnapshotResult({
+    userId,
+    algorithmVersion: "fastapi_hybrid_v2",
+    surface: RecommendationSurface.HOME,
+    candidateProfile: "active-not-deleted-current-catalog",
+    filterProfile: "exclude-user-history-production",
+    items: books.map((book, index) => ({
+      bookId: book.id,
+      position: index + 1,
+      score: book.recommendationScore ?? 0,
+      evidence: book.recommendationEvidence ?? null,
+      source: "CURRENT",
+      productionOrder: index,
+    })),
+  });
 }
 
 export async function getRecommendedBooks(): Promise<RecommendationBatch> {
@@ -303,28 +318,61 @@ export async function getRecommendedBooks(): Promise<RecommendationBatch> {
       books: await getFallbackBooksSafely("guest"),
       requestId: null,
       source: "fallback",
+      trackingStatus: "DEGRADED",
+      trackingReason: "REQUEST_VALIDATION_FAILED",
+      trackingNormalization: EMPTY_NORMALIZATION,
     };
   }
 
   try {
     await syncConversionsSafely(resolvedUserId);
     const recommendations = await fetchAIRecommendations(resolvedUserId);
-    await persistRecommendations(resolvedUserId, recommendations);
-    const recommendedBooks = await getBooksByRecommendations(recommendations);
+    const normalization = normalizeRecommendationCandidates(
+      recommendations.map((item, index) => ({
+        bookId: item.bookId,
+        rank: index + 1,
+        score: item.score,
+        evidence: item.evidence,
+        source: "CURRENT" as const,
+        productionOrder: index,
+        payload: item,
+      })),
+      FALLBACK_LIMIT,
+    );
+    const normalizedRecommendations = normalization.items.map((item) => item.payload);
+    await persistRecommendations(resolvedUserId, normalizedRecommendations);
+    const recommendedBooks = await getBooksByRecommendations(normalizedRecommendations);
 
     if (recommendedBooks.length === 0) {
-      return { books: await getFallbackBooks(), requestId: null, source: "fallback" };
+      return {
+        books: await getFallbackBooks(),
+        requestId: null,
+        source: "fallback",
+        trackingStatus: "DEGRADED",
+        trackingReason: "REQUEST_VALIDATION_FAILED",
+        trackingNormalization: normalization.stats,
+      };
     }
 
-    const requestId = await createRequestSnapshotSafely(resolvedUserId, recommendedBooks);
-    return { books: recommendedBooks, requestId, source: "fastapi_hybrid_v2" };
+    const tracking = await createRequestSnapshotSafely(resolvedUserId, recommendedBooks);
+    return {
+      books: recommendedBooks,
+      requestId: tracking.requestId,
+      source: "fastapi_hybrid_v2",
+      trackingStatus: tracking.trackingStatus,
+      trackingReason:
+        tracking.trackingStatus === "TRACKED" ? normalization.reason : tracking.trackingReason,
+      trackingNormalization: normalization.stats,
+    };
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Lỗi không xác định.";
-    console.error(`[getRecommendedBooks] Fallback vì AI service lỗi: ${message}`);
+    console.error("[getRecommendedBooks] Fallback vì AI service lỗi.");
     return {
       books: await getFallbackBooksSafely("ai_error"),
       requestId: null,
       source: "fallback",
+      trackingStatus: "DEGRADED",
+      trackingReason: "PERSISTENCE_UNAVAILABLE",
+      trackingNormalization: EMPTY_NORMALIZATION,
     };
   }
 }
@@ -339,10 +387,23 @@ export async function refreshRecommendationsForUser(
   }
 
   const recommendations = await fetchAIRecommendations(cleanUserId);
-  await persistRecommendations(cleanUserId, recommendations);
+  const normalization = normalizeRecommendationCandidates(
+    recommendations.map((item, index) => ({
+      bookId: item.bookId,
+      rank: index + 1,
+      score: item.score,
+      evidence: item.evidence,
+      source: "CURRENT" as const,
+      productionOrder: index,
+      payload: item,
+    })),
+    FALLBACK_LIMIT,
+  );
+  const normalizedRecommendations = normalization.items.map((item) => item.payload);
+  await persistRecommendations(cleanUserId, normalizedRecommendations);
 
   return {
-    count: recommendations.length,
+    count: normalizedRecommendations.length,
     algorithm: "fastapi_hybrid_v2",
   };
 }

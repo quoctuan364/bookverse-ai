@@ -10,6 +10,7 @@ import prisma from "@/lib/prisma";
 import {
   RecommendationTelemetryError,
   createRecommendationRequestSnapshot,
+  createRecommendationRequestSnapshotResult,
   recordRecommendationTelemetry,
   syncRecommendationConversionsForUser,
 } from "@/lib/recommendation-telemetry";
@@ -76,8 +77,8 @@ async function main(): Promise<void> {
   const lockedId = `${prefix}-LOCKED`;
   const orderIds = [`${prefix}-VALID`, `${prefix}-CANCELLED`, `${prefix}-REFUNDED`];
   const before = await counts();
-  const books = await prisma.book.findMany({ orderBy: { id: "asc" }, take: 3, select: { id: true } });
-  assert.equal(books.length, 3, "Test cần tối thiểu ba Book.");
+  const books = await prisma.book.findMany({ orderBy: { id: "asc" }, take: 4, select: { id: true } });
+  assert.equal(books.length, 4, "Test cần tối thiểu bốn Book.");
 
   try {
     await prisma.user.createMany({
@@ -88,18 +89,93 @@ async function main(): Promise<void> {
       ],
     });
 
-    const requestId = await createRecommendationRequestSnapshot({
+    const normalizedSnapshot = await createRecommendationRequestSnapshotResult({
       userId: ownerId,
       algorithmVersion: "integration-fixture-v1",
       surface: RecommendationSurface.HOME,
       candidateProfile: "integration",
       filterProfile: "integration",
       items: [
-        { bookId: books[0].id, position: 1, score: 9.5, evidence: "server evidence" },
-        { bookId: books[1].id, position: 2, score: 8.5, evidence: "server evidence" },
+        { bookId: books[0].id, position: 1, score: 9.5, evidence: "current", source: "CURRENT" },
+        { bookId: books[1].id, position: 1, score: 8.5, evidence: "legacy", source: "LEGACY" },
+        { bookId: books[0].id, position: 2, score: 7.5, evidence: "duplicate Book" },
+        { bookId: books[2].id, position: 0, score: 6.5, evidence: "invalid rank" },
       ],
     });
+    assert.equal(normalizedSnapshot.trackingStatus, "TRACKED");
+    assert.equal(normalizedSnapshot.trackingReason, "DUPLICATE_BOOK_NORMALIZED");
+    const requestId = normalizedSnapshot.requestId;
     assert.ok(requestId);
+
+    const normalizedItems = await prisma.recommendationRequestItem.findMany({
+      where: { requestId },
+      orderBy: { position: "asc" },
+      select: { bookId: true, position: true, score: true, evidence: true },
+    });
+    assert.deepEqual(normalizedItems.map((item) => item.position), [1, 2, 3]);
+    assert.deepEqual(normalizedItems.map((item) => item.bookId), books.slice(0, 3).map((book) => book.id));
+    assert.deepEqual(normalizedItems.map((item) => item.score), [9.5, 8.5, 6.5]);
+
+    const beforeAtomicFailure = await Promise.all([
+      prisma.recommendationRequest.count({ where: { userId: ownerId } }),
+      prisma.recommendationRequestItem.count({ where: { request: { userId: ownerId } } }),
+    ]);
+    const atomicFailure = await createRecommendationRequestSnapshotResult({
+      userId: ownerId,
+      algorithmVersion: "integration-atomic-failure-v1",
+      surface: RecommendationSurface.RECOMMENDATION_API,
+      candidateProfile: "integration",
+      filterProfile: "integration",
+      items: [
+        { bookId: books[0].id, position: 1, score: 1 },
+        { bookId: `${prefix}-BOOK-NOT-FOUND`, position: 2, score: 0.5 },
+      ],
+    });
+    assert.equal(atomicFailure.trackingStatus, "DEGRADED");
+    assert.equal(atomicFailure.requestId, null);
+    const afterAtomicFailure = await Promise.all([
+      prisma.recommendationRequest.count({ where: { userId: ownerId } }),
+      prisma.recommendationRequestItem.count({ where: { request: { userId: ownerId } } }),
+    ]);
+    assert.deepEqual(afterAtomicFailure, beforeAtomicFailure, "Transaction lỗi không được để lại request mồ côi.");
+
+    const concurrentSnapshots = await Promise.all([
+      createRecommendationRequestSnapshotResult({
+        userId: ownerId,
+        algorithmVersion: "integration-concurrent-a-v1",
+        surface: RecommendationSurface.RECOMMENDATION_API,
+        candidateProfile: "integration-a",
+        filterProfile: "integration",
+        items: [
+          { bookId: books[0].id, position: 1, score: 3 },
+          { bookId: books[1].id, position: 1, score: 2 },
+        ],
+      }),
+      createRecommendationRequestSnapshotResult({
+        userId: ownerId,
+        algorithmVersion: "integration-concurrent-b-v1",
+        surface: RecommendationSurface.DASHBOARD,
+        candidateProfile: "integration-b",
+        filterProfile: "integration",
+        items: [
+          { bookId: books[2].id, position: 9, score: 5 },
+          { bookId: books[1].id, position: 20, score: 4 },
+        ],
+      }),
+    ]);
+    assert.ok(concurrentSnapshots.every((item) => item.trackingStatus === "TRACKED" && item.requestId));
+    const concurrentSnapshotIds = concurrentSnapshots.map((item) => item.requestId as string);
+    assert.equal(new Set(concurrentSnapshotIds).size, 2, "Hai request đồng thời phải có ID độc lập.");
+    const concurrentSnapshotItems = await prisma.recommendationRequestItem.findMany({
+      where: { requestId: { in: concurrentSnapshotIds } },
+      orderBy: [{ requestId: "asc" }, { position: "asc" }],
+      select: { requestId: true, bookId: true, position: true },
+    });
+    for (const concurrentId of concurrentSnapshotIds) {
+      const requestItems = concurrentSnapshotItems.filter((item) => item.requestId === concurrentId);
+      assert.deepEqual(requestItems.map((item) => item.position), [1, 2]);
+      assert.equal(new Set(requestItems.map((item) => item.bookId)).size, 2);
+    }
 
     const impression = await recordRecommendationTelemetry({
       currentUserId: ownerId,
@@ -147,7 +223,7 @@ async function main(): Promise<void> {
         recordRecommendationTelemetry({
           currentUserId: ownerId,
           requestId,
-          bookId: books[2].id,
+          bookId: books[3].id,
           eventType: "CLICK",
         }),
       "BOOK_NOT_IN_REQUEST",
@@ -238,6 +314,11 @@ async function main(): Promise<void> {
       status: "PASS",
       databaseName: target.databaseName,
       requestId,
+      normalization: normalizedSnapshot.normalization,
+      normalizedPositions: normalizedItems.map((item) => item.position),
+      atomicRollback: afterAtomicFailure.join("|") === beforeAtomicFailure.join("|"),
+      concurrentSnapshotIds,
+      concurrentSnapshotsIndependent: new Set(concurrentSnapshotIds).size === 2,
       impressionIdempotent: true,
       clickIdempotent: true,
       nonOwnerBlocked: true,

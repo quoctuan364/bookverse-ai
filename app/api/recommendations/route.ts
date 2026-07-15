@@ -3,9 +3,15 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
 import {
-  createRecommendationRequestSnapshot,
+  createRecommendationRequestSnapshotResult,
   syncRecommendationConversionsForUser,
+  type RecommendationTrackingResult,
 } from "@/lib/recommendation-telemetry";
+import {
+  dedupeRecommendationEvidence,
+  normalizeRecommendationCandidates,
+  type RecommendationNormalizationResult,
+} from "@/lib/recommendation-position-policy";
 
 type DecimalLike = {
   toNumber: () => number;
@@ -49,20 +55,48 @@ async function createApiRequestSafely(
   userId: string,
   algorithmVersion: string,
   items: Array<{ bookId: string; position: number; score: number; evidence?: string | null }>,
-): Promise<string | null> {
-  try {
-    return await createRecommendationRequestSnapshot({
-      userId,
-      algorithmVersion,
-      surface: RecommendationSurface.RECOMMENDATION_API,
-      candidateProfile: "persisted-recommendation-catalog",
-      filterProfile: "active-user-owned-request",
-      items,
-    });
-  } catch {
-    console.error("[api/recommendations] Không thể tạo request telemetry.");
-    return null;
-  }
+): Promise<RecommendationTrackingResult> {
+  return createRecommendationRequestSnapshotResult({
+    userId,
+    algorithmVersion,
+    surface: RecommendationSurface.RECOMMENDATION_API,
+    candidateProfile: "persisted-recommendation-catalog",
+    filterProfile: "active-user-owned-request",
+    items,
+  });
+}
+
+function trackingContract<T>(
+  tracking: RecommendationTrackingResult,
+  normalization: RecommendationNormalizationResult<T>,
+) {
+  return {
+    requestId: tracking.requestId,
+    trackingStatus: tracking.trackingStatus,
+    trackingReason:
+      tracking.trackingStatus === "TRACKED" ? normalization.reason : tracking.trackingReason,
+    trackingNormalization: normalization.stats,
+  };
+}
+
+type EvidenceRow = {
+  id: string;
+  type: string;
+  label: string;
+  weight: number;
+  sourceType: string | null;
+  sourceId: string | null;
+};
+
+function serializeEvidence(evidence: EvidenceRow[]) {
+  return dedupeRecommendationEvidence(evidence).map((item) => ({
+    id: item.id,
+    type: item.type,
+    text: item.label,
+    weight: item.weight,
+    sourceType: item.sourceType,
+    sourceId: item.sourceId,
+  }));
 }
 
 export async function GET(request: Request) {
@@ -124,8 +158,14 @@ export async function GET(request: Request) {
         {
           score: "desc",
         },
+        {
+          generatedAt: "desc",
+        },
+        {
+          id: "asc",
+        },
       ],
-      take: limit,
+      take: Math.min(limit * 4, 160),
       include: {
         book: {
           select: {
@@ -161,24 +201,37 @@ export async function GET(request: Request) {
     });
 
     if (dailyRecommendations.length > 0) {
-      const requestId = await createApiRequestSafely(
-        userId,
-        dailyRecommendations[0]?.algorithm ?? "daily_hybrid_v1",
-        dailyRecommendations.map((item) => ({
+      const normalization = normalizeRecommendationCandidates(
+        dailyRecommendations.map((item, index) => ({
           bookId: item.book.id,
-          position: item.rank,
+          rank: item.rank,
           score: item.score,
           evidence: item.reason ?? item.evidence[0]?.label ?? null,
+          source: "DAILY" as const,
+          productionOrder: index,
+          payload: item,
+        })),
+        limit,
+      );
+      const tracking = await createApiRequestSafely(
+        userId,
+        normalization.items[0]?.payload.algorithm ?? "daily_hybrid_v1",
+        normalization.items.map((item) => ({
+          bookId: item.bookId,
+          position: item.position,
+          score: item.score,
+          evidence: item.evidence,
         })),
       );
       return NextResponse.json(
         {
           success: true,
           source: "daily_recommendations",
-          requestId,
-          data: dailyRecommendations.map((recommendation) => ({
+          ...trackingContract(tracking, normalization),
+          data: normalization.items.map(({ payload: recommendation, position }) => ({
             id: recommendation.id,
             rank: recommendation.rank,
+            position,
             score: recommendation.score,
             reason: recommendation.reason ?? recommendation.evidence[0]?.label ?? null,
             algorithm: recommendation.algorithm,
@@ -193,17 +246,11 @@ export async function GET(request: Request) {
               rating: recommendation.book.rating ? decimalToNumber(recommendation.book.rating) : null,
               category: recommendation.book.category,
             },
-            evidence: recommendation.evidence.map((item) => ({
-              id: item.id,
-              type: item.type,
-              text: item.label,
-              weight: item.weight,
-              sourceType: item.sourceType,
-              sourceId: item.sourceId,
-            })),
+            evidence: serializeEvidence(recommendation.evidence),
           })),
           meta: {
-            count: dailyRecommendations.length,
+            count: normalization.items.length,
+            rawCount: dailyRecommendations.length,
             limit,
           },
         },
@@ -226,8 +273,14 @@ export async function GET(request: Request) {
         {
           score: "desc",
         },
+        {
+          generatedAt: "desc",
+        },
+        {
+          id: "asc",
+        },
       ],
-      take: limit,
+      take: Math.min(limit * 4, 160),
       include: {
         evidence: {
           orderBy: {
@@ -269,14 +322,26 @@ export async function GET(request: Request) {
     });
     const bookById = new Map(books.map((book) => [book.id, book]));
     const validFallback = fallbackRecommendations.filter((item) => bookById.has(item.targetId));
-    const requestId = await createApiRequestSafely(
-      userId,
-      validFallback[0]?.algorithm ?? "fastapi_hybrid_v2",
-      validFallback.map((item) => ({
+    const normalization = normalizeRecommendationCandidates(
+      validFallback.map((item, index) => ({
         bookId: item.targetId,
-        position: item.rank,
+        rank: item.rank,
         score: item.score,
         evidence: item.reason ?? item.evidence[0]?.label ?? null,
+        source: item.algorithm === "fastapi_hybrid_v2" ? ("CURRENT" as const) : ("LEGACY" as const),
+        productionOrder: index,
+        payload: item,
+      })),
+      limit,
+    );
+    const tracking = await createApiRequestSafely(
+      userId,
+      normalization.items[0]?.payload.algorithm ?? "fastapi_hybrid_v2",
+      normalization.items.map((item) => ({
+        bookId: item.bookId,
+        position: item.position,
+        score: item.score,
+        evidence: item.evidence,
       })),
     );
 
@@ -284,9 +349,9 @@ export async function GET(request: Request) {
       {
         success: true,
         source: "recommendations",
-        requestId,
-        data: validFallback
-          .map((recommendation) => {
+        ...trackingContract(tracking, normalization),
+        data: normalization.items
+          .map(({ payload: recommendation, position }) => {
             const book = bookById.get(recommendation.targetId);
 
             if (!book) {
@@ -296,6 +361,7 @@ export async function GET(request: Request) {
             return {
               id: recommendation.id,
               rank: recommendation.rank,
+              position,
               score: recommendation.score,
               reason: recommendation.reason ?? recommendation.evidence[0]?.label ?? null,
               algorithm: recommendation.algorithm,
@@ -310,19 +376,13 @@ export async function GET(request: Request) {
                 rating: book.rating ? decimalToNumber(book.rating) : null,
                 category: book.category,
               },
-              evidence: recommendation.evidence.map((item) => ({
-                id: item.id,
-                type: item.type,
-                text: item.label,
-                weight: item.weight,
-                sourceType: item.sourceType,
-                sourceId: item.sourceId,
-              })),
+              evidence: serializeEvidence(recommendation.evidence),
             };
           })
           .filter((item): item is NonNullable<typeof item> => Boolean(item)),
         meta: {
-          count: fallbackRecommendations.length,
+          count: normalization.items.length,
+          rawCount: fallbackRecommendations.length,
           limit,
         },
       },
@@ -331,14 +391,13 @@ export async function GET(request: Request) {
       },
     );
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Lỗi không xác định.";
-    console.error(`[api/recommendations] ${message}`);
+    // Không log raw Prisma/SQL/connection string.
+    console.error("[api/recommendations] request failed");
 
     return NextResponse.json(
       {
         success: false,
         error: "Không thể lấy gợi ý sách cá nhân hóa.",
-        detail: process.env.NODE_ENV === "development" ? message : undefined,
       },
       {
         status: 500,
