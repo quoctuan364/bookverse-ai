@@ -413,3 +413,67 @@ Policy là click hợp lệ chia impression hợp lệ trong cùng surface/thờ
 ## F1.14. Hạn chế và F2
 
 Dữ liệu lịch sử synthetic, required field legacy chưa đầy đủ, chưa có telemetry người dùng thật và final window cũ không unseen. F2 nên thu log thật đủ thời gian, thêm data-quality/retention monitoring và dashboard theo surface; chỉ tune trên validation. Sau khi khóa model mới tạo final test post-F1 hoàn toàn chưa xem.
+
+---
+
+# Báo cáo kiểm thử Checkpoint F1.1 — Telemetry reliability và hotfix R1.1
+
+Ngày chạy cuối: 15/07/2026.
+
+## F1.1.1. Root cause và bản sửa
+
+`app/api/recommendations/route.ts` đọc chung Recommendation current/legacy, sắp xếp để hiển thị rồi dùng thẳng `rank` gốc làm request-item `position`. Hai Book khác nhau có cùng rank làm vi phạm unique `recommendation_request_items_requestId_position_key`; nested create rollback toàn request. Wrapper API bắt lỗi để recommendation vẫn hiển thị nên response có đủ Book nhưng `requestId=null`.
+
+Hotfix đưa merge/dedupe/position vào policy tập trung. Book trùng được loại trước top-K; thứ tự production được giữ, tie-break là source priority, rank hợp lệ, Book ID; score không đổi và evidence không bị cộng/trùng. Position được gán lại liên tục `1..N`. Request và toàn bộ item được ghi trong một transaction; persistence lỗi trả contract degraded an toàn.
+
+## F1.1.2. Kết quả test
+
+- Unit TypeScript: 85/85 PASS, gồm rank trùng/null/0/âm/gap, ba nguồn, duplicate Book, top-K deterministic, evidence, score, empty/one Book, client payload giả và degraded contract.
+- PostgreSQL integration: rank collision vẫn có requestId; position `[1,2,3]`; atomic failure không orphan; hai request concurrent độc lập; impression/click idempotent; non-owner/locked/arbitrary Book bị chặn; conversion attribution và cleanup PASS.
+- Stress: 100/100 request TRACKED, 100 requestId duy nhất, null-rate 0; 34 HOME, 33 API, 33 DASHBOARD; 100 duplicate Book, 100 duplicate rank, 300 invalid rank và 200 candidate quá top-K được normalize. Mismatch Book/score/evidence/position = 0; duplicate Book/position = 0; orphan request/item/event = 0; recommendation/telemetry 5xx = 0.
+- Production parity: 3 user/30 row PASS, max score delta 0, Book/evidence giữ nguyên. Hai evaluation run có cùng checksum `bfdb45b1981dd53715943d6f2271e731a3443dae70ed097ab965cd9236ac7ad9`.
+- Regression: Prisma validate/generate, typecheck, Python compile/pytest, Category ultra + legacy, Stock 11/11, Assistant d1, taxonomy, Next build, Compose config và Docker web build đều exit 0.
+
+## F1.1.3. Browser và degraded UI
+
+Browser tích hợp lỗi runtime `Cannot redefine property: process`; kiểm thử chuyển sang Chrome Playwright headless theo fallback đã duyệt. Trên production build test: Home có 10 Book/15 link hero+grid; API position 1–10 và database khớp; scroll lần hai không phát impression lại; duplicate event trả 200; click grid và hero đều điều hướng. AI service tắt thật vẫn render fallback, không gắn requestId, không gửi telemetry và không có console crash.
+
+Playwright phát hiện lớp chú thích hero chặn pointer event; thêm `pointer-events-none` và retest hero click PASS. Ảnh smoke demo xác nhận layout/card/reason hiển thị, nhưng một static cover resource trả 404 và một số bìa hiện nền trống; đây là rủi ro asset dữ liệu có sẵn, không thuộc telemetry F1.1.
+
+## F1.1.4. Hotfix demo
+
+- Baseline: 12/12 migration `APPLIED_VALID`; web R1 `sha256:7c05c1fdb4cc07f538819787d7b903c5e2f2824cb66cba87f2d0bf56df81d827`.
+- Image R1.1: `sha256:216b0b32dd54b2de81afca696840d21ebf8b1049a8c80de04dd3b23799184b3f`; image env/history và web log secret/raw-DB scan PASS.
+- Chỉ web container được recreate. StartedAt của DB `2026-07-15T13:51:12.382247592Z` và AI `2026-07-15T13:56:59.721176726Z` giữ nguyên.
+- Surface lỗi thật có 22 candidate và 10 rank collision; API vẫn trả 10 Book, position 1–10, `trackingStatus=TRACKED`, requestId khác null. Marker `deployment-smoke-r1-1` được ghi đúng request.
+- Impression 201, duplicate 200/idempotent; click 201 và điều hướng `/book/B0273`; non-owner 403, locked 403, arbitrary Book 404; `/`, `/catalog`, `/dashboard` và login đều HTTP 200.
+- Cleanup xóa đúng 2 request, 10 current recommendation, 1 BOOK_VIEW theo ID và phục hồi `lastActiveAt`/lock của ba user.
+
+## F1.1.5. Count và command cuối
+
+| Dữ liệu demo | Trước | Sau cleanup |
+|---|---:|---:|
+| User | 300 | 300 |
+| Category | 24 | 24 |
+| Book | 1.200 | 1.200 |
+| Listing | 1.200 | 1.200 |
+| Order | 1.500 | 1.500 |
+| OrderItem | 2.570 | 2.570 |
+| Recommendation | 3.000 | 3.000 |
+| RecommendationEvidence | 6.027 | 6.027 |
+| RecommendationRequest/Item/Event | 0/0/0 | 0/0/0 |
+
+| Command/cổng | Exit code | Kết quả |
+|---|---:|---|
+| `npx prisma validate` / `npx prisma generate` | 0/0 | PASS |
+| `npm run typecheck` / `npm test` | 0/0 | PASS; 85/85 |
+| Python compile / pytest / DB parity | 0 | PASS; 21 pass, 1 skip + 1 integration |
+| Category / legacy Category / Stock / Assistant | 0 | PASS |
+| Taxonomy / rank collision / telemetry integration | 0 | PASS |
+| `npm run test:telemetry-reliability` | 0 | PASS; 100/100 |
+| Hai lượt `ai_service/evaluate.py` | 0/0 | PASS; cùng checksum |
+| `npm run build` / `docker compose config --quiet` | 0/0 | PASS |
+| `docker compose build --no-cache web` | 0 | PASS |
+| Browser Playwright headless | N/A | PASS; công cụ không trả process exit code |
+
+Không sửa schema/migration, dataset, Category/stock/checkout, Assistant d1, evaluation split, FastAPI production weight hoặc AI image.

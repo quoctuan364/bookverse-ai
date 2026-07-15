@@ -521,3 +521,18 @@ Checkpoint F2 đề xuất chỉ bắt đầu sau thời gian thu log thật: gi
 - Nếu reconciliation hoặc test fail: dừng, không retry destructive; rollback app/feature flag và restore test dump.
 - Database demo chỉ được áp dụng khi người dùng duyệt riêng sau khi xem report rehearsal.
 - Source rollback local đã khả dụng từ baseline commit `df4602f`. Repository chưa có remote và chưa push; dataset/ebook lớn, secret, dump và output runtime không nằm trong Git.
+
+### CHECKPOINT: F1.1 — Recommendation telemetry reliability — ĐÃ HOÀN THÀNH
+
+Trạng thái ngày 15/07/2026: **ĐÃ HOÀN THÀNH VÀ TRIỂN KHAI HOTFIX R1.1** trên branch `checkpoint-f1-1-telemetry-reliability`.
+
+1. Root cause đã được tái hiện trên `bookverse_ai_test`: current/legacy có rank trùng, API dùng rank làm unique position nên transaction rollback và wrapper trả `requestId=null` dù vẫn có Book.
+2. Policy tập trung dedupe Book, giữ thứ tự production, source priority `CURRENT > DAILY > LEGACY > FALLBACK`, không đổi score, kiểm soát evidence và gán position liên tục `1..N`.
+3. Persistence request/items atomic. Database khỏe trả TRACKED/requestId; unavailable trả DEGRADED/reason code an toàn, UI không gửi event khi thiếu requestId.
+4. Unit 85/85, integration PostgreSQL, stress 100 request, production parity 30/30, hai evaluation checksum giống nhau và toàn bộ regression/build PASS.
+5. Browser/Playwright kiểm tra Home/API, impression dwell/idempotency, scroll, degraded UI và click/navigation. Lớp chú thích hero được sửa để không chặn click.
+6. Hotfix code-only chỉ recreate web. Image R1.1 là `sha256:216b0b32dd54b2de81afca696840d21ebf8b1049a8c80de04dd3b23799184b3f`; rollback R1 là `sha256:7c05c1fdb4cc07f538819787d7b903c5e2f2824cb66cba87f2d0bf56df81d827`.
+7. Smoke trên demo gặp 10 duplicate rank vẫn TRACKED/requestId khác null; 201/200 idempotency, click/navigation, 403/404 đều PASS. Record smoke được xóa đúng ID; business count giữ nguyên và telemetry về 0.
+8. Không sửa model weight, FastAPI, schema/migration, dataset, Category, stock, checkout, Assistant d1 hoặc evaluation split.
+
+Điều kiện mở F2: thu telemetry production thật đủ thời gian; chốt retention/privacy và data-quality threshold; có volume impression/click theo surface đủ để CTR không còn `NOT_AVAILABLE`; chỉ tune trên validation mới và khóa model trước final-test mới hoàn toàn chưa xem.

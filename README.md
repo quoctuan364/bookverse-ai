@@ -148,12 +148,17 @@ Taxonomy dùng chung nằm tại `shared/interaction-taxonomy.v1.json`; tài li�
 ```powershell
 npm run data:analyze-interactions
 npm run test:taxonomy-parity
+npm run test:rank-collision
 npm run test:telemetry-integration
+npm run test:telemetry-reliability
+npm run report:recommendation-tracking -- --since-hours=24
 python -m pytest ai_service/tests -q
 python ai_service/prepare_temporal_split.py
 ```
 
 Integration và split chỉ dùng `bookverse_ai_test`. Ba cửa sổ hiện tại là train trước 01/06/2026, validation từ 01/06 đến trước 20/06 và final từ 20/06. Final hiện không còn unseen vì đã được xem ở Checkpoint E; không dùng nó để tune. CTR production vẫn là `NOT_AVAILABLE` vì dữ liệu cũ synthetic và chưa có kỳ thu thập impression/click instrumented thật.
+
+Hotfix F1.1 chuẩn hóa recommendation ở mọi surface: dedupe Book theo source policy, giữ score/evidence của candidate thắng và gán `position` liên tục `1..N` thay vì dùng rank gốc làm unique position. Database khỏe trả `requestId` khác null với `trackingStatus="TRACKED"`; persistence thật sự lỗi trả recommendation ở chế độ `DEGRADED` mà không lộ raw database error. Stress test bắt buộc chạy 100 request trên ba surface, đối soát Book/score/evidence/position với database và cleanup về 0. Chi tiết tại `docs/RECOMMENDATION_TRACKING.md` và `docs/DEPLOYMENT_R1_1_REPORT.md`.
 
 ## Cấu hình pgvector và RAG Chatbot
 
