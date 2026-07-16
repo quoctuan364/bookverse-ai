@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Bot, Search, Sparkles } from "lucide-react";
 import { askBookAssistant } from "@/actions/assistant.actions";
 import { AssistantPageClient } from "@/components/assistant/AssistantPageClient";
+import { SafeBookCover } from "@/components/shared/SafeBookCover";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,9 +14,6 @@ interface AssistantPageProps {
     q?: string;
   }>;
 }
-
-const fallbackCover =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='600' viewBox='0 0 400 600'%3E%3Crect width='400' height='600' fill='%23153A3F'/%3E%3Crect x='48' y='56' width='304' height='488' rx='18' fill='%23F8F6F1' opacity='0.94'/%3E%3Ctext x='200' y='292' text-anchor='middle' font-family='Arial,sans-serif' font-size='38' font-weight='700' fill='%23153A3F'%3EBookVerse%3C/text%3E%3Ctext x='200' y='338' text-anchor='middle' font-family='Arial,sans-serif' font-size='28' fill='%23153A3F'%3EAI%3C/text%3E%3C/svg%3E";
 
 function formatPrice(price: number): string {
   return new Intl.NumberFormat("vi-VN", {
@@ -105,10 +103,10 @@ export default async function AssistantPage({ searchParams }: AssistantPageProps
                   <article className="group overflow-hidden rounded-lg border border-[#17191F]/10 bg-[#FFFDF8] shadow-[0_12px_34px_rgba(39,44,51,0.08)] transition hover:-translate-y-1 hover:border-[#0F766E]/30 hover:shadow-[0_22px_46px_rgba(39,44,51,0.12)]">
                     <div className="flex gap-4 p-4">
                       <div className="aspect-[2/3] w-24 shrink-0 overflow-hidden rounded-lg bg-[#EDE3D5] shadow-[0_12px_26px_rgba(39,44,51,0.12)]">
-                        <img
+                        <SafeBookCover
                           alt={`Bìa sách ${book.title}`}
                           className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                          src={book.coverImage ?? fallbackCover}
+                          src={book.coverImage}
                         />
                       </div>
                       <div className="min-w-0 flex-1">

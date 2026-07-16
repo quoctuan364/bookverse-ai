@@ -10,6 +10,7 @@ import {
 } from "@/components/dashboard/DashboardCharts";
 import { getCurrentUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
+import { loadSellerQualityScores } from "@/lib/seller-quality-data";
 
 export const metadata: Metadata = {
   title: "Dashboard | BookVerse AI",
@@ -148,7 +149,7 @@ export default async function DashboardPage() {
   const readingStartDate = buildDayLabels(14)[0]?.date ?? startOfDay(new Date());
   const revenueStartDate = buildDayLabels(30)[0]?.date ?? startOfDay(new Date());
 
-  const [readingSessions, readingProgress, revenueItems, sellerAiScore] = await Promise.all([
+  const [readingSessions, readingProgress, revenueItems, sellerQualityScores] = await Promise.all([
     prisma.readingSession.findMany({
       where: {
         createdAt: {
@@ -224,19 +225,9 @@ export default async function DashboardPage() {
         totalPrice: true,
       },
     }),
-    prisma.sellerAiScore.findUnique({
-      where: {
-        sellerId: userId,
-      },
-      select: {
-        completedOrders: true,
-        explanation: true,
-        responseRate: true,
-        score: true,
-        trusted: true,
-      },
-    }),
+    loadSellerQualityScores([userId]),
   ]);
+  const sellerQualityScore = sellerQualityScores.get(userId);
 
   const readingChartData = buildReadingChartData(readingSessions);
   const revenueChartData = buildRevenueChartData(revenueItems);
@@ -355,39 +346,41 @@ export default async function DashboardPage() {
           </div>
 
           <aside className="h-fit rounded-2xl border border-white/10 bg-zinc-950/72 p-5 shadow-[0_24px_90px_rgba(0,0,0,0.32)] backdrop-blur-2xl">
-            <h2 className="text-xl font-black">AI Seller Score</h2>
-            <p className="mt-1 text-sm text-zinc-400">Điểm uy tín người bán từ bảng `seller_ai_scores`.</p>
+            <h2 className="text-xl font-black">Điểm chất lượng theo quy tắc</h2>
+            <p className="mt-1 text-sm text-zinc-400">
+              Công thức deterministic v1 từ đơn hoàn tất/hủy và chất lượng listing; không phải điểm AI.
+            </p>
 
-            {sellerAiScore ? (
+            {sellerQualityScore ? (
               <div className="mt-5">
                 <div className="flex items-end justify-between gap-3">
                   <div>
-                    <p className="text-4xl font-black text-[#F2C14E]">{sellerAiScore.score.toFixed(1)}</p>
+                    <p className="text-4xl font-black text-[#F2C14E]">{sellerQualityScore.score.toFixed(1)}</p>
                     <p className="text-sm text-zinc-400">/ 100 điểm</p>
                   </div>
                   <span className="rounded-full border border-[#0F766E]/35 bg-[#0F766E]/18 px-3 py-1 text-xs font-bold text-[#7DD3C7]">
-                    {sellerAiScore.trusted ? "Trusted Seller" : "Đang đánh giá"}
+                    {sellerQualityScore.badge}
                   </span>
                 </div>
 
                 <div className="mt-5 grid grid-cols-2 gap-3">
                   <div className="rounded-xl border border-white/10 bg-white/[0.05] p-3">
-                    <p className="text-lg font-black">{sellerAiScore.completedOrders}</p>
+                    <p className="text-lg font-black">{sellerQualityScore.facts.completedOrders}</p>
                     <p className="text-xs text-zinc-500">Đơn hoàn tất</p>
                   </div>
                   <div className="rounded-xl border border-white/10 bg-white/[0.05] p-3">
-                    <p className="text-lg font-black">{Math.round(sellerAiScore.responseRate * 100)}%</p>
-                    <p className="text-xs text-zinc-500">Tỷ lệ phản hồi</p>
+                    <p className="text-lg font-black">{sellerQualityScore.facts.cancelledOrders}</p>
+                    <p className="text-xs text-zinc-500">Đơn đã hủy</p>
                   </div>
                 </div>
 
                 <p className="mt-4 rounded-xl border border-white/10 bg-white/[0.05] p-3 text-sm leading-6 text-zinc-300">
-                  {sellerAiScore.explanation ?? "Chưa có giải thích chi tiết từ hệ thống AI."}
+                  {sellerQualityScore.reasons.join(" ")}
                 </p>
               </div>
             ) : (
               <p className="mt-5 rounded-xl border border-dashed border-white/12 bg-white/[0.04] p-4 text-sm leading-6 text-zinc-400">
-                Tài khoản này chưa có điểm seller. Khi có listing và đơn hàng, hệ thống sẽ cập nhật AI Score.
+                Chưa tính được điểm chất lượng theo quy tắc cho tài khoản này.
               </p>
             )}
           </aside>

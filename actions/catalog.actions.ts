@@ -1,5 +1,6 @@
 "use server";
 
+import { normalizeBookCoverUrl } from "@/lib/book-cover";
 import prisma from "@/lib/prisma";
 
 type DecimalLike = {
@@ -49,18 +50,6 @@ function decimalToNumber(value: DecimalLike | number | string | null): number | 
   }
 
   return value.toNumber();
-}
-
-function normalizeCoverPath(coverPath: string | null): string | null {
-  if (!coverPath) {
-    return null;
-  }
-
-  if (coverPath.startsWith("/") || coverPath.startsWith("http")) {
-    return coverPath;
-  }
-
-  return `/${coverPath}`;
 }
 
 export async function getCatalogData(filters: CatalogFilters = {}): Promise<CatalogData> {
@@ -137,7 +126,7 @@ export async function getCatalogData(filters: CatalogFilters = {}): Promise<Cata
         title: book.title,
         author: book.authorName,
         description: book.description,
-        coverImage: normalizeCoverPath(book.coverPath),
+        coverImage: normalizeBookCoverUrl(book.coverPath),
         price: decimalToNumber(book.price) ?? 0,
         rating: decimalToNumber(book.rating),
         category: book.category,

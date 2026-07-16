@@ -1,9 +1,6 @@
 FROM node:20-alpine AS builder
 
 WORKDIR /app
-ENV DATABASE_URL="postgresql://postgres:postgres@db:5432/bookverse_ai?schema=public"
-ENV AUTH_SECRET="bookverse-ai-docker-build-secret"
-ENV AI_SERVICE_URL="http://ai_service:8000"
 
 COPY package.json package-lock.json ./
 RUN npm ci

@@ -94,7 +94,7 @@ export default async function SellerRevenuePage() {
               <div className="mt-4 grid gap-3 text-sm leading-6 text-zinc-300">
                 <p>Doanh thu chỉ được ghi nhận khi đơn chuyển sang COMPLETED.</p>
                 <p>Seller có thể tự chuyển PAID/PAID_DEMO sang SHIPPED, sau đó SHIPPED sang COMPLETED.</p>
-                <p>Listing bị report hoặc đơn cancelled sẽ kéo điểm uy tín xuống ở trang tổng quan.</p>
+                <p>Listing bị report hoặc đơn cancelled sẽ kéo điểm chất lượng theo quy tắc xuống ở trang tổng quan.</p>
               </div>
             </aside>
           </section>

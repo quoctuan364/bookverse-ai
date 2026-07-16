@@ -33,6 +33,7 @@ import {
   updateUserRole,
 } from "@/actions/dashboard.actions";
 import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
+import { SafeBookCover } from "@/components/shared/SafeBookCover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { requireModeratorUser } from "@/lib/permissions";
@@ -417,7 +418,7 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
               <article className="rounded-lg bg-[#F7F4ED] p-4" key={book.id}>
                 <div className="flex gap-4">
                   <div className="flex h-24 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#153A3F] text-xs font-black text-white">
-                    {book.coverPath ? <img alt={book.title} className="h-full w-full object-cover" src={book.coverPath} /> : "No cover"}
+                    <SafeBookCover alt={book.title} className="h-full w-full object-cover" src={book.coverPath} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -460,7 +461,7 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
         </section>
 
         <section className="bv-card rounded-lg p-5" id="marketplace">
-          {sectionTitle(<Store className="h-5 w-5" aria-hidden="true" />, "Admin Marketplace", "Duyệt, từ chối hoặc ẩn listing; xem seller score và lý do từ chối.")}
+          {sectionTitle(<Store className="h-5 w-5" aria-hidden="true" />, "Admin Marketplace", "Duyệt, từ chối hoặc ẩn listing; xem điểm chất lượng theo quy tắc và lý do từ chối.")}
           <div className="space-y-3">
             {data.listings.map((listing) => (
               <article className="rounded-lg bg-[#F7F4ED] p-4" key={listing.id}>
@@ -472,7 +473,7 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
                       <StatusBadge value={listing.condition} />
                     </div>
                     <p className="mt-1 text-sm text-[#66706B]">
-                      {formatPrice(listing.price)} · Seller {listing.seller.name} · {listing.seller.listingCount} listing · Score {listing.seller.sellerScore ?? "N/A"}
+                      {formatPrice(listing.price)} · Seller {listing.seller.name} · {listing.seller.listingCount} listing · Điểm chất lượng {listing.seller.sellerQualityScore}/100
                     </p>
                     {listing.rejectionReason ? <p className="mt-2 text-sm text-red-700">Lý do: {listing.rejectionReason}</p> : null}
                   </div>

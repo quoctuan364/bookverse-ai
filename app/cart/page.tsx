@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SubmitButton } from "@/components/shared/SubmitButton";
+import { SafeBookCover } from "@/components/shared/SafeBookCover";
 import { getCurrentUser } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
@@ -20,9 +21,6 @@ interface CartPageProps {
     error?: string;
   }>;
 }
-
-const fallbackCover =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='600' viewBox='0 0 400 600'%3E%3Crect width='400' height='600' fill='%23153A3F'/%3E%3Crect x='48' y='56' width='304' height='488' rx='18' fill='%23F8F6F1' opacity='0.94'/%3E%3Ctext x='200' y='292' text-anchor='middle' font-family='Arial,sans-serif' font-size='38' font-weight='700' fill='%23153A3F'%3EBookVerse%3C/text%3E%3Ctext x='200' y='338' text-anchor='middle' font-family='Arial,sans-serif' font-size='28' fill='%23153A3F'%3ECart%3C/text%3E%3C/svg%3E";
 
 function formatPrice(price: number): string {
   return new Intl.NumberFormat("vi-VN", {
@@ -203,10 +201,10 @@ export default async function CartPage({ searchParams }: CartPageProps) {
                       className="aspect-[2/3] w-28 shrink-0 overflow-hidden rounded-lg bg-[#EDE3D5] shadow-[0_12px_26px_rgba(39,44,51,0.12)]"
                       href={`/book/${item.book.id}`}
                     >
-                      <img
+                      <SafeBookCover
                         alt={`Bìa sách ${item.book.title}`}
                         className="h-full w-full object-cover"
-                        src={item.book.coverImage ?? fallbackCover}
+                        src={item.book.coverImage}
                       />
                     </Link>
 

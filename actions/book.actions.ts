@@ -1,7 +1,9 @@
 "use server";
 
 import { ListingStatus } from "@prisma/client";
+import { normalizeBookCoverUrl } from "@/lib/book-cover";
 import prisma from "@/lib/prisma";
+import { loadSellerQualityScores } from "@/lib/seller-quality-data";
 
 type DecimalLike = {
   toNumber: () => number;
@@ -28,11 +30,14 @@ export interface MarketplaceListing {
     id: string;
     name: string;
   };
-  sellerAiScore: {
+  sellerQualityScore: {
     score: number;
     completedOrders: number;
-    responseRate: number;
-    isTrusted: boolean;
+    cancelledOrders: number;
+    reportedListings: number;
+    isHighQuality: boolean;
+    badge: string;
+    formulaVersion: string;
   };
   book: {
     id: string;
@@ -55,18 +60,6 @@ function decimalToNumber(value: DecimalLike | number | string): number {
   return value.toNumber();
 }
 
-function normalizeCoverPath(coverPath: string | null): string | null {
-  if (!coverPath) {
-    return null;
-  }
-
-  if (coverPath.startsWith("/") || coverPath.startsWith("http")) {
-    return coverPath;
-  }
-
-  return `/${coverPath}`;
-}
-
 function getRandomOffsets(total: number, limit: number): number[] {
   const result = new Set<number>();
   const totalItems = Math.min(total, limit);
@@ -81,18 +74,6 @@ function getRandomOffsets(total: number, limit: number): number[] {
 function logActionError(actionName: string, error: unknown): void {
   const message = error instanceof Error ? error.message : "Lỗi không xác định";
   console.error(`[${actionName}] ${message}`);
-}
-
-function buildMockSellerAiScore(sellerId: string) {
-  const sellerSeed = Array.from(sellerId).reduce((total, character) => total + character.charCodeAt(0), 0);
-  const score = Math.min(99, 74 + (sellerSeed % 22));
-
-  return {
-    score,
-    completedOrders: Math.max(5, sellerSeed % 31),
-    responseRate: Math.min(99, 84 + (sellerSeed % 11)),
-    isTrusted: score >= 85,
-  };
 }
 
 export async function getFeaturedBooks(): Promise<FeaturedBook[]> {
@@ -131,7 +112,7 @@ export async function getFeaturedBooks(): Promise<FeaturedBook[]> {
         id: book.id,
         title: book.title,
         author: book.authorName,
-        coverImage: normalizeCoverPath(book.coverPath),
+        coverImage: normalizeBookCoverUrl(book.coverPath),
         price: decimalToNumber(book.price),
         category: book.category,
       });
@@ -176,17 +157,34 @@ export async function getMarketplaceListings(): Promise<MarketplaceListing[]> {
       },
     });
 
+    const sellerQualityScores = await loadSellerQualityScores(listings.map((listing) => listing.seller.id));
+
     return listings.map((listing) => ({
       id: listing.id,
       condition: listing.condition,
       price: decimalToNumber(listing.price),
       seller: listing.seller,
-      sellerAiScore: buildMockSellerAiScore(listing.seller.id),
+      sellerQualityScore: (() => {
+        const quality = sellerQualityScores.get(listing.seller.id);
+        if (!quality) {
+          throw new Error(`Không tính được điểm chất lượng cho seller ${listing.seller.id}.`);
+        }
+
+        return {
+          score: quality.score,
+          completedOrders: quality.facts.completedOrders,
+          cancelledOrders: quality.facts.cancelledOrders,
+          reportedListings: quality.facts.reportedListings,
+          isHighQuality: quality.isHighQuality,
+          badge: quality.badge,
+          formulaVersion: quality.formulaVersion,
+        };
+      })(),
       book: {
         id: listing.book?.id ?? listing.id,
         title: listing.book?.title ?? listing.title,
         author: listing.book?.authorName ?? "Không rõ tác giả",
-        coverImage: normalizeCoverPath(listing.book?.coverPath ?? null),
+        coverImage: normalizeBookCoverUrl(listing.book?.coverPath ?? null),
         price: decimalToNumber(listing.book?.price ?? listing.price),
       },
     }));

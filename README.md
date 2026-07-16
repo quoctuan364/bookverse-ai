@@ -2,6 +2,8 @@
 
 BookVerse AI là đồ án tốt nghiệp xây dựng nền tảng sách điện tử thông minh. Hệ thống có kho sách, chợ sách cũ, giỏ hàng, cộng đồng, trình đọc online, hồ sơ người dùng, dashboard quản trị và gợi ý AI có giải thích.
 
+> Trạng thái hiện hành: xem [`docs/CURRENT_STATUS.md`](docs/CURRENT_STATUS.md). Các báo cáo checkpoint cũ chỉ là historical snapshot, không tự động chứng minh source hiện tại. AI metric offline còn thấp, dữ liệu chủ yếu là `SYNTHETIC_DATA`/`DEMO_DATA`, CTR production hiện `NOT_AVAILABLE` và chưa có UAT/SUS người dùng thật.
+
 ## Công nghệ sử dụng
 
 - Next.js 15 App Router, React 19, TypeScript strict.
@@ -20,11 +22,11 @@ BookVerse AI là đồ án tốt nghiệp xây dựng nền tảng sách điện
 - Sổ địa chỉ giao hàng hỗ trợ thêm/sửa/xóa/đặt mặc định, checkout lưu snapshot địa chỉ vào đơn hàng.
 - Thư viện cá nhân hiển thị sách đang đọc, đã mua, yêu thích, bookmark và highlight từ database thật.
 - Notification Center có filter tất cả/chưa đọc, thông báo listing, đơn hàng, cộng đồng, bảo mật và AI.
-- Trang chủ hiển thị gợi ý AI, lý do gợi ý và danh sách dự phòng khi AI service chưa chạy.
+- Trang chủ chỉ hiển thị lý do cá nhân hóa khi có evidence; danh sách dự phòng dùng trạng thái trung tính “chưa có giải thích cá nhân hóa đã được xác minh”.
 - Danh mục sách tìm kiếm sách theo tên, tác giả, mô tả, thể loại và thẻ.
 - Trang chi tiết sách có tracking `VIEW`, đọc thử, yêu thích, thêm giỏ, mua demo qua checkout và viết review thật.
 - Chợ sách cũ cho người bán đăng tin, quản trị viên duyệt/từ chối, người mua thêm giỏ hoặc mua ngay.
-- Seller Dashboard tại `/seller` cho SELLER/ADMIN quản lý listing, tạo/sửa/ẩn/hiện listing, theo dõi đơn của chính mình, cập nhật trạng thái giao hàng hợp lệ, xem doanh thu và điểm uy tín.
+- Seller Dashboard tại `/seller` cho SELLER/ADMIN quản lý listing, tạo/sửa/ẩn/hiện listing, theo dõi đơn của chính mình, cập nhật trạng thái giao hàng hợp lệ, xem doanh thu và điểm chất lượng deterministic theo quy tắc.
 - Giỏ hàng dùng bảng `Order PENDING` chưa có `paymentMethod`, hỗ trợ đổi số lượng, xóa sách, chọn địa chỉ giao hàng và tạo đơn thật có timeline.
 - Checkout đã harden: giữ tồn kho bằng conditional update trong transaction, chống oversell/self-purchase/double submit và chỉ checkout một seller mỗi đơn.
 - Trình đọc online đọc ebook HTML trong `public/ebooks/html`, lưu tiến độ, phiên đọc, bookmark và highlight theo `blockId`.
@@ -391,14 +393,14 @@ npm run data:backfill-categories -- --execute
 
 Lần execute thứ hai phải báo `changed: 0` và `unchanged: 2200`. Mỗi lần chạy tạo report mới trong `outputs/categories`; script dùng `flag: wx` nên không ghi đè report cũ.
 
-Chạy integration verifier trên database test và đọc schema demo cũ ở chế độ read-only:
+Chạy integration verifier trên database test và một fixture legacy độc lập có database name `bookverse_ai` ở chế độ read-only. Không trỏ biến legacy vào demo hiện tại vì demo đã có bốn field hierarchy:
 
 ```powershell
 $env:CATEGORY_LEGACY_DATABASE_URL="postgresql://YOUR_USER:YOUR_PASSWORD@localhost:5432/bookverse_ai?schema=public"
 npm run test:category-integration
 ```
 
-Verifier kiểm tra 2.200 Category, 43 root, 2.157 child, 27 canonical group, Book–Category, orphan/cycle/self-parent, thứ tự canonical → parent → category gốc và khả năng chạy với database demo chưa có cột mới.
+Verifier kiểm tra 2.200 Category, 43 root, 2.157 child, 27 canonical group, Book–Category, orphan/cycle/self-parent, thứ tự canonical → parent → category gốc và khả năng chạy với fixture schema legacy chưa có cột mới.
 
 Integration riêng cho legacy tự tạo database tạm, từ chối ghi đè database có sẵn, test dry-run/execute/idempotency/tamper rồi drop đúng database do lượt test tạo:
 
@@ -410,7 +412,7 @@ npm run test:category-legacy
 
 Xem bảng 24 mapping và lý do tại `docs/CATEGORY_LEGACY_COMPATIBILITY.md`; runbook migration/restore nằm tại `docs/DEPLOYMENT.md`.
 
-Backup trước migration được giữ ngoài Git tại `backups/database`. Quy trình restore rehearsal dùng database tạm `bookverse_ai_restore_test`: tạo database tạm, chạy `pg_restore`, đối chiếu count/schema, sau đó chỉ drop đúng database tạm. Tuyệt đối không restore đè hoặc apply migration Category lên `bookverse_ai` nếu chưa được duyệt riêng.
+Backup trước migration được giữ ngoài Git tại `backups/database`. Quy trình restore rehearsal dùng database tạm `bookverse_ai_restore_test`: tạo database tạm, chạy `pg_restore`, đối chiếu count/schema, sau đó chỉ drop đúng database tạm. Không restore đè hoặc chạy lại destructive migration/backfill trên `bookverse_ai` nếu chưa có phê duyệt và backup mới.
 
 ## Tồn kho và checkout an toàn — Checkpoint A
 
@@ -440,7 +442,7 @@ Test tự tạo fixture có prefix riêng, bao phủ tranh stock 1, retry cùng 
 
 Checkpoint A.2 ngày 14/07/2026 đã thay rehearsal cũ bằng quy trình đầy đủ: database rỗng chạy 11 migration hai lần, full clone demo được audit/reconcile rồi chạy trọn `prisma migrate deploy`, Category/stock idempotency, catalog/filter/canonical/FastAPI/vector/marketplace/checkout smoke đều PASS. Rollback restore từ backup cũng khớp count và semantic schema checksum. Ba database tạm đã được drop sau khi lưu report.
 
-Compose nguồn đã pin `pgvector/pgvector:0.8.5-pg16` và có `docker-compose.rehearsal.yml` tách project/volume/port. Container demo đang chạy vẫn là `postgres:16-alpine`, thiếu extension `vector` và chỉ có 5 migration history row vì A.2 không restart/recreate hoặc ghi demo. Triển khai thật phải đi đúng runbook 15 bước trong `docs/DEPLOYMENT.md` và cần phê duyệt riêng.
+Compose nguồn đã pin `pgvector/pgvector:0.8.5-pg16` và có `docker-compose.rehearsal.yml` tách project/volume/port. Baseline read-only ngày 16/07/2026 xác nhận container demo đang chạy đúng image này, có extension `vector`, 12 migration hoàn tất và 24/24 Category legacy đã có canonical mapping. Chi tiết hiện hành ở `docs/CURRENT_STATUS.md`.
 
 Checkpoint D ngày 14/07/2026 đã thống nhất `/assistant` và chatbot nổi theo contract `d1`, thêm timeout/local fallback minh bạch, chặn mock production, chuẩn hóa session ownership/feedback ownership và safe error. Checkpoint này không sửa Prisma schema, migration, FastAPI hay database demo. Unit 63/63, integration database test, production API/UI smoke, build và database-unavailable smoke đều PASS; xem `docs/CHECKPOINT_D_TEST_REPORT.md`.
 

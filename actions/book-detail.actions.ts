@@ -1,6 +1,7 @@
 "use server";
 
 import { InteractionType, ListingStatus, TargetType } from "@prisma/client";
+import { normalizeBookCoverUrl } from "@/lib/book-cover";
 import { TAXONOMY_VERSION } from "@/lib/interaction-taxonomy";
 import { getCurrentUser, PermissionError, requireAuthenticatedUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
@@ -64,18 +65,6 @@ function decimalToNumber(value: DecimalLike | number | string | null): number | 
   }
 
   return value.toNumber();
-}
-
-function normalizeCoverPath(coverPath: string | null): string | null {
-  if (!coverPath) {
-    return null;
-  }
-
-  if (coverPath.startsWith("/") || coverPath.startsWith("http")) {
-    return coverPath;
-  }
-
-  return `/${coverPath}`;
 }
 
 function logActionError(actionName: string, error: unknown): void {
@@ -151,7 +140,7 @@ export async function getBookById(id: string): Promise<BookDetail | null> {
       title: book.title,
       author: book.authorName,
       description: book.description,
-      coverImage: normalizeCoverPath(book.coverPath),
+      coverImage: normalizeBookCoverUrl(book.coverPath),
       price: decimalToNumber(book.price) ?? 0,
       rating: decimalToNumber(book.rating),
       pages: book.pages,

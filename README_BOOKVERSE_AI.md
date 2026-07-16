@@ -22,7 +22,7 @@ Trong repo này, các file scaffold đã được tạo trực tiếp ở `D:\Do
 Tạo file `.env` từ `.env.example`, sau đó sửa `DATABASE_URL` theo PostgreSQL local:
 
 ```env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/bookverse_ai?schema=public"
+DATABASE_URL="postgresql://YOUR_USER:YOUR_PASSWORD@localhost:5432/bookverse_ai?schema=public"
 DEMO_DATA_DIR="D:/Doantotnghiep/data/demo"
 ```
 

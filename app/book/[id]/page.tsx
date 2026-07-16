@@ -7,6 +7,7 @@ import { toggleFavoriteBook } from "@/actions/library.actions";
 import { addListingToCart, createDemoOrder } from "@/actions/marketplace.actions";
 import { BookViewTracker } from "@/components/shared/BookViewTracker";
 import { ReviewSection } from "@/components/shared/ReviewSection";
+import { SafeBookCover } from "@/components/shared/SafeBookCover";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -19,9 +20,6 @@ interface BookDetailPageProps {
     error?: string;
   }>;
 }
-
-const fallbackCover =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='600' viewBox='0 0 400 600'%3E%3Crect width='400' height='600' fill='%23153A3F'/%3E%3Crect x='48' y='56' width='304' height='488' rx='18' fill='%23F8F6F1' opacity='0.94'/%3E%3Ctext x='200' y='292' text-anchor='middle' font-family='Arial,sans-serif' font-size='38' font-weight='700' fill='%23153A3F'%3EBookVerse%3C/text%3E%3Ctext x='200' y='338' text-anchor='middle' font-family='Arial,sans-serif' font-size='28' fill='%23153A3F'%3EAI%3C/text%3E%3C/svg%3E";
 
 export const dynamic = "force-dynamic";
 
@@ -162,10 +160,10 @@ export default async function BookDetailPage({ params, searchParams }: BookDetai
         <section className="grid gap-8 lg:grid-cols-[1fr_2fr] lg:gap-12">
           <aside className="space-y-4">
             <div className="overflow-hidden rounded-lg border border-[#17191F]/10 bg-[#EDE3D5] shadow-[0_24px_55px_rgba(39,44,51,0.16)]">
-              <img
+              <SafeBookCover
                 alt={`Bìa sách ${book.title}`}
                 className="aspect-[2/3] h-full w-full object-cover"
-                src={book.coverImage ?? fallbackCover}
+                src={book.coverImage}
               />
             </div>
 

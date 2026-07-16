@@ -1,5 +1,7 @@
 # BookVerse AI Dataset Report
 
+> **HISTORICAL SNAPSHOT:** báo cáo này mô tả dataset/analyzer tại ngày tạo. Trạng thái triển khai hiện hành xem [`CURRENT_STATUS.md`](CURRENT_STATUS.md). Dataset ultra-2200 là `SYNTHETIC_DATA`, không phải dữ liệu người dùng thật.
+
 Ngày tạo: 2026-07-12T12:05:19.571Z
 
 Nguồn: **data/json/bookverse_ultra_seed_2200.json**
@@ -57,7 +59,8 @@ SHA-256: **e1e7b7d29f659fa9ea9272ce5ab1ca28095e289b0cc170d8f93e43221acf0047**
 - Category hierarchy đã hoàn tất rehearsal Lượt 1B trên `bookverse_ai_test`: 43 root, 2.157 child, orphan/cycle/self-parent bằng 0.
 - Mapping dẫn xuất có 27 canonical group, 2.200/2.200 category đã map và SHA-256 `dd07599644f68458139e836b8f5cb7529de28fb197076392fe5f8f2c6cc09527`.
 - Import dry-run, non-replace và replace-existing đều chạy thành công trên database test; sau replace, backfill dry-run báo `changed = 0`.
-- Database demo `bookverse_ai` vẫn có 1.200 Book, 24 Category và chưa có migration Category mới.
+- Database demo `bookverse_ai` vẫn có 1.200 Book và 24 Category. **Cập nhật read-only 16/07/2026:** 12 migration đã hoàn tất; Category query trả 24 root và 24/24 canonical mapping, nên nhận xét cũ “chưa có migration Category” không còn đúng.
+- AI metric offline hiện thấp (Behavior HitRate@10 `0,021008`, Hybrid production HitRate@10 `0,008403`); CTR thật `NOT_AVAILABLE` vì chưa có telemetry người dùng thật đủ điều kiện.
 
 ## Giới hạn dữ liệu Category
 

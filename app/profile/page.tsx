@@ -14,6 +14,7 @@ import {
   Store,
 } from "lucide-react";
 import { getProfileDashboardData } from "@/actions/profile.actions";
+import { SafeBookCover } from "@/components/shared/SafeBookCover";
 
 export const dynamic = "force-dynamic";
 
@@ -22,9 +23,6 @@ interface ProfilePageProps {
     message?: string;
   }>;
 }
-
-const fallbackCover =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='600' viewBox='0 0 400 600'%3E%3Crect width='400' height='600' fill='%23153A3F'/%3E%3Crect x='48' y='56' width='304' height='488' rx='18' fill='%23F8F6F1' opacity='0.94'/%3E%3Ctext x='200' y='292' text-anchor='middle' font-family='Arial,sans-serif' font-size='38' font-weight='700' fill='%23153A3F'%3EBookVerse%3C/text%3E%3Ctext x='200' y='338' text-anchor='middle' font-family='Arial,sans-serif' font-size='28' fill='%23153A3F'%3EAI%3C/text%3E%3C/svg%3E";
 
 function formatPrice(price: number): string {
   return new Intl.NumberFormat("vi-VN", {
@@ -229,10 +227,10 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                     href={`/read/${item.bookId}`}
                     key={item.bookId}
                   >
-                    <img
+                    <SafeBookCover
                       alt={`Bìa sách ${item.title}`}
                       className="h-28 w-20 shrink-0 rounded-lg object-cover shadow-[0_10px_22px_rgba(39,44,51,0.12)]"
-                      src={item.coverImage ?? fallbackCover}
+                      src={item.coverImage}
                     />
                     <div className="min-w-0 flex-1">
                       <p className="line-clamp-2 font-black text-[#17202A]">{item.title}</p>

@@ -3,6 +3,7 @@
 import bcrypt from "bcrypt";
 import { NotificationType, Prisma, TargetType } from "@prisma/client";
 import { recordAuditLog } from "@/lib/audit";
+import { normalizeBookCoverUrl } from "@/lib/book-cover";
 import { createNotification } from "@/lib/notifications";
 import { getCurrentUser, PermissionError, requireAuthenticatedUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
@@ -139,18 +140,6 @@ function decimalToNumber(value: DecimalLike | number | string): number {
   }
 
   return value.toNumber();
-}
-
-function normalizeCoverPath(coverPath: string | null): string | null {
-  if (!coverPath) {
-    return null;
-  }
-
-  if (coverPath.startsWith("/") || coverPath.startsWith("http")) {
-    return coverPath;
-  }
-
-  return `/${coverPath}`;
 }
 
 function normalizeText(value: string, maxLength: number): string | null {
@@ -393,7 +382,7 @@ export async function getProfileDashboardData(): Promise<ProfileDashboardData | 
         bookId: item.bookId,
         title: item.book.title,
         author: item.book.authorName,
-        coverImage: normalizeCoverPath(item.book.coverPath),
+        coverImage: normalizeBookCoverUrl(item.book.coverPath),
         currentPage: item.currentPage,
         progressPercent: item.progressPercent,
         totalMinutes: item.totalMinutes,

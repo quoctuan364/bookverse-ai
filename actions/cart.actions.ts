@@ -7,6 +7,7 @@ import {
   PaymentMethod,
 } from "@prisma/client";
 import { checkoutOrder, CheckoutDomainError } from "@/lib/checkout-service";
+import { normalizeBookCoverUrl } from "@/lib/book-cover";
 import { getCurrentUser, PermissionError, requireAuthenticatedUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
 import { validateRequestedQuantity } from "@/lib/stock-policy";
@@ -81,18 +82,6 @@ function decimalToNumber(value: DecimalLike | number | string): number {
   }
 
   return value.toNumber();
-}
-
-function normalizeCoverPath(coverPath: string | null): string | null {
-  if (!coverPath) {
-    return null;
-  }
-
-  if (coverPath.startsWith("/") || coverPath.startsWith("http")) {
-    return coverPath;
-  }
-
-  return `/${coverPath}`;
 }
 
 function parsePaymentMethod(value: string): PaymentMethod | null {
@@ -328,7 +317,7 @@ export async function getCartPageData(): Promise<CartPageData> {
         id: item.book.id,
         title: item.book.title,
         author: item.book.authorName,
-        coverImage: normalizeCoverPath(item.book.coverPath),
+        coverImage: normalizeBookCoverUrl(item.book.coverPath),
       },
       seller: item.listing?.seller ?? null,
       availability: {

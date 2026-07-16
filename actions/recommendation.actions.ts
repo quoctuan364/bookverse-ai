@@ -5,6 +5,7 @@ import {
   RecommendationSurface,
   TargetType,
 } from "@prisma/client";
+import { normalizeBookCoverUrl } from "@/lib/book-cover";
 import { getCurrentUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
 import {
@@ -72,18 +73,6 @@ function decimalToNumber(value: DecimalLike | number | string): number {
   }
 
   return value.toNumber();
-}
-
-function normalizeCoverPath(coverPath: string | null): string | null {
-  if (!coverPath) {
-    return null;
-  }
-
-  if (coverPath.startsWith("/") || coverPath.startsWith("http")) {
-    return coverPath;
-  }
-
-  return `/${coverPath}`;
 }
 
 function isAIRecommendation(value: unknown): value is AIRecommendation {
@@ -167,7 +156,7 @@ async function getBooksByRecommendations(
       id: book.id,
       title: book.title,
       author: book.authorName,
-      coverImage: normalizeCoverPath(book.coverPath),
+      coverImage: normalizeBookCoverUrl(book.coverPath),
       price: decimalToNumber(book.price),
       recommendationScore: recommendationById.get(book.id)?.score,
       recommendationEvidence: recommendationById.get(book.id)?.evidence,
@@ -266,7 +255,7 @@ async function getFallbackBooks(): Promise<RecommendedBook[]> {
     id: book.id,
     title: book.title,
     author: book.authorName,
-    coverImage: normalizeCoverPath(book.coverPath),
+    coverImage: normalizeBookCoverUrl(book.coverPath),
     price: decimalToNumber(book.price),
   }));
 }

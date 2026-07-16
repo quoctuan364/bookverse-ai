@@ -96,22 +96,32 @@ export function classifyRecommendationPersistenceFailure(
   return "PERSISTENCE_UNAVAILABLE";
 }
 
+function recommendationPersistenceErrorLabel(error: unknown): string {
+  if (!error || typeof error !== "object") return "UNKNOWN";
+  const details = error as { code?: unknown; name?: unknown };
+  if (typeof details.code === "string" && /^P\d{4}$/.test(details.code)) return details.code;
+  if (typeof details.name === "string" && /^Prisma[A-Za-z]+Error$/.test(details.name)) {
+    return details.name;
+  }
+  return "UNKNOWN";
+}
+
 async function persistRecommendationSnapshot(input: NormalizedSnapshotPersistenceInput): Promise<string> {
-  const request = await prisma.$transaction(async (transaction) => {
-    return transaction.recommendationRequest.create({
-      data: {
-        userId: input.userId,
-        algorithmVersion: input.algorithmVersion,
-        taxonomyVersion: TAXONOMY_VERSION,
-        surface: input.surface,
-        candidateProfile: input.candidateProfile,
-        filterProfile: input.filterProfile,
-        items: {
-          create: input.items,
-        },
+  // Nested create của Prisma đã là một atomic write. Interactive transaction bọc ngoài
+  // từng request làm stress concurrency chạm P2028 (transaction hết hạn) không cần thiết.
+  const request = await prisma.recommendationRequest.create({
+    data: {
+      userId: input.userId,
+      algorithmVersion: input.algorithmVersion,
+      taxonomyVersion: TAXONOMY_VERSION,
+      surface: input.surface,
+      candidateProfile: input.candidateProfile,
+      filterProfile: input.filterProfile,
+      items: {
+        create: input.items,
       },
-      select: { id: true },
-    });
+    },
+    select: { id: true },
   });
   return request.id;
 }
@@ -173,7 +183,7 @@ export async function createRecommendationRequestSnapshotResult(input: {
     const trackingReason = classifyRecommendationPersistenceFailure(error);
     // Không log raw error vì Prisma có thể chứa SQL hoặc connection string.
     console.error(
-      `[recommendation.telemetry] snapshot degraded reason=${trackingReason} surface=${input.surface}`,
+      `[recommendation.telemetry] snapshot degraded reason=${trackingReason} code=${recommendationPersistenceErrorLabel(error)} surface=${input.surface}`,
     );
     return {
       requestId: null,

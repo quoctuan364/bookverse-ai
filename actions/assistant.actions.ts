@@ -1,5 +1,6 @@
 "use server";
 
+import { normalizeBookCoverUrl } from "@/lib/book-cover";
 import prisma from "@/lib/prisma";
 
 type DecimalLike = {
@@ -37,18 +38,6 @@ function decimalToNumber(value: DecimalLike | number | string | null): number | 
   }
 
   return value.toNumber();
-}
-
-function normalizeCoverPath(coverPath: string | null): string | null {
-  if (!coverPath) {
-    return null;
-  }
-
-  if (coverPath.startsWith("/") || coverPath.startsWith("http")) {
-    return coverPath;
-  }
-
-  return `/${coverPath}`;
 }
 
 function buildReason(query: string, category: string, rating: number | null): string {
@@ -135,7 +124,7 @@ export async function askBookAssistant(query: string): Promise<AssistantResponse
         id: book.id,
         title: book.title,
         author: book.authorName,
-        coverImage: normalizeCoverPath(book.coverPath),
+        coverImage: normalizeBookCoverUrl(book.coverPath),
         price: decimalToNumber(book.price) ?? 0,
         category: book.category.name,
         rating,

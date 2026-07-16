@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { OrderStatus, UserRole } from "@prisma/client";
+import { normalizeBookCoverUrl } from "@/lib/book-cover";
 import {
   cancelOrderWithRestock,
   OrderCancellationError,
@@ -83,18 +84,6 @@ function decimalToNumber(value: DecimalLike | number | string): number {
   }
 
   return value.toNumber();
-}
-
-function normalizeCoverPath(coverPath: string | null): string | null {
-  if (!coverPath) {
-    return null;
-  }
-
-  if (coverPath.startsWith("/") || coverPath.startsWith("http")) {
-    return coverPath;
-  }
-
-  return `/${coverPath}`;
 }
 
 function handleOrderError(error: unknown, fallbackMessage: string): OrderActionResult {
@@ -223,7 +212,7 @@ export async function getOrderDetailData(orderId: string): Promise<OrderDetailDa
         id: item.book.id,
         title: item.book.title,
         author: item.book.authorName,
-        coverImage: normalizeCoverPath(item.book.coverPath),
+        coverImage: normalizeBookCoverUrl(item.book.coverPath),
       },
       seller: item.listing?.seller ?? null,
     })),

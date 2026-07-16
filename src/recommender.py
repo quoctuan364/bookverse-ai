@@ -204,8 +204,9 @@ def recommend_for_user(
 
 
 def popular_books(data: dict[str, pd.DataFrame], top_k: int = 8) -> pd.DataFrame:
-    fake_user_id = data["users"].iloc[0]["user_id"]
-    return recommend_for_user(fake_user_id, data, top_k=top_k, mode="popular", exclude_owned=False)
+    # Chế độ popular không cá nhân hóa; user mẫu chỉ đáp ứng contract dùng chung.
+    sample_user_id = data["users"].iloc[0]["user_id"]
+    return recommend_for_user(sample_user_id, data, top_k=top_k, mode="popular", exclude_owned=False)
 
 
 def search_books(

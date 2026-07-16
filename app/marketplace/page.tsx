@@ -7,6 +7,7 @@ import {
   getMarketplacePageData,
 } from "@/actions/marketplace.actions";
 import { Badge } from "@/components/ui/badge";
+import { SafeBookCover } from "@/components/shared/SafeBookCover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -216,17 +217,11 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
               >
                 <div className="flex gap-4 p-4">
                   <div className="aspect-[2/3] w-28 shrink-0 overflow-hidden rounded-lg bg-[#EDE3D5] shadow-[0_12px_26px_rgba(39,44,51,0.12)]">
-                    {listing.book?.coverImage ? (
-                      <img
-                        alt={`Bìa sách ${listing.book.title}`}
-                        className="h-full w-full object-cover"
-                        src={listing.book.coverImage}
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center px-3 text-center text-xs font-bold text-[#17202A]">
-                        BookVerse
-                      </div>
-                    )}
+                    <SafeBookCover
+                      alt={`Bìa sách ${listing.book?.title ?? listing.title}`}
+                      className="h-full w-full object-cover"
+                      src={listing.book?.coverImage}
+                    />
                   </div>
 
                   <div className="min-w-0 flex-1">
@@ -243,10 +238,10 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
                       >
                         {getStatusLabel(listing.status)}
                       </Badge>
-                      {listing.sellerAiScore.isTrusted ? (
+                      {listing.sellerQualityScore.isHighQuality ? (
                         <Badge className="gap-1 bg-[#F2C14E] text-[#17202A]">
                           <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-                          Người bán uy tín
+                          Chất lượng cao theo quy tắc
                         </Badge>
                       ) : null}
                     </div>
@@ -259,22 +254,22 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
                     </p>
                     <div className="mt-2 grid grid-cols-3 gap-2 rounded-lg border border-[#17191F]/10 bg-[#F7F4ED] p-3 text-xs">
                       <div>
-                        <p className="text-[#66706B]">AI Score</p>
+                        <p className="text-[#66706B]">Điểm chất lượng</p>
                         <p className="mt-1 inline-flex items-center gap-1 font-black text-[#8A5C00]">
                           <Star className="h-3.5 w-3.5 fill-[#F2C14E] text-[#F2C14E]" aria-hidden="true" />
-                          {listing.sellerAiScore.score}/100
+                          {listing.sellerQualityScore.score}/100
                         </p>
                       </div>
                       <div>
                         <p className="text-[#66706B]">Đơn tốt</p>
                         <p className="mt-1 font-black text-[#17202A]">
-                          {listing.sellerAiScore.completedOrders}
+                          {listing.sellerQualityScore.completedOrders}
                         </p>
                       </div>
                       <div>
-                        <p className="text-[#66706B]">Phản hồi</p>
+                        <p className="text-[#66706B]">Đơn hủy</p>
                         <p className="mt-1 font-black text-[#17202A]">
-                          {listing.sellerAiScore.responseRate}%
+                          {listing.sellerQualityScore.cancelledOrders}
                         </p>
                       </div>
                     </div>

@@ -10,12 +10,13 @@ import {
   UserRole,
 } from "@prisma/client";
 import { recordAuditLog } from "@/lib/audit";
+import { normalizeBookCoverUrl } from "@/lib/book-cover";
 import { createNotification, createNotifications } from "@/lib/notifications";
 import { checkOrderTransition, getAllowedOrderNextStatuses } from "@/lib/order-workflow";
 import { filterSellerOwnedItems } from "@/lib/order-ownership";
 import { getCurrentUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
-import { calculateSellerTrustScore, type SellerTrustScoreResult } from "@/lib/seller-score";
+import { calculateSellerQualityScore, type SellerQualityScoreResult } from "@/lib/seller-score";
 
 type DecimalLike = {
   toNumber: () => number;
@@ -181,7 +182,7 @@ export interface SellerOverviewData {
     readAt: Date | null;
     createdAt: Date;
   }>;
-  score: SellerTrustScoreResult;
+  score: SellerQualityScoreResult;
 }
 
 const nonCartOrderWhere: Prisma.OrderWhereInput = {
@@ -207,18 +208,6 @@ function decimalToNumber(value: DecimalLike | number | string): number {
   }
 
   return value.toNumber();
-}
-
-function normalizeCoverPath(coverPath: string | null): string | null {
-  if (!coverPath) {
-    return null;
-  }
-
-  if (coverPath.startsWith("/") || coverPath.startsWith("http")) {
-    return coverPath;
-  }
-
-  return `/${coverPath}`;
 }
 
 function cleanText(value: string, maxLength: number): string {
@@ -447,7 +436,7 @@ function serializeListing(listing: {
     cartAdds: listing.cartAdds,
     purchases: listing.purchases,
     targetAudience: listing.targetAudience,
-    imageUrl: normalizeCoverPath(listing.images?.[0]?.url ?? null),
+    imageUrl: normalizeBookCoverUrl(listing.images?.[0]?.url ?? null),
     orderCount: listing._count?.orderItems ?? 0,
     createdAt: listing.createdAt,
     updatedAt: listing.updatedAt,
@@ -640,7 +629,7 @@ async function loadSellerOrders(
   return orders.map((order) => serializeSellerOrder(order, sellerId));
 }
 
-async function getSellerTrustScore(sellerId: string): Promise<SellerTrustScoreResult> {
+async function getSellerQualityScore(sellerId: string): Promise<SellerQualityScoreResult> {
   const [listings, completedOrders, cancelledOrders] = await Promise.all([
     prisma.listing.findMany({
       where: {
@@ -682,7 +671,7 @@ async function getSellerTrustScore(sellerId: string): Promise<SellerTrustScoreRe
     }),
   ]);
 
-  return calculateSellerTrustScore({
+  return calculateSellerQualityScore({
     completedOrders,
     cancelledOrders,
     reportedListings: listings.filter((listing) => listing.reportCount > 0).length,
@@ -768,7 +757,7 @@ export async function getSellerOverviewData(): Promise<SellerOverviewData> {
       recentListings: [],
       recentOrders: [],
       notifications: [],
-      score: calculateSellerTrustScore({
+      score: calculateSellerQualityScore({
         completedOrders: 0,
         cancelledOrders: 0,
         reportedListings: 0,
@@ -880,7 +869,7 @@ export async function getSellerOverviewData(): Promise<SellerOverviewData> {
         createdAt: true,
       },
     }),
-    getSellerTrustScore(sellerId),
+    getSellerQualityScore(sellerId),
   ]);
 
   const orderCounts = sellerOrders.reduce<Record<string, number>>((result, order) => {
@@ -909,7 +898,7 @@ export async function getSellerOverviewData(): Promise<SellerOverviewData> {
       { label: "Tổng đơn liên quan", value: sellerOrders.length },
       { label: "Doanh thu completed", value: totalCompletedRevenue, tone: "money" },
       { label: "Doanh thu tháng này", value: monthRevenue, tone: "money" },
-      { label: "Seller score", value: score.score, tone: score.score >= 80 ? "success" : "warning" },
+      { label: "Điểm chất lượng (quy tắc)", value: score.score, tone: score.score >= 80 ? "success" : "warning" },
     ],
     recentListings: recentListingsRows.map(serializeListing),
     recentOrders: sellerOrders.slice(0, 5),

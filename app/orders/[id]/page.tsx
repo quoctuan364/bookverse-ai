@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { CalendarClock, MapPin, PackageCheck, ReceiptText, Truck } from "lucide-react";
 import { cancelPendingOrder, getOrderDetailData } from "@/actions/order.actions";
 import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
+import { SafeBookCover } from "@/components/shared/SafeBookCover";
 import { getCurrentUser } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
@@ -16,9 +17,6 @@ interface OrderDetailPageProps {
     message?: string;
   }>;
 }
-
-const fallbackCover =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='600' viewBox='0 0 400 600'%3E%3Crect width='400' height='600' fill='%23153A3F'/%3E%3Crect x='48' y='56' width='304' height='488' rx='18' fill='%23F8F6F1' opacity='0.94'/%3E%3Ctext x='200' y='292' text-anchor='middle' font-family='Arial,sans-serif' font-size='38' font-weight='700' fill='%23153A3F'%3EBookVerse%3C/text%3E%3Ctext x='200' y='338' text-anchor='middle' font-family='Arial,sans-serif' font-size='28' fill='%23153A3F'%3EOrder%3C/text%3E%3C/svg%3E";
 
 function formatPrice(price: number): string {
   return new Intl.NumberFormat("vi-VN", {
@@ -179,7 +177,7 @@ export default async function OrderDetailPage({ params, searchParams }: OrderDet
               {order.items.map((item) => (
                 <article className="flex flex-col gap-4 rounded-xl border border-white/10 bg-white/[0.05] p-4 sm:flex-row" key={item.id}>
                   <Link className="aspect-[2/3] w-24 shrink-0 overflow-hidden rounded-lg bg-[#EDE3D5]" href={`/book/${item.book.id}`}>
-                    <img alt={`Bìa sách ${item.book.title}`} className="h-full w-full object-cover" src={item.book.coverImage ?? fallbackCover} />
+                    <SafeBookCover alt={`Bìa sách ${item.book.title}`} className="h-full w-full object-cover" src={item.book.coverImage} />
                   </Link>
                   <div className="min-w-0 flex-1">
                     <Link className="line-clamp-2 text-lg font-black text-white hover:underline" href={`/book/${item.book.id}`}>

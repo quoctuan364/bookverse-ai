@@ -1,5 +1,6 @@
 import { RecommendationSurface, TargetType } from "@prisma/client";
 import { NextResponse } from "next/server";
+import { normalizeBookCoverUrl } from "@/lib/book-cover";
 import { getCurrentUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
 import {
@@ -27,18 +28,6 @@ function decimalToNumber(value: DecimalLike | number | string): number {
   }
 
   return value.toNumber();
-}
-
-function normalizeCoverPath(coverPath: string | null): string | null {
-  if (!coverPath) {
-    return null;
-  }
-
-  if (coverPath.startsWith("/") || coverPath.startsWith("http")) {
-    return coverPath;
-  }
-
-  return `/${coverPath}`;
 }
 
 function parseLimit(value: string | null): number {
@@ -241,7 +230,7 @@ export async function GET(request: Request) {
               id: recommendation.book.id,
               title: recommendation.book.title,
               author: recommendation.book.authorName,
-              cover_url: normalizeCoverPath(recommendation.book.coverPath),
+              cover_url: normalizeBookCoverUrl(recommendation.book.coverPath),
               price: decimalToNumber(recommendation.book.price),
               rating: recommendation.book.rating ? decimalToNumber(recommendation.book.rating) : null,
               category: recommendation.book.category,
@@ -371,7 +360,7 @@ export async function GET(request: Request) {
                 id: book.id,
                 title: book.title,
                 author: book.authorName,
-                cover_url: normalizeCoverPath(book.coverPath),
+                cover_url: normalizeBookCoverUrl(book.coverPath),
                 price: decimalToNumber(book.price),
                 rating: book.rating ? decimalToNumber(book.rating) : null,
                 category: book.category,

@@ -3,6 +3,7 @@ import { Bot, BookOpen, Search, Sparkles, Store } from "lucide-react";
 import { getRecommendedBooks } from "@/actions/recommendation.actions";
 import { RecommendationTrackedLink } from "@/components/recommendation/RecommendationTrackedLink";
 import { BookCard } from "@/components/shared/BookCard";
+import { SafeBookCover } from "@/components/shared/SafeBookCover";
 import { getCurrentUser } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
@@ -84,10 +85,10 @@ export default async function HomePage() {
                     requestId={recommendationBatch.requestId}
                     style={{ transform: `translateY(${index % 2 === 0 ? "18px" : "-10px"})` }}
                   >
-                    <img
+                    <SafeBookCover
                       alt={`Bìa sách ${book.title}`}
                       className="aspect-[2/3] w-full rounded-lg object-cover shadow-[0_18px_34px_rgba(0,0,0,0.28)] transition duration-300 group-hover:-translate-y-2"
-                      src={book.coverImage ?? "/covers/flat/book-0001.svg"}
+                      src={book.coverImage}
                     />
                   </RecommendationTrackedLink>
                 ))}

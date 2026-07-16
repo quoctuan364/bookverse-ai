@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { InteractionType, OrderStatus, TargetType } from "@prisma/client";
+import { normalizeBookCoverUrl } from "@/lib/book-cover";
 import { TAXONOMY_VERSION } from "@/lib/interaction-taxonomy";
 import prisma from "@/lib/prisma";
 import { PermissionError, requireAuthenticatedUser } from "@/lib/permissions";
@@ -84,24 +85,12 @@ function decimalToNumber(value: DecimalLike | number | string): number {
   return value.toNumber();
 }
 
-function normalizeCoverPath(coverPath: string | null): string | null {
-  if (!coverPath) {
-    return null;
-  }
-
-  if (coverPath.startsWith("/") || coverPath.startsWith("http")) {
-    return coverPath;
-  }
-
-  return `/${coverPath}`;
-}
-
 function serializeBook(book: { id: string; title: string; authorName: string; coverPath: string | null }) {
   return {
     bookId: book.id,
     title: book.title,
     author: book.authorName,
-    coverImage: normalizeCoverPath(book.coverPath),
+    coverImage: normalizeBookCoverUrl(book.coverPath),
   };
 }
 

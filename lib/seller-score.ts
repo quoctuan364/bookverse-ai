@@ -1,4 +1,6 @@
-export interface SellerTrustScoreInput {
+export const SELLER_QUALITY_FORMULA_VERSION = "seller-quality-v1" as const;
+
+export interface SellerQualityScoreInput {
   completedOrders: number;
   cancelledOrders: number;
   reportedListings: number;
@@ -7,9 +9,12 @@ export interface SellerTrustScoreInput {
   totalListings: number;
 }
 
-export interface SellerTrustScoreResult {
+export interface SellerQualityScoreResult {
   score: number;
-  badge: "Uy tín cao" | "Ổn định" | "Cần cải thiện" | "Rủi ro";
+  badge: "Chất lượng cao" | "Ổn định" | "Cần cải thiện" | "Rủi ro theo quy tắc";
+  isHighQuality: boolean;
+  formulaVersion: typeof SELLER_QUALITY_FORMULA_VERSION;
+  facts: SellerQualityScoreInput;
   reasons: string[];
   suggestions: string[];
 }
@@ -18,20 +23,32 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-export function calculateSellerTrustScore(input: SellerTrustScoreInput): SellerTrustScoreResult {
-  const completedBonus = Math.min(input.completedOrders * 2, 20);
-  const cancelledPenalty = Math.min(input.cancelledOrders * 5, 20);
-  const reportPenalty = Math.min(input.reportedListings * 5, 20);
+function normalizeCount(value: number): number {
+  return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+}
+
+export function calculateSellerQualityScore(input: SellerQualityScoreInput): SellerQualityScoreResult {
+  const facts: SellerQualityScoreInput = {
+    completedOrders: normalizeCount(input.completedOrders),
+    cancelledOrders: normalizeCount(input.cancelledOrders),
+    reportedListings: normalizeCount(input.reportedListings),
+    longDescriptionListings: normalizeCount(input.longDescriptionListings),
+    approvedListings: normalizeCount(input.approvedListings),
+    totalListings: normalizeCount(input.totalListings),
+  };
+  const completedBonus = Math.min(facts.completedOrders * 2, 20);
+  const cancelledPenalty = Math.min(facts.cancelledOrders * 5, 20);
+  const reportPenalty = Math.min(facts.reportedListings * 5, 20);
   const descriptionBonus =
-    input.totalListings > 0 && input.longDescriptionListings / input.totalListings >= 0.6 ? 5 : 0;
-  const approvedBonus = input.approvedListings >= 3 ? 5 : 0;
+    facts.totalListings > 0 && facts.longDescriptionListings / facts.totalListings >= 0.6 ? 5 : 0;
+  const approvedBonus = facts.approvedListings >= 3 ? 5 : 0;
   const score = clamp(70 + completedBonus + descriptionBonus + approvedBonus - cancelledPenalty - reportPenalty, 0, 100);
 
   const reasons = [
-    `Base 70 điểm.`,
-    `+${completedBonus} từ ${input.completedOrders} đơn completed.`,
-    `-${cancelledPenalty} từ ${input.cancelledOrders} đơn cancelled.`,
-    `-${reportPenalty} từ ${input.reportedListings} listing bị report.`,
+    "Mốc khởi đầu 70 điểm.",
+    `+${completedBonus} từ ${facts.completedOrders} đơn hoàn tất.`,
+    `-${cancelledPenalty} từ ${facts.cancelledOrders} đơn đã hủy.`,
+    `-${reportPenalty} từ ${facts.reportedListings} tin đăng bị báo cáo.`,
   ];
 
   if (descriptionBonus > 0) {
@@ -50,9 +67,9 @@ export function calculateSellerTrustScore(input: SellerTrustScoreInput): SellerT
     "Hạn chế hủy đơn khi đã xác nhận.",
   ];
 
-  let badge: SellerTrustScoreResult["badge"] = "Rủi ro";
+  let badge: SellerQualityScoreResult["badge"] = "Rủi ro theo quy tắc";
   if (score >= 80) {
-    badge = "Uy tín cao";
+    badge = "Chất lượng cao";
   } else if (score >= 60) {
     badge = "Ổn định";
   } else if (score >= 40) {
@@ -62,6 +79,9 @@ export function calculateSellerTrustScore(input: SellerTrustScoreInput): SellerT
   return {
     score,
     badge,
+    isHighQuality: score >= 80,
+    formulaVersion: SELLER_QUALITY_FORMULA_VERSION,
+    facts,
     reasons,
     suggestions,
   };

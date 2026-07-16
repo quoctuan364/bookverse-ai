@@ -2,6 +2,17 @@
 
 Tài liệu này chia việc nâng cấp thành các lượt có checkpoint và ghi trạng thái thực thi đã được kiểm chứng.
 
+> Tài liệu này gồm kế hoạch và historical snapshot của nhiều checkpoint. Trạng thái hiện hành ngày 16/07/2026 nằm ở [`CURRENT_STATUS.md`](CURRENT_STATUS.md). Các câu “chưa thay đổi database demo” bên dưới chỉ đúng tại thời điểm checkpoint tương ứng, không mô tả baseline hiện tại.
+
+## Cập nhật P0 ngày 16/07/2026
+
+- Đã xóa `BookCard.buildMockEvidence`; thiếu evidence hiển thị trạng thái trung tính.
+- Đã xóa `buildMockSellerAiScore`; production UI/API dùng “Điểm chất lượng theo quy tắc” deterministic `seller-quality-v1` và có test.
+- Production assistant mock guard là `ALREADY_FIXED_VERIFIED`; không còn mock flag có hiệu lực ở production.
+- Cover dùng fallback chung cho null/path sai/load error; browser audit ép 404 trên Home/Recommendation, Catalog, Book detail, Marketplace, Cart và Seller đã có bằng chứng.
+- Docker/Compose/FastAPI không còn credential hard-code trong production source; image candidate không chứa `.env` hoặc secret trong config/history.
+- AI metric offline vẫn thấp; dữ liệu chủ yếu synthetic/demo; CTR thật `NOT_AVAILABLE`.
+
 Trạng thái ngày 14/07/2026:
 
 - **Checkpoint C: ĐÃ DUYỆT và đã hoàn thành Lượt 1A.**
@@ -65,8 +76,8 @@ Review unique là migration riêng trong Lượt 1: trước tiên phải lập 
 3. Regenerate dữ liệu temporal hoặc thu thập log có thời gian thật; split train/test theo mốc thời gian.
 4. Thêm Popularity và Content-only baseline; báo Precision@K, Recall@K, NDCG@K, HitRate@K và Coverage.
 5. Lưu config, seed, query window, commit/build identifier và output JSON để tái lập.
-6. Thay **buildMockSellerAiScore** bằng SellerAiScore được tính từ dữ liệu thật hoặc ẩn toàn bộ khối nếu chưa đủ dữ liệu.
-7. Không để **BookCard.buildMockEvidence** tạo lý do giả; hiển thị evidence thật hoặc trạng thái “chưa có giải thích”.
+6. **P0 VERIFIED 16/07/2026:** thay **buildMockSellerAiScore** bằng điểm chất lượng theo quy tắc deterministic; không còn gọi là AI Score.
+7. **P0 VERIFIED 16/07/2026:** bỏ **BookCard.buildMockEvidence**; hiển thị evidence thật hoặc trạng thái “chưa có giải thích cá nhân hóa đã được xác minh”.
 8. Chatbot phải báo rõ degraded/unavailable; mock chỉ được bật bằng cờ development/test.
 9. Reader không được trình bày demo page như ebook thật.
 
@@ -157,7 +168,7 @@ Không bắt đầu UI polish cho một luồng khi contract/error state của l
 
 ### CHECKPOINT: A — Listing stock và chống oversell — ĐÃ HOÀN THÀNH DEPLOYMENT READINESS
 
-Trạng thái thực thi ngày 14/07/2026: schema/migration, backup, profile `legacy-demo-24`, Category/stock backfill, atomic checkout, idempotency, cancel/restock, unit test, PostgreSQL concurrency, ultra-2200 regression, FastAPI smoke, build và deployment verifier đều PASS. A.2 bổ sung image pgvector pin đúng PostgreSQL 16, audit bảy trạng thái, fresh database từ rỗng, full clone migration deploy và rollback rehearsal. Database demo chỉ được đọc và chưa có migration/backfill; triển khai thật vẫn cần phê duyệt riêng theo `docs/DEPLOYMENT.md`.
+**HISTORICAL SNAPSHOT 14/07/2026:** schema/migration, backup, profile `legacy-demo-24`, Category/stock backfill, atomic checkout, idempotency, cancel/restock, unit test, PostgreSQL concurrency, ultra-2200 regression, FastAPI smoke, build và deployment verifier đã PASS trên source lúc đó. A.2 bổ sung image pgvector pin đúng PostgreSQL 16, audit bảy trạng thái, fresh database từ rỗng, full clone migration deploy và rollback rehearsal. Câu “database demo chưa có migration/backfill” chỉ mô tả A.2; baseline read-only 16/07/2026 đã có 12 migration, pgvector và 24/24 canonical mapping như `CURRENT_STATUS.md`.
 
 Kết quả bổ sung A.1:
 
@@ -246,7 +257,7 @@ Kết quả bổ sung A.2:
 
 ### CHECKPOINT: B — Category hierarchy và canonical category — ĐÃ HOÀN THÀNH TRÊN DATABASE TEST
 
-Kết quả thực thi ngày 13/07/2026:
+**HISTORICAL SNAPSHOT — kết quả thực thi ngày 13/07/2026:**
 
 - Migration `20260712153000_add_category_hierarchy_and_canonical_fields` chỉ được apply lên `bookverse_ai_test`.
 - 2.200 Category gồm 43 root và 2.157 child; 27 canonical group; orphan/cycle/self-parent/unmapped đều bằng 0.
@@ -254,7 +265,7 @@ Kết quả thực thi ngày 13/07/2026:
 - Import dry-run, non-replace và replace-existing đều giữ hierarchy; backfill sau replace tiếp tục `changed = 0`.
 - FastAPI sử dụng canonical → parent → category gốc và chạy được với cả schema test mới lẫn schema demo cũ.
 - Backup SHA-256 đúng kỳ vọng; restore sang `bookverse_ai_restore_test` trả 2.200 Book/Category, 2.200 quan hệ, 9 migration cũ và không có cột Category mới; database tạm đã được drop sau kiểm tra.
-- Database demo không được ghi: vẫn có 1.200 Book, 24 Category và chưa apply migration Category.
+- Trong lượt 13/07, database demo không được ghi và khi đó chưa apply migration Category. Nhận xét này không còn mô tả baseline 16/07; xem `CURRENT_STATUS.md`.
 
 1. **Vấn đề hiện tại**
    - Category trong Prisma là danh sách phẳng. Dataset có cây parent_id/level nhưng import không lưu.

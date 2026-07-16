@@ -46,7 +46,7 @@ export default async function SellerDashboardPage({ searchParams }: SellerPagePr
             </Link>
           ) : null
         }
-        description="Quản lý listing, đơn hàng, thông báo kiểm duyệt, doanh thu và điểm uy tín người bán trong một luồng demo hoàn chỉnh."
+        description="Quản lý listing, đơn hàng, thông báo kiểm duyệt, doanh thu và điểm chất lượng theo quy tắc trong một luồng demo hoàn chỉnh."
         title="Seller Dashboard"
       />
 

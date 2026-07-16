@@ -1,12 +1,14 @@
 # Báo cáo kiểm thử Checkpoint A.2 — Deployment Readiness
 
+> **HISTORICAL SNAPSHOT ngày 14/07/2026:** đây không phải test report của source hiện tại. Trạng thái/test mới nhất xem [`CURRENT_STATUS.md`](CURRENT_STATUS.md). Không dùng số PASS cũ thay cho command chạy trên HEAD hiện tại.
+
 Ngày chạy: 14/07/2026.
 
 ## 1. Kết luận
 
-**BookVerse AI đã sẵn sàng về kỹ thuật để triển khai Category và stock migration lên database demo. Database demo chưa được thay đổi; việc triển khai thật cần một phê duyệt riêng.**
+**Kết luận lịch sử tại thời điểm A.2:** source khi đó đã qua rehearsal kỹ thuật cho Category/stock; database demo chưa được thay đổi trong checkpoint A.2. Baseline hiện tại đã khác và được ghi riêng trong `CURRENT_STATUS.md`.
 
-Kết luận dựa trên fresh migration, full clone, pgvector, migration reconciliation, Category/stock idempotency, smoke, rollback và toàn bộ cổng kiểm tra đều có exit code 0. Checkpoint D không được bắt đầu.
+Kết luận A.2 dựa trên fresh migration, full clone, pgvector, migration reconciliation, Category/stock idempotency, smoke và rollback ở thời điểm đó. Câu “Checkpoint D không được bắt đầu” đã hết hiệu lực; D/E/F1/F1.1 đã có các snapshot riêng nhưng vẫn phải chạy regression lại trên source hiện tại.
 
 ## 2. Git branch/commit
 

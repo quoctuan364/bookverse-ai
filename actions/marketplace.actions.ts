@@ -10,9 +10,11 @@ import {
   TargetType,
   UserRole,
 } from "@prisma/client";
+import { normalizeBookCoverUrl } from "@/lib/book-cover";
 import { createNotifications } from "@/lib/notifications";
 import { PermissionError, requireAuthenticatedUser, requireSellerUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
+import { loadSellerQualityScores } from "@/lib/seller-quality-data";
 
 type DecimalLike = {
   toNumber: () => number;
@@ -40,11 +42,14 @@ export interface MarketplaceListingItem {
     id: string;
     name: string;
   };
-  sellerAiScore: {
+  sellerQualityScore: {
     score: number;
     completedOrders: number;
-    responseRate: number;
-    isTrusted: boolean;
+    cancelledOrders: number;
+    reportedListings: number;
+    isHighQuality: boolean;
+    badge: string;
+    formulaVersion: string;
   };
   book: {
     id: string;
@@ -94,38 +99,12 @@ function decimalToNumber(value: DecimalLike | number | string): number {
   return value.toNumber();
 }
 
-function normalizeCoverPath(coverPath: string | null): string | null {
-  if (!coverPath) {
-    return null;
-  }
-
-  if (coverPath.startsWith("/") || coverPath.startsWith("http")) {
-    return coverPath;
-  }
-
-  return `/${coverPath}`;
-}
-
 function buildListingId(): string {
   return `LIST-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
 }
 
 function buildCartOrderId(): string {
   return `CART-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
-}
-
-function buildMockSellerAiScore(sellerId: string, cartAdds: number, purchases: number) {
-  const sellerSeed = Array.from(sellerId).reduce((total, character) => total + character.charCodeAt(0), 0);
-  const behaviorBonus = Math.min(18, purchases * 4 + cartAdds);
-  const score = Math.min(99, 72 + (sellerSeed % 14) + behaviorBonus);
-  const responseRate = Math.min(99, 82 + (sellerSeed % 12));
-
-  return {
-    score,
-    completedOrders: Math.max(3, purchases + (sellerSeed % 17)),
-    responseRate,
-    isTrusted: score >= 85,
-  };
 }
 
 function parseCondition(value: string): ListingCondition {
@@ -289,6 +268,8 @@ export async function getMarketplacePageData(
       }),
     ]);
 
+    const sellerQualityScores = await loadSellerQualityScores(listings.map((listing) => listing.seller.id));
+
     return {
       listings: listings.map((listing) => ({
         id: listing.id,
@@ -303,13 +284,28 @@ export async function getMarketplacePageData(
         stock: listing.stock,
         targetAudience: listing.targetAudience,
         seller: listing.seller,
-        sellerAiScore: buildMockSellerAiScore(listing.seller.id, listing.cartAdds, listing.purchases),
+        sellerQualityScore: (() => {
+          const quality = sellerQualityScores.get(listing.seller.id);
+          if (!quality) {
+            throw new Error(`Không tính được điểm chất lượng cho seller ${listing.seller.id}.`);
+          }
+
+          return {
+            score: quality.score,
+            completedOrders: quality.facts.completedOrders,
+            cancelledOrders: quality.facts.cancelledOrders,
+            reportedListings: quality.facts.reportedListings,
+            isHighQuality: quality.isHighQuality,
+            badge: quality.badge,
+            formulaVersion: quality.formulaVersion,
+          };
+        })(),
         book: listing.book
           ? {
               id: listing.book.id,
               title: listing.book.title,
               author: listing.book.authorName,
-              coverImage: normalizeCoverPath(listing.book.coverPath),
+              coverImage: normalizeBookCoverUrl(listing.book.coverPath),
               category: listing.book.category.name,
             }
           : null,

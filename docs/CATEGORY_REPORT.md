@@ -1,5 +1,7 @@
 # BookVerse AI Category Report
 
+> **HISTORICAL SNAPSHOT:** số liệu phân tích/rehearsal trong tài liệu này được tạo ngày 13–14/07/2026. Trạng thái source/database hiện hành xem [`CURRENT_STATUS.md`](CURRENT_STATUS.md); không dùng câu kết cũ về demo như bằng chứng hiện tại.
+
 Ngày tạo: 2026-07-13T17:45:50.935Z
 
 ## 1. Hiện trạng
@@ -187,4 +189,4 @@ Trên deployment rehearsal clone demo:
 | Book–Category SHA-256 | `f051090fb24abf12888453c87498030839ade45f3c6901721c1cbc6f75327ebc` |
 | Execute lần hai | `changedRows=0` |
 
-Deployment verifier trả `status=PASS`; catalog 1.200 Book, filter `C001` 50 Book và recommendation query 1.200 row đều dùng canonical đúng. Database demo vẫn chưa có bốn cột hierarchy và chưa được backfill.
+Tại thời điểm rehearsal, deployment verifier trả `status=PASS`; catalog 1.200 Book, filter `C001` 50 Book và recommendation query 1.200 row đều dùng canonical đúng. **Cập nhật read-only 16/07/2026:** demo hiện đã query được bốn field hierarchy, có 24 root, 0 child và 24/24 canonical mapping; nhận xét “chưa có cột/chưa backfill” không còn đúng.

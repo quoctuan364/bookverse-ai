@@ -14,7 +14,6 @@ from sqlalchemy.exc import SQLAlchemyError
 from ai_service.evaluation.taxonomy import map_legacy_interaction_event
 
 
-DEFAULT_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/bookverse_ai"
 MAX_RECOMMENDATIONS = 10
 
 READING_CATEGORY_WEIGHT = 12.0
@@ -87,7 +86,9 @@ def normalize_database_url(database_url: str) -> str:
 
 @lru_cache(maxsize=1)
 def get_engine() -> Engine:
-    database_url = os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
+    database_url = os.getenv("DATABASE_URL", "").strip()
+    if not database_url:
+        raise RuntimeError("DATABASE_URL is required for the recommendation service.")
     return create_engine(normalize_database_url(database_url), pool_pre_ping=True)
 
 

@@ -1,6 +1,8 @@
 import { ListingCondition, ListingStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
+import { normalizeBookCoverUrl } from "@/lib/book-cover";
 import prisma from "@/lib/prisma";
+import { loadSellerQualityScores } from "@/lib/seller-quality-data";
 
 type DecimalLike = {
   toNumber: () => number;
@@ -16,18 +18,6 @@ function decimalToNumber(value: DecimalLike | number | string): number {
   }
 
   return value.toNumber();
-}
-
-function normalizeCoverPath(coverPath: string | null): string | null {
-  if (!coverPath) {
-    return null;
-  }
-
-  if (coverPath.startsWith("/") || coverPath.startsWith("http")) {
-    return coverPath;
-  }
-
-  return `/${coverPath}`;
 }
 
 function parseCondition(value: string | null): ListingCondition | null {
@@ -90,19 +80,11 @@ export async function GET(request: Request) {
           select: {
             id: true,
             name: true,
-            sellerAiScore: {
-              select: {
-                score: true,
-                completedOrders: true,
-                responseRate: true,
-                trusted: true,
-                explanation: true,
-              },
-            },
           },
         },
       },
     });
+    const sellerQualityScores = await loadSellerQualityScores(listings.map((listing) => listing.seller.id));
 
     return NextResponse.json(
       {
@@ -123,7 +105,7 @@ export async function GET(request: Request) {
                 id: listing.book.id,
                 title: listing.book.title,
                 author: listing.book.authorName,
-                cover_url: normalizeCoverPath(listing.book.coverPath),
+                cover_url: normalizeBookCoverUrl(listing.book.coverPath),
                 price: decimalToNumber(listing.book.price),
                 rating: listing.book.rating ? decimalToNumber(listing.book.rating) : null,
               }
@@ -131,15 +113,20 @@ export async function GET(request: Request) {
           seller: {
             id: listing.seller.id,
             name: listing.seller.name,
-            ai_score: listing.seller.sellerAiScore
-              ? {
-                  score: listing.seller.sellerAiScore.score,
-                  completed_orders: listing.seller.sellerAiScore.completedOrders,
-                  response_rate: listing.seller.sellerAiScore.responseRate,
-                  trusted: listing.seller.sellerAiScore.trusted,
-                  explanation: listing.seller.sellerAiScore.explanation,
-                }
-              : null,
+            quality_score: (() => {
+              const quality = sellerQualityScores.get(listing.seller.id);
+              return quality
+                ? {
+                    score: quality.score,
+                    completed_orders: quality.facts.completedOrders,
+                    cancelled_orders: quality.facts.cancelledOrders,
+                    reported_listings: quality.facts.reportedListings,
+                    badge: quality.badge,
+                    formula_version: quality.formulaVersion,
+                    reasons: quality.reasons,
+                  }
+                : null;
+            })(),
           },
         })),
         meta: {

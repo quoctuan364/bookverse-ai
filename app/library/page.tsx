@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BookMarked, BookOpen, Heart, Highlighter, LibraryBig, ReceiptText, Trash2 } from "lucide-react";
 import { getLibraryData, toggleFavoriteBook, type LibraryBookItem } from "@/actions/library.actions";
+import { SafeBookCover } from "@/components/shared/SafeBookCover";
 import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/permissions";
 
@@ -13,9 +14,6 @@ interface LibraryPageProps {
     message?: string;
   }>;
 }
-
-const fallbackCover =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='600' viewBox='0 0 400 600'%3E%3Crect width='400' height='600' fill='%23153A3F'/%3E%3Crect x='48' y='56' width='304' height='488' rx='18' fill='%23F8F6F1' opacity='0.94'/%3E%3Ctext x='200' y='292' text-anchor='middle' font-family='Arial,sans-serif' font-size='38' font-weight='700' fill='%23153A3F'%3EBookVerse%3C/text%3E%3Ctext x='200' y='338' text-anchor='middle' font-family='Arial,sans-serif' font-size='28' fill='%23153A3F'%3EAI%3C/text%3E%3C/svg%3E";
 
 function formatDate(value: Date | null): string {
   if (!value) {
@@ -55,10 +53,10 @@ function statusLabel(status: string): string {
 function MiniBook({ item, href }: { item: LibraryBookItem; href: string }) {
   return (
     <Link className="flex gap-3 rounded-xl border border-white/10 bg-white/[0.05] p-3 transition hover:bg-white/[0.08]" href={href}>
-      <img
+      <SafeBookCover
         alt={`Bìa sách ${item.title}`}
         className="h-24 w-16 shrink-0 rounded-lg object-cover shadow-[0_10px_22px_rgba(0,0,0,0.18)]"
-        src={item.coverImage ?? fallbackCover}
+        src={item.coverImage}
       />
       <span className="min-w-0">
         <span className="line-clamp-2 font-black text-white">{item.title}</span>

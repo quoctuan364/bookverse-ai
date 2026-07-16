@@ -16,6 +16,7 @@ import prisma from "@/lib/prisma";
 import { refreshRecommendationsForUser } from "@/actions/recommendation.actions";
 import { recordAuditLog } from "@/lib/audit";
 import { generateBookEmbedding } from "@/lib/book-embeddings";
+import { normalizeBookCoverUrl } from "@/lib/book-cover";
 import { createNotification, createNotifications } from "@/lib/notifications";
 import {
   cancelOrderWithRestock,
@@ -27,6 +28,7 @@ import {
   requireAdminUser,
   requireModeratorUser,
 } from "@/lib/permissions";
+import { loadSellerQualityScores } from "@/lib/seller-quality-data";
 
 type DecimalLike = {
   toNumber: () => number;
@@ -101,8 +103,9 @@ export interface AdminListingItem {
     name: string;
     email: string | null;
     listingCount: number;
-    sellerScore: number | null;
-    trusted: boolean;
+    sellerQualityScore: number;
+    highQuality: boolean;
+    formulaVersion: string;
   };
   createdAt: Date;
 }
@@ -230,18 +233,6 @@ function decimalToNumber(value: DecimalLike | number | string): number {
   }
 
   return value.toNumber();
-}
-
-function normalizeCoverPath(coverPath: string | null): string | null {
-  if (!coverPath) {
-    return null;
-  }
-
-  if (coverPath.startsWith("/") || coverPath.startsWith("http")) {
-    return coverPath;
-  }
-
-  return `/${coverPath}`;
 }
 
 function toSafePage(value?: number): number {
@@ -683,7 +674,6 @@ export async function getAdminCenterData(filters: AdminCenterFilters = {}): Prom
               id: true,
               name: true,
               email: true,
-              sellerAiScore: true,
               _count: {
                 select: {
                   listings: true,
@@ -782,6 +772,7 @@ export async function getAdminCenterData(filters: AdminCenterFilters = {}): Prom
         },
       }),
     ]);
+    const sellerQualityScores = await loadSellerQualityScores(listings.map((listing) => listing.seller.id));
 
     return {
       metrics: [
@@ -821,7 +812,7 @@ export async function getAdminCenterData(filters: AdminCenterFilters = {}): Prom
         author: book.authorName,
         category: book.category.name,
         status: book.status,
-        coverPath: normalizeCoverPath(book.coverPath),
+        coverPath: normalizeBookCoverUrl(book.coverPath),
         isEbook: book.isEbook,
         hasCover: Boolean(book.coverPath),
         hasDescription: Boolean(book.description?.trim()),
@@ -836,14 +827,22 @@ export async function getAdminCenterData(filters: AdminCenterFilters = {}): Prom
         price: decimalToNumber(listing.price),
         reportCount: listing.reportCount,
         rejectionReason: listing.rejectionReason,
-        seller: {
-          id: listing.seller.id,
-          name: listing.seller.name,
-          email: listing.seller.email,
-          listingCount: listing.seller._count.listings,
-          sellerScore: listing.seller.sellerAiScore?.score ?? null,
-          trusted: listing.seller.sellerAiScore?.trusted ?? false,
-        },
+        seller: (() => {
+          const quality = sellerQualityScores.get(listing.seller.id);
+          if (!quality) {
+            throw new Error(`Không tính được điểm chất lượng cho seller ${listing.seller.id}.`);
+          }
+
+          return {
+            id: listing.seller.id,
+            name: listing.seller.name,
+            email: listing.seller.email,
+            listingCount: listing.seller._count.listings,
+            sellerQualityScore: quality.score,
+            highQuality: quality.isHighQuality,
+            formulaVersion: quality.formulaVersion,
+          };
+        })(),
         createdAt: listing.createdAt,
       })),
       orders: orders.map((order) => ({
