@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { CalendarClock, MapPin, PackageCheck, ReceiptText, Truck } from "lucide-react";
 import { cancelPendingOrder, getOrderDetailData } from "@/actions/order.actions";
 import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
-import { SafeBookCover } from "@/components/shared/SafeBookCover";
+import { BookCover } from "@/components/shared/BookCover";
 import { getCurrentUser } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
@@ -177,7 +177,14 @@ export default async function OrderDetailPage({ params, searchParams }: OrderDet
               {order.items.map((item) => (
                 <article className="flex flex-col gap-4 rounded-xl border border-white/10 bg-white/[0.05] p-4 sm:flex-row" key={item.id}>
                   <Link className="aspect-[2/3] w-24 shrink-0 overflow-hidden rounded-lg bg-[#EDE3D5]" href={`/book/${item.book.id}`}>
-                    <SafeBookCover alt={`Bìa sách ${item.book.title}`} className="h-full w-full object-cover" src={item.book.coverImage} />
+                    <BookCover
+                      alt={`Bìa sách ${item.book.title}`}
+                      author={item.book.author}
+                      bookId={item.book.id}
+                      className="h-full w-full object-cover"
+                      src={item.book.coverImage}
+                      title={item.book.title}
+                    />
                   </Link>
                   <div className="min-w-0 flex-1">
                     <Link className="line-clamp-2 text-lg font-black text-white hover:underline" href={`/book/${item.book.id}`}>

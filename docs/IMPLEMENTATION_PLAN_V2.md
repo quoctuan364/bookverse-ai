@@ -9,7 +9,7 @@ Tài liệu này chia việc nâng cấp thành các lượt có checkpoint và 
 - Đã xóa `BookCard.buildMockEvidence`; thiếu evidence hiển thị trạng thái trung tính.
 - Đã xóa `buildMockSellerAiScore`; production UI/API dùng “Điểm chất lượng theo quy tắc” deterministic `seller-quality-v1` và có test.
 - Production assistant mock guard là `ALREADY_FIXED_VERIFIED`; không còn mock flag có hiệu lực ở production.
-- Cover dùng fallback chung cho null/path sai/load error; browser audit ép 404 trên Home/Recommendation, Catalog, Book detail, Marketplace, Cart và Seller đã có bằng chứng.
+- Cover V2 dùng `BookCover` chung cho null/path sai/load error; fallback có 8 artwork/6 layout deterministic. Audit dataset hiện có 2.200 bìa synthetic cũ và 0 bìa thật được phê duyệt; browser-smoke toàn bộ surface đang chờ database demo hoạt động.
 - Docker/Compose/FastAPI không còn credential hard-code trong production source; image candidate không chứa `.env` hoặc secret trong config/history.
 - AI metric offline vẫn thấp; dữ liệu chủ yếu synthetic/demo; CTR thật `NOT_AVAILABLE`.
 

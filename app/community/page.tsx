@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Flag, MessageCircle, PenLine, ThumbsUp, UserCircle } from "lucide-react";
 import { getAllPosts } from "@/actions/community.actions";
+import { BookCover } from "@/components/shared/BookCover";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +75,24 @@ export default async function CommunityPage() {
                       {post.title}
                     </h2>
                     <p className="mt-2 line-clamp-3 leading-7 text-[#42524D]">{post.content}</p>
+
+                    {post.book ? (
+                      <div className="mt-4 flex max-w-md gap-3 rounded-xl bg-[#F7F4ED] p-3">
+                        <BookCover
+                          alt={`Bìa sách ${post.book.title}`}
+                          author={post.book.author}
+                          bookId={post.book.id}
+                          category={post.book.category}
+                          className="h-20 w-[54px] shrink-0 rounded-md"
+                          src={post.book.coverImage}
+                          title={post.book.title}
+                        />
+                        <span className="min-w-0 self-center">
+                          <span className="block text-xs font-bold uppercase tracking-wide text-[#66706B]">Sách đang thảo luận</span>
+                          <span className="mt-1 line-clamp-2 block text-sm font-black text-[#17202A]">{post.book.title}</span>
+                        </span>
+                      </div>
+                    ) : null}
 
                     <div className="mt-4 flex items-center gap-5 text-sm text-gray-500">
                       <span className="inline-flex items-center gap-2">

@@ -7,7 +7,7 @@ import {
   getMarketplacePageData,
 } from "@/actions/marketplace.actions";
 import { Badge } from "@/components/ui/badge";
-import { SafeBookCover } from "@/components/shared/SafeBookCover";
+import { BookCover } from "@/components/shared/BookCover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -217,10 +217,14 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
               >
                 <div className="flex gap-4 p-4">
                   <div className="aspect-[2/3] w-28 shrink-0 overflow-hidden rounded-lg bg-[#EDE3D5] shadow-[0_12px_26px_rgba(39,44,51,0.12)]">
-                    <SafeBookCover
+                    <BookCover
                       alt={`Bìa sách ${listing.book?.title ?? listing.title}`}
+                      author={listing.book?.author}
+                      bookId={listing.book?.id ?? listing.id}
+                      category={listing.book?.category}
                       className="h-full w-full object-cover"
                       src={listing.book?.coverImage}
+                      title={listing.book?.title ?? listing.title}
                     />
                   </div>
 

@@ -62,8 +62,10 @@ function getRoleLabel(role?: string): string {
 export async function Navbar() {
   const session = await auth();
   const user = session?.user;
-  const currentUser = user?.id
-    ? await prisma.user.findUnique({
+  let currentUser: { name: string; role: string; isLocked: boolean } | null = null;
+  if (user?.id) {
+    try {
+      currentUser = await prisma.user.findUnique({
         where: {
           id: user.id,
         },
@@ -72,8 +74,12 @@ export async function Navbar() {
           role: true,
           isLocked: true,
         },
-      })
-    : null;
+      });
+    } catch {
+      // Trang tĩnh/diagnostic vẫn phải hiển thị được khi database local tạm dừng.
+      console.error("[Navbar] Database không khả dụng; điều hướng đang dùng thông tin session tối thiểu.");
+    }
+  }
   const activeUser = currentUser && !currentUser.isLocked ? currentUser : null;
   const effectiveRole = activeUser?.role;
   const effectiveName = activeUser?.name ?? user?.name;
@@ -108,7 +114,7 @@ export async function Navbar() {
           />
         </form>
 
-        <div className="hidden items-center gap-1 xl:flex">
+        <div className="hidden items-center gap-1 2xl:flex">
           {navItems.map((item) => {
             const Icon = item.icon;
 
@@ -200,7 +206,7 @@ export async function Navbar() {
           )}
         </div>
 
-        <details className="group ml-auto md:hidden">
+        <details className="group 2xl:hidden">
           <summary className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-lg border border-white/10 bg-white/[0.07] text-zinc-100 shadow-[0_10px_28px_rgba(0,0,0,0.18)] transition hover:bg-white/[0.11]">
             <Menu className="h-5 w-5" aria-hidden="true" />
             <span className="sr-only">Mở menu</span>

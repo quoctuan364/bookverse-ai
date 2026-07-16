@@ -76,6 +76,7 @@ export interface SellerListingItem {
     id: string;
     title: string;
     author: string;
+    coverImage: string | null;
   } | null;
 }
 
@@ -418,7 +419,7 @@ function serializeListing(listing: {
   targetAudience: string | null;
   createdAt: Date;
   updatedAt: Date;
-  book: { id: string; title: string; authorName: string } | null;
+  book: { id: string; title: string; authorName: string; coverPath: string | null } | null;
   images?: Array<{ url: string }>;
   _count?: { orderItems: number };
 }): SellerListingItem {
@@ -445,6 +446,7 @@ function serializeListing(listing: {
           id: listing.book.id,
           title: listing.book.title,
           author: listing.book.authorName,
+          coverImage: normalizeBookCoverUrl(listing.book.coverPath),
         }
       : null,
   };
@@ -836,6 +838,7 @@ export async function getSellerOverviewData(): Promise<SellerOverviewData> {
             id: true,
             title: true,
             authorName: true,
+            coverPath: true,
           },
         },
         images: {
@@ -934,6 +937,7 @@ export async function getSellerListingsData(filters: { q?: string; status?: stri
             id: true,
             title: true,
             authorName: true,
+            coverPath: true,
           },
         },
         images: {
@@ -986,6 +990,7 @@ export async function getSellerListingEditorData(listingId?: string): Promise<Se
           id: true,
           title: true,
           authorName: true,
+          coverPath: true,
         },
       },
       images: {

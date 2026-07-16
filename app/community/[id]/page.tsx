@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { Flag, MessageCircle, ThumbsUp, UserCircle } from "lucide-react";
 import { ReactionType } from "@prisma/client";
 import { createComment, getPostById, reactToPost } from "@/actions/community.actions";
+import { BookCover } from "@/components/shared/BookCover";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -112,9 +113,25 @@ export default async function CommunityPostDetailPage({
               </div>
 
               {post.book ? (
-                <p className="mt-2 text-sm text-[#66706B]">
-                  Gắn với sách: <span className="font-bold text-[#17202A]">{post.book.title}</span>
-                </p>
+                <a
+                  className="mt-4 flex max-w-md gap-3 rounded-xl border border-[#17191F]/10 bg-[#F7F4ED] p-3 transition hover:border-[#0F766E]/35"
+                  href={`/book/${post.book.id}`}
+                >
+                  <BookCover
+                    alt={`Bìa sách ${post.book.title}`}
+                    author={post.book.author}
+                    bookId={post.book.id}
+                    category={post.book.category}
+                    className="h-24 w-16 shrink-0 rounded-md"
+                    src={post.book.coverImage}
+                    title={post.book.title}
+                  />
+                  <span className="min-w-0 self-center">
+                    <span className="block text-xs font-bold uppercase tracking-wide text-[#66706B]">Gắn với sách</span>
+                    <span className="mt-1 line-clamp-2 block font-black text-[#17202A]">{post.book.title}</span>
+                    <span className="mt-1 block truncate text-sm text-[#66706B]">{post.book.author}</span>
+                  </span>
+                </a>
               ) : null}
 
               <h1 className="mt-4 text-2xl font-black leading-tight text-[#17202A] sm:text-3xl">

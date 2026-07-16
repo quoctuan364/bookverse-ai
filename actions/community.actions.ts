@@ -1,6 +1,7 @@
 "use server";
 
 import { PostStatus, ReactionType, TargetType } from "@prisma/client";
+import { normalizeBookCoverUrl } from "@/lib/book-cover";
 import { TAXONOMY_VERSION } from "@/lib/interaction-taxonomy";
 import { PermissionError, requireAuthenticatedUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
@@ -10,12 +11,21 @@ export interface CommunityPostAuthor {
   name: string;
 }
 
+export interface CommunityBookSummary {
+  id: string;
+  title: string;
+  author: string;
+  category: string;
+  coverImage: string | null;
+}
+
 export interface CommunityPost {
   id: string;
   title: string;
   content: string;
   createdAt: Date;
   author: CommunityPostAuthor;
+  book: CommunityBookSummary | null;
   commentCount: number;
   reactionCount: number;
   reportCount: number;
@@ -34,10 +44,6 @@ export interface CommunityComment {
 }
 
 export interface CommunityPostDetail extends CommunityPost {
-  book: {
-    id: string;
-    title: string;
-  } | null;
   comments: CommunityComment[];
 }
 
@@ -80,6 +86,19 @@ export async function getAllPosts(): Promise<CommunityPost[]> {
             name: true,
           },
         },
+        book: {
+          select: {
+            id: true,
+            title: true,
+            authorName: true,
+            coverPath: true,
+            category: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
         _count: {
           select: {
             comments: true,
@@ -95,6 +114,15 @@ export async function getAllPosts(): Promise<CommunityPost[]> {
       content: post.content,
       createdAt: post.createdAt,
       author: post.author,
+      book: post.book
+        ? {
+            id: post.book.id,
+            title: post.book.title,
+            author: post.book.authorName,
+            category: post.book.category.name,
+            coverImage: normalizeBookCoverUrl(post.book.coverPath),
+          }
+        : null,
       commentCount: post._count.comments,
       reactionCount: post.reactionCount || post._count.reactions,
       reportCount: post.reportCount,
@@ -132,6 +160,13 @@ export async function getPostById(postId: string): Promise<CommunityPostDetail |
           select: {
             id: true,
             title: true,
+            authorName: true,
+            coverPath: true,
+            category: {
+              select: {
+                name: true,
+              },
+            },
           },
         },
         comments: {
@@ -166,7 +201,15 @@ export async function getPostById(postId: string): Promise<CommunityPostDetail |
       commentCount: post.commentCount || post.comments.length,
       reactionCount: post.reactionCount,
       reportCount: post.reportCount,
-      book: post.book,
+      book: post.book
+        ? {
+            id: post.book.id,
+            title: post.book.title,
+            author: post.book.authorName,
+            category: post.book.category.name,
+            coverImage: normalizeBookCoverUrl(post.book.coverPath),
+          }
+        : null,
       comments: post.comments.map((comment) => ({
         id: comment.id,
         content: comment.content,

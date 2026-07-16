@@ -33,7 +33,7 @@ import {
   updateUserRole,
 } from "@/actions/dashboard.actions";
 import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
-import { SafeBookCover } from "@/components/shared/SafeBookCover";
+import { BookCover } from "@/components/shared/BookCover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { requireModeratorUser } from "@/lib/permissions";
@@ -418,7 +418,15 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
               <article className="rounded-lg bg-[#F7F4ED] p-4" key={book.id}>
                 <div className="flex gap-4">
                   <div className="flex h-24 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#153A3F] text-xs font-black text-white">
-                    <SafeBookCover alt={book.title} className="h-full w-full object-cover" src={book.coverPath} />
+                    <BookCover
+                      alt={book.title}
+                      author={book.author}
+                      bookId={book.id}
+                      category={book.category}
+                      className="h-full w-full object-cover"
+                      src={book.coverPath}
+                      title={book.title}
+                    />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">

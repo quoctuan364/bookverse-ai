@@ -47,7 +47,7 @@ D:\Doantotnghiep
 ├─ prisma/              # Prisma schema, migrations, seed
 ├─ data/demo/           # CSV demo nhỏ, không xóa dữ liệu gốc
 ├─ data/json/           # Dataset lớn 2.200 sách để import khi cần
-├─ public/covers/       # Bìa sách PNG/SVG
+├─ public/covers/       # Artwork fallback V2; bìa synthetic cũ chỉ giữ làm dữ liệu lịch sử
 ├─ public/ebooks/       # Ebook HTML/JSON cho reader
 ├─ ai_service/          # FastAPI service cho gợi ý sách
 ├─ scripts/             # Script import/làm mới dữ liệu
@@ -539,6 +539,14 @@ Lệnh `data:import` phải dùng biến `DATABASE_URL` của `bookverse_ai_test
 ## Ghi chú dữ liệu
 
 - Không xóa hoặc ghi đè file dữ liệu gốc trong `data/demo`.
-- Ebook HTML/JSON và cover SVG đã được thêm vào `public/ebooks` và `public/covers` để reader/catalog dùng trực tiếp.
+- Ebook HTML/JSON đã được thêm vào `public/ebooks`. Cover SVG cũ là `SYNTHETIC_DATA`, không được dùng như bìa thật; UI hiện dùng `BookCover` và fallback V2 có nhãn “BookVerse Demo”.
+
+### Trạng thái bìa sách
+
+- `2.200/2.200` URL trong dataset ultra là bìa synthetic cũ, trạng thái `NOT_VERIFIED`.
+- Có 8 artwork fallback nguyên bản, 6 layout deterministic, tỷ lệ `2:3`; đây là `GENERATED_DEMO_ASSET`, không phải bìa nhà xuất bản.
+- Số bìa thật có nguồn/giấy phép đã duyệt: `0` (`NOT_AVAILABLE`).
+- Danh sách 120 sách ưu tiên cần bìa thật: `docs/REAL_COVER_CANDIDATES.csv`.
+- Audit và hướng dẫn: `docs/COVER_SYSTEM.md`; bằng chứng triển khai: `docs/COVER_V2_REPORT.md`; chạy `npm run covers:audit`.
 - Script `prisma/seed.ts` seed demo nhỏ và đặt mật khẩu `123456` cho user mẫu.
 - Script import quy mô lớn mặc định fail-closed; chỉ `--execute --replace-existing` mới dọn dữ liệu và chỉ được phép trên database test nằm trong allowlist.

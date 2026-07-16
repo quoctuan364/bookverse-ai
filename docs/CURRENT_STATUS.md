@@ -15,12 +15,10 @@ Cập nhật: 16/07/2026. Đây là nguồn trạng thái hiện hành; các bá
 
 | Kết luận | Trạng thái | Bằng chứng | Giới hạn |
 |---|---|---|---|
-| Git baseline | VERIFIED | HEAD trước P0 `ccbc9329e48288f28fef57a676d0d1d030996673`, branch `checkpoint-f1-1-telemetry-reliability`, worktree sạch | Commit P0 chỉ tạo sau regression cuối |
+| Git baseline lượt Cover V2 | VERIFIED | HEAD đầu lượt `2ebb170e466ac57bd8d88ecb2f659cfdba601ea8`, branch `checkpoint-f1-1-telemetry-reliability`, worktree sạch | Chưa phải commit Cover V2 |
 | Prisma schema/client | VERIFIED | `npx prisma validate` và `npx prisma generate`, exit 0 | Có cảnh báo cấu hình `package.json#prisma` sẽ deprecated ở Prisma 7 |
-| Demo database | VERIFIED | Query read-only xác nhận `bookverse_ai`: 300 User, 24 Category, 1.200 Book, 1.200 Listing, 1.500 Order, 2.570 OrderItem | Không migration/backfill/seed/write trong lượt P0 |
-| Migration demo | VERIFIED | 12/12 migration `APPLIED_VALID`, schema checksum `465c2d7e5b93f385cb7052517a11bc942c4df22ef0059f416722448bcd9757cd` | Audit read-only |
-| pgvector demo | VERIFIED | Container DB dùng `pgvector/pgvector:0.8.5-pg16`; extension `plpgsql`, `vector`; 12 migration hoàn tất | Không restart/recreate demo trong lượt P0 |
-| Category demo | VERIFIED | Query Prisma trên field hierarchy: 24 root, 0 child, 24 canonical mapping | Đây là profile legacy 24 Category, không phải taxonomy ultra-2200 |
+| Demo database lượt Cover V2 | BLOCKED | Prisma read-only query tới `localhost:5432` và `5433` đều không kết nối; Docker API pipe không tồn tại | `BLOCKED_DB_UNAVAILABLE`; không restart, migrate, backfill, seed hay ghi DB |
+| Migration/pgvector/category demo | NOT_VERIFIED | Không thể query lại trong lượt Cover V2 vì database dừng | Các số liệu P0 cũ chỉ là historical evidence, không dùng làm trạng thái DB hiện tại |
 
 ## P0 trước bảo vệ
 
@@ -30,8 +28,12 @@ Cập nhật: 16/07/2026. Đây là nguồn trạng thái hiện hành; các bá
 | Seller AI Score giả | VERIFIED | Đã xóa cả hai `buildMockSellerAiScore`; UI/API dùng `seller-quality-v1`, không dùng random/seller ID và không gọi là AI | Dữ liệu giao dịch demo chủ yếu synthetic nên điểm không phải uy tín người bán thật |
 | Công thức seller quality | VERIFIED | `70 + min(completed*2,20) + descriptionBonus + approvedBonus - min(cancelled*5,20) - min(reported*5,20)`, clamp 0..100; unit test deterministic/monotonic/bounds | Rule và trọng số là quyết định sản phẩm, chưa được nghiên cứu người dùng xác nhận |
 | Production assistant mock guard | VERIFIED | `isDevelopmentMockEnabled` đã tồn tại trước lượt P0 và unit test xác nhận production luôn tắt mock | `ALREADY_FIXED_VERIFIED`; provider OpenAI/Gemini thật chưa được xác minh trong lượt này |
-| Cover null/path/404 | VERIFIED | `normalizeBookCoverUrl` + `SafeBookCover`; browser audit production image ép 404 trên Home/Recommendation, Catalog, Book detail, Marketplace, Cart, Seller: broken=0 | Browser tích hợp bị lỗi runtime; dùng Playwright cục bộ, screenshot thật trong `outputs/p0-cover-audit` |
-| Cover demo remote | PARTIAL | Query read-only: 1.200/1.200 URL remote, null/local = 0. Single-pass mới nhất có 1.196/1.200 GET 200 image; B0148/B0173/B0292/B0310 lỗi mạng/timeout tạm thời rồi mỗi URL đều trả 200 image ở 3/3 lần retry | Không có 404 bền vững được xác nhận; CDN remote không ổn định nên không được gọi 1.200/1.200 luôn khả dụng. UI fallback đã VERIFIED độc lập |
+| Component `BookCover` V2 | VERIFIED | Dùng chung, tỷ lệ 2:3, alt text, timeout 8 giây, null/malformed/load error về fallback, reducer đóng trạng thái nên không retry vô hạn; unit test mới xác nhận | Remote tải thành công vẫn là `NOT_VERIFIED` nếu chưa có bằng chứng nguồn/giấy phép |
+| Fallback bìa V2 | VERIFIED | 8 artwork `320x480`, 6 layout deterministic, seed `bookId`, title tối đa 3 dòng, author tối đa 2 dòng; không render giá/edition/ID/badge category trong ảnh | `GENERATED_DEMO_ASSET`, không phải bìa nhà xuất bản và không được gọi là bìa thật |
+| Audit dataset cover | VERIFIED | `npm run covers:audit`, exit 0: 2.200/2.200 `LEGACY_SYNTHETIC`, 2.200 `NOT_VERIFIED`, 0 Git-tracked, 0 bìa thật được phê duyệt | Audit trên `SYNTHETIC_DATA` JSON read-only; database demo đang BLOCKED |
+| Bìa thật hợp pháp | NOT_AVAILABLE | `config/real-cover-sources.json` có 0 nguồn được duyệt; `docs/REAL_COVER_CANDIDATES.csv` liệt kê 120 Book ưu tiên | Chưa có file/URL do NXB, tác giả hoặc nguồn có giấy phép cung cấp |
+| Responsive trang Cover V2 | VERIFIED | In-app browser tại `/design/cover-system`: 360/768/1366/1920 đều 8 cover, 8 artwork, 6 layout, ratio 0,667, broken image 0, không tràn ngang, clamp 3 | Chụp screenshot qua browser đã chạy nhưng FAILED do timeout; không dùng screenshot làm bằng chứng |
+| Đồng nhất các surface | PARTIAL | Source scan xác nhận `BookCover` trên Home, Catalog/Recommendation qua `BookCard`, Detail, Marketplace, Cart, Seller, Community, Library, Order, Profile, Admin, Assistant | Chưa browser-smoke từng trang vì database demo đang dừng |
 | Secret trong source/image mới | VERIFIED | Dockerfile bỏ secret build; Compose yêu cầu environment; `.dockerignore` chặn `.env`; web builder/final và AI image audit không thấy DATABASE_URL/AUTH_SECRET/credential URL | Chưa rotate secret và chưa thay/restart container demo theo đúng phạm vi |
 | Production mock scan | VERIFIED | Runtime source không còn `buildMockEvidence`, `buildMockSellerAiScore`, `sellerAiScore` hoặc nhãn AI Score; 94/94 unit test gồm production mock guard | Cần giữ scan trong CI để chống tái xuất hiện; chưa có bằng chứng CI runner đã chạy |
 | Regression cuối P0 | VERIFIED | Prisma validate/generate, typecheck, 94/94 TypeScript, 21 Python + 1 database integration, Category/stock/assistant/taxonomy/rank/telemetry, stress 100/100 request và production build đều exit 0 | Không thay thế UAT, provider thật hoặc production deployment |

@@ -4,7 +4,7 @@ import { Eye, EyeOff, Filter, Pencil, Plus, Search } from "lucide-react";
 import { ListingStatus } from "@prisma/client";
 import { getSellerListingsData, setSellerListingVisibility } from "@/actions/seller.actions";
 import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
-import { SafeBookCover } from "@/components/shared/SafeBookCover";
+import { BookCover } from "@/components/shared/BookCover";
 import { Input } from "@/components/ui/input";
 import {
   conditionLabel,
@@ -115,7 +115,14 @@ export default async function SellerListingsPage({ searchParams }: SellerListing
               <article className="bv-card rounded-lg p-5" key={listing.id}>
                 <div className="grid gap-4 lg:grid-cols-[120px_1fr_auto]">
                   <div className="aspect-[2/3] w-full overflow-hidden rounded-lg bg-white/[0.06] lg:w-[120px]">
-                    <SafeBookCover alt={listing.title} className="h-full w-full object-cover" src={listing.imageUrl} />
+                    <BookCover
+                      alt={listing.title}
+                      author={listing.book?.author}
+                      bookId={listing.book?.id ?? listing.id}
+                      className="h-full w-full object-cover"
+                      src={listing.book?.coverImage ?? listing.imageUrl}
+                      title={listing.book?.title ?? listing.title}
+                    />
                   </div>
 
                   <div className="min-w-0">

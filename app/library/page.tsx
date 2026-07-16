@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BookMarked, BookOpen, Heart, Highlighter, LibraryBig, ReceiptText, Trash2 } from "lucide-react";
 import { getLibraryData, toggleFavoriteBook, type LibraryBookItem } from "@/actions/library.actions";
-import { SafeBookCover } from "@/components/shared/SafeBookCover";
+import { BookCover } from "@/components/shared/BookCover";
 import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/permissions";
 
@@ -53,10 +53,13 @@ function statusLabel(status: string): string {
 function MiniBook({ item, href }: { item: LibraryBookItem; href: string }) {
   return (
     <Link className="flex gap-3 rounded-xl border border-white/10 bg-white/[0.05] p-3 transition hover:bg-white/[0.08]" href={href}>
-      <SafeBookCover
+      <BookCover
         alt={`Bìa sách ${item.title}`}
+        author={item.author}
+        bookId={item.bookId}
         className="h-24 w-16 shrink-0 rounded-lg object-cover shadow-[0_10px_22px_rgba(0,0,0,0.18)]"
         src={item.coverImage}
+        title={item.title}
       />
       <span className="min-w-0">
         <span className="line-clamp-2 font-black text-white">{item.title}</span>

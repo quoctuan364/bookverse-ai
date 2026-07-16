@@ -1,6 +1,6 @@
 import { BookOpen, Info, Sparkles } from "lucide-react";
 import { RecommendationTrackedLink } from "@/components/recommendation/RecommendationTrackedLink";
-import { SafeBookCover } from "@/components/shared/SafeBookCover";
+import { BookCover } from "@/components/shared/BookCover";
 import { Badge } from "@/components/ui/badge";
 import { getRecommendationEvidencePresentation } from "@/lib/book-card-presentation";
 
@@ -40,11 +40,14 @@ export function BookCard({ book, recommendationRequestId }: BookCardProps) {
     >
       <article className="group overflow-hidden rounded-2xl border border-white/10 bg-slate-950/72 text-zinc-100 shadow-[0_24px_70px_rgba(0,0,0,0.26)] backdrop-blur-2xl transition-all duration-300 hover:-translate-y-1 hover:border-[#0F766E]/45 hover:shadow-[0_28px_90px_rgba(0,0,0,0.36)]">
         <div className="relative aspect-[2/3] overflow-hidden bg-zinc-900">
-          <SafeBookCover
+          <BookCover
             alt={`Bìa sách ${book.title}`}
+            author={book.author}
+            bookId={book.id}
             className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
             loading="lazy"
             src={book.coverImage}
+            title={book.title}
           />
           <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-slate-950/86 to-transparent" />
           <Badge className="absolute left-3 top-3 border-0 bg-[#0F766E] text-[#FFFDF8] shadow-[0_8px_20px_rgba(15,118,110,0.24)]">

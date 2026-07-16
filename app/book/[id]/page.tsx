@@ -7,7 +7,7 @@ import { toggleFavoriteBook } from "@/actions/library.actions";
 import { addListingToCart, createDemoOrder } from "@/actions/marketplace.actions";
 import { BookViewTracker } from "@/components/shared/BookViewTracker";
 import { ReviewSection } from "@/components/shared/ReviewSection";
-import { SafeBookCover } from "@/components/shared/SafeBookCover";
+import { BookCover } from "@/components/shared/BookCover";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -160,10 +160,14 @@ export default async function BookDetailPage({ params, searchParams }: BookDetai
         <section className="grid gap-8 lg:grid-cols-[1fr_2fr] lg:gap-12">
           <aside className="space-y-4">
             <div className="overflow-hidden rounded-lg border border-[#17191F]/10 bg-[#EDE3D5] shadow-[0_24px_55px_rgba(39,44,51,0.16)]">
-              <SafeBookCover
+              <BookCover
                 alt={`Bìa sách ${book.title}`}
+                author={book.author}
+                bookId={book.id}
+                category={book.category.name}
                 className="aspect-[2/3] h-full w-full object-cover"
                 src={book.coverImage}
+                title={book.title}
               />
             </div>
 

@@ -14,7 +14,7 @@ import {
   Store,
 } from "lucide-react";
 import { getProfileDashboardData } from "@/actions/profile.actions";
-import { SafeBookCover } from "@/components/shared/SafeBookCover";
+import { BookCover } from "@/components/shared/BookCover";
 
 export const dynamic = "force-dynamic";
 
@@ -227,10 +227,13 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                     href={`/read/${item.bookId}`}
                     key={item.bookId}
                   >
-                    <SafeBookCover
+                    <BookCover
                       alt={`Bìa sách ${item.title}`}
+                      author={item.author}
+                      bookId={item.bookId}
                       className="h-28 w-20 shrink-0 rounded-lg object-cover shadow-[0_10px_22px_rgba(39,44,51,0.12)]"
                       src={item.coverImage}
+                      title={item.title}
                     />
                     <div className="min-w-0 flex-1">
                       <p className="line-clamp-2 font-black text-[#17202A]">{item.title}</p>

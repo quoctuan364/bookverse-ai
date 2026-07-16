@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SubmitButton } from "@/components/shared/SubmitButton";
-import { SafeBookCover } from "@/components/shared/SafeBookCover";
+import { BookCover } from "@/components/shared/BookCover";
 import { getCurrentUser } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
@@ -201,10 +201,13 @@ export default async function CartPage({ searchParams }: CartPageProps) {
                       className="aspect-[2/3] w-28 shrink-0 overflow-hidden rounded-lg bg-[#EDE3D5] shadow-[0_12px_26px_rgba(39,44,51,0.12)]"
                       href={`/book/${item.book.id}`}
                     >
-                      <SafeBookCover
+                      <BookCover
                         alt={`Bìa sách ${item.book.title}`}
+                        author={item.book.author}
+                        bookId={item.book.id}
                         className="h-full w-full object-cover"
                         src={item.book.coverImage}
+                        title={item.book.title}
                       />
                     </Link>
 

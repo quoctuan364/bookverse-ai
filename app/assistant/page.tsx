@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Bot, Search, Sparkles } from "lucide-react";
 import { askBookAssistant } from "@/actions/assistant.actions";
 import { AssistantPageClient } from "@/components/assistant/AssistantPageClient";
-import { SafeBookCover } from "@/components/shared/SafeBookCover";
+import { BookCover } from "@/components/shared/BookCover";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -103,10 +103,14 @@ export default async function AssistantPage({ searchParams }: AssistantPageProps
                   <article className="group overflow-hidden rounded-lg border border-[#17191F]/10 bg-[#FFFDF8] shadow-[0_12px_34px_rgba(39,44,51,0.08)] transition hover:-translate-y-1 hover:border-[#0F766E]/30 hover:shadow-[0_22px_46px_rgba(39,44,51,0.12)]">
                     <div className="flex gap-4 p-4">
                       <div className="aspect-[2/3] w-24 shrink-0 overflow-hidden rounded-lg bg-[#EDE3D5] shadow-[0_12px_26px_rgba(39,44,51,0.12)]">
-                        <SafeBookCover
+                        <BookCover
                           alt={`Bìa sách ${book.title}`}
+                          author={book.author}
+                          bookId={book.id}
+                          category={book.category}
                           className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                           src={book.coverImage}
+                          title={book.title}
                         />
                       </div>
                       <div className="min-w-0 flex-1">
