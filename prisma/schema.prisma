@@ -282,12 +282,56 @@ model Book {
   recommendationFeedback     RecommendationFeedback[]
   recommendationRequestItems RecommendationRequestItem[]
   embedding                  BookEmbedding?
+  sourceMetadata             BookSourceMetadata?
   createdAt                  DateTime                    @default(now())
   updatedAt                  DateTime                    @updatedAt
 
   @@index([categoryId])
   @@index([title])
   @@index([status])
+}
+
+model BookSourceMetadata {
+  id                        String   @id @default(cuid())
+  bookId                    String   @unique
+  sourceProvider            String
+  sourceRecordKey           String
+  sourceRecordType          String
+  sourceWorkKey             String?
+  sourceWorkKeyRaw          String?
+  sourceEditionKey          String?
+  sourcePageUrl             String
+  dataLabel                 String
+  metadataQuality           String
+  coverId                   String?
+  coverRightsStatus         String
+  priceStatus               String
+  languageProfile           String
+  languages                 String[] @default([])
+  isbn                      String?  @unique
+  publisher                 String?
+  sourceFormat              String
+  descriptionStatus         String
+  sourceRatingStatus        String
+  sourceRatingAverage       Float?
+  sourceRatingCount         Int?
+  primarySourceCategoryId   String
+  primarySourceCategoryName String
+  sourceCategoryIds         String[] @default([])
+  isVietnameseEdition       Boolean  @default(false)
+  authorNationality         String
+  importedAt                DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+  book                      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceProvider, sourceRecordKey])
+  @@unique([sourceProvider, sourceWorkKey])
+  @@index([sourceRecordType])
+  @@index([dataLabel])
+  @@index([languageProfile])
+  @@index([isVietnameseEdition])
+  @@index([primarySourceCategoryId])
+  @@map("book_source_metadata")
 }
 
 model Listing {

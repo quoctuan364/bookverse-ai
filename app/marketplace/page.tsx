@@ -216,7 +216,7 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
                 key={listing.id}
               >
                 <div className="flex gap-4 p-4">
-                  <div className="aspect-[2/3] w-28 shrink-0 overflow-hidden rounded-lg bg-[#EDE3D5] shadow-[0_12px_26px_rgba(39,44,51,0.12)]">
+                  <div className="aspect-[2/3] w-28 shrink-0 self-start overflow-hidden rounded-lg bg-[#EDE3D5] shadow-[0_12px_26px_rgba(39,44,51,0.12)]">
                     <BookCover
                       alt={`Bìa sách ${listing.book?.title ?? listing.title}`}
                       author={listing.book?.author}

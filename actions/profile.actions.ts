@@ -7,6 +7,7 @@ import { normalizeBookCoverUrl } from "@/lib/book-cover";
 import { createNotification } from "@/lib/notifications";
 import { getCurrentUser, PermissionError, requireAuthenticatedUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
+import { getRecommendationEvidenceStatus, type RecommendationEvidenceStatus } from "@/lib/recommendation-evidence-policy";
 
 type DecimalLike = {
   toNumber: () => number;
@@ -63,6 +64,7 @@ export interface ProfileRecommendationItem {
   author: string;
   score: number;
   reason: string | null;
+  evidenceStatus: RecommendationEvidenceStatus;
 }
 
 export interface ProfileDashboardData {
@@ -327,6 +329,17 @@ export async function getProfileDashboardData(): Promise<ProfileDashboardData | 
           rank: "asc",
         },
         take: 6,
+        include: {
+          evidence: {
+            orderBy: {
+              weight: "desc",
+            },
+            take: 1,
+            select: {
+              metadata: true,
+            },
+          },
+        },
       }),
       prisma.review.count({
         where: {
@@ -428,6 +441,17 @@ export async function getProfileDashboardData(): Promise<ProfileDashboardData | 
             author: book.authorName,
             score: recommendation.score,
             reason: recommendation.reason,
+            evidenceStatus: getRecommendationEvidenceStatus({
+              evidence: recommendation.reason,
+              provenance:
+                recommendation.evidence[0]?.metadata &&
+                typeof recommendation.evidence[0].metadata === "object" &&
+                !Array.isArray(recommendation.evidence[0].metadata)
+                  ? (recommendation.evidence[0].metadata as { provenance?: unknown }).provenance
+                  : undefined,
+              expectedUserId: userId,
+              fallback: recommendation.reason ? undefined : "POPULARITY_FALLBACK",
+            }),
           };
         })
         .filter((item): item is ProfileRecommendationItem => Boolean(item)),

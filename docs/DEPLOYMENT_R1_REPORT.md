@@ -1,5 +1,7 @@
 # Biên bản Deployment R1 — BookVerse AI
 
+> **Historical checkpoint snapshot — không phản ánh toàn bộ trạng thái hiện tại.** Xem [`CURRENT_STATUS.md`](CURRENT_STATUS.md) trước khi dùng bất kỳ kết luận nào.
+
 Ngày triển khai: 15/07/2026. Database: `bookverse_ai`. Báo cáo này không chứa mật khẩu, token hoặc connection string đầy đủ.
 
 ## 1. Kết luận

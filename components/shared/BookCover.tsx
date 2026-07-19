@@ -8,6 +8,7 @@ import {
   getDemoCoverArt,
   getDemoCoverLayout,
   isApprovedRealCover,
+  isUsableBookCoverDimensions,
   sanitizeFallbackAuthor,
   sanitizeFallbackTitle,
 } from "@/lib/book-cover";
@@ -55,12 +56,15 @@ export function BookCover({
 }: BookCoverProps) {
   const [loadState, dispatch] = useReducer(bookCoverLoadReducer, src, createBookCoverLoadState);
   const sourceImageRef = useRef<HTMLImageElement>(null);
+  const previousSourceRef = useRef<{ bookId: string; src?: string | null }>({ bookId, src });
   const art = useMemo(() => getDemoCoverArt({ bookId, title, category }), [bookId, category, title]);
   const layout = useMemo(() => getDemoCoverLayout(bookId), [bookId]);
   const displayTitle = useMemo(() => sanitizeFallbackTitle(title), [title]);
   const displayAuthor = useMemo(() => sanitizeFallbackAuthor(author), [author]);
 
   useEffect(() => {
+    if (previousSourceRef.current.bookId === bookId && previousSourceRef.current.src === src) return;
+    previousSourceRef.current = { bookId, src };
     dispatch({ type: "RESET", source: src });
   }, [bookId, src]);
 
@@ -77,7 +81,7 @@ export function BookCover({
   useEffect(() => {
     const image = sourceImageRef.current;
     if (!image?.complete || loadState.settled || loadState.showFallback) return;
-    if (image.naturalWidth > 0) {
+    if (isUsableBookCoverDimensions(image.naturalWidth, image.naturalHeight)) {
       dispatch({ type: "SOURCE_LOADED", approvedReal: isApprovedRealCover(bookId, src) });
     } else {
       dispatch({ type: "SOURCE_FAILED", reason: "ERROR" });
@@ -85,6 +89,11 @@ export function BookCover({
   }, [bookId, loadState.settled, loadState.showFallback, src]);
 
   const markLoaded = () => {
+    const image = sourceImageRef.current;
+    if (!image || !isUsableBookCoverDimensions(image.naturalWidth, image.naturalHeight)) {
+      dispatch({ type: "SOURCE_FAILED", reason: "ERROR" });
+      return;
+    }
     dispatch({ type: "SOURCE_LOADED", approvedReal: isApprovedRealCover(bookId, src) });
   };
 
@@ -97,6 +106,7 @@ export function BookCover({
       aria-label={loadState.showFallback ? `Bìa minh họa cho ${displayTitle}` : undefined}
       className={cn("relative isolate block overflow-hidden bg-slate-900 [container-type:inline-size]", className)}
       data-cover-art={loadState.showFallback ? art : undefined}
+      data-cover-book-id={bookId}
       data-cover-fallback={loadState.showFallback ? "true" : "false"}
       data-cover-layout={loadState.showFallback ? layout : undefined}
       data-cover-status={loadState.status}
@@ -107,7 +117,7 @@ export function BookCover({
         <img
           ref={sourceImageRef}
           alt={alt ?? `Bìa sách ${title}`}
-          className="h-full w-full object-cover"
+          className="h-full w-full bg-white object-contain"
           decoding="async"
           fetchPriority={priority ? "high" : "auto"}
           loading={priority ? "eager" : loading}

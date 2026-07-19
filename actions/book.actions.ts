@@ -22,6 +22,19 @@ export interface FeaturedBook {
   };
 }
 
+export interface CuratedBook {
+  id: string;
+  title: string;
+  author: string;
+  coverImage: string | null;
+  price: number;
+  catalogSource: "CURATED_REAL";
+  metadataBadge: "Metadata tuyển chọn";
+  priceLabel: "Giá demo";
+  sourceRating: number | null;
+  category: string | null;
+}
+
 export interface MarketplaceListing {
   id: string;
   condition: string;
@@ -60,17 +73,6 @@ function decimalToNumber(value: DecimalLike | number | string): number {
   return value.toNumber();
 }
 
-function getRandomOffsets(total: number, limit: number): number[] {
-  const result = new Set<number>();
-  const totalItems = Math.min(total, limit);
-
-  while (result.size < totalItems) {
-    result.add(Math.floor(Math.random() * total));
-  }
-
-  return Array.from(result);
-}
-
 function logActionError(actionName: string, error: unknown): void {
   const message = error instanceof Error ? error.message : "Lỗi không xác định";
   console.error(`[${actionName}] ${message}`);
@@ -78,49 +80,83 @@ function logActionError(actionName: string, error: unknown): void {
 
 export async function getFeaturedBooks(): Promise<FeaturedBook[]> {
   try {
-    const totalBooks = await prisma.book.count();
-
-    if (totalBooks === 0) {
-      return [];
-    }
-
-    const randomOffsets = getRandomOffsets(totalBooks, 5);
-    const books: FeaturedBook[] = [];
-
-    for (const skip of randomOffsets) {
-      const book = await prisma.book.findFirst({
-        skip,
-        orderBy: {
-          id: "asc",
-        },
-        include: {
-          category: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-            },
+    // Danh sách ổn định giúp cùng source cho cùng kết quả và loại Math.random khỏi runtime production.
+    const books = await prisma.book.findMany({
+      orderBy: [{ rating: "desc" }, { id: "asc" }],
+      take: 5,
+      include: {
+        category: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
           },
         },
-      });
+      },
+    });
 
-      if (!book) {
-        continue;
-      }
-
-      books.push({
-        id: book.id,
-        title: book.title,
-        author: book.authorName,
-        coverImage: normalizeBookCoverUrl(book.coverPath),
-        price: decimalToNumber(book.price),
-        category: book.category,
-      });
-    }
-
-    return books;
+    return books.map((book) => ({
+      id: book.id,
+      title: book.title,
+      author: book.authorName,
+      coverImage: normalizeBookCoverUrl(book.coverPath),
+      price: decimalToNumber(book.price),
+      category: book.category,
+    }));
   } catch (error: unknown) {
     logActionError("getFeaturedBooks", error);
+    return [];
+  }
+}
+
+export async function getCuratedBooks(): Promise<CuratedBook[]> {
+  try {
+    const books = await prisma.book.findMany({
+      where: {
+        sourceMetadata: {
+          is: {
+            sourceProvider: "OPEN_LIBRARY",
+          },
+        },
+      },
+      orderBy: [
+        { sourceMetadata: { sourceRatingAverage: { sort: "desc", nulls: "last" } } },
+        { title: "asc" },
+        { id: "asc" },
+      ],
+      take: 10,
+      select: {
+        id: true,
+        title: true,
+        authorName: true,
+        coverPath: true,
+        price: true,
+        sourceMetadata: {
+          select: {
+            sourceRatingAverage: true,
+          },
+        },
+        category: {
+          select: { name: true },
+        },
+      },
+    });
+
+    return books.map((book) => ({
+      id: book.id,
+      title: book.title,
+      author: book.authorName,
+      coverImage: normalizeBookCoverUrl(book.coverPath),
+      price: decimalToNumber(book.price),
+      catalogSource: "CURATED_REAL",
+      metadataBadge: "Metadata tuyển chọn",
+      priceLabel: "Giá demo",
+      sourceRating: book.sourceMetadata?.sourceRatingAverage ?? null,
+      category: book.category?.name ?? null,
+    }));
+  } catch (error: unknown) {
+    // Database chưa apply migration G2 sẽ không có bảng metadata; Home vẫn hoạt động với khu vực cũ.
+    logActionError("getCuratedBooks", error);
     return [];
   }
 }

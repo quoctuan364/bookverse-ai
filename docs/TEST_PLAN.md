@@ -1,5 +1,21 @@
 # Kế hoạch kiểm thử Checkpoint A
 
+> Phần A bên dưới là kế hoạch lịch sử. Cổng hiện hành cho G2 nằm ngay sau ghi chú này; kết quả thật xem [`CURRENT_STATUS.md`](CURRENT_STATUS.md).
+
+## Kế hoạch hiện hành — Checkpoint G2
+
+1. Checksum ZIP/JSON, runtime validation 3.046 record và phân loại work/edition-only.
+2. Prisma schema additive, migration chỉ trên test, backup trước migration và restore clone.
+3. Category mapping 39/39 theo checksum, fail-closed nếu target không tồn tại.
+4. Validate-only, dry-run, execute và execute lần hai; count synthetic/hành vi không giảm hoặc đổi.
+5. Catalog pagination 24; filter real/demo/language/year/ISBN/rating nguồn; nhãn giá/metadata/ấn bản Việt.
+6. Recommendation isolation ở Next.js và FastAPI; parity fixture không đổi.
+7. Browser 360/390/768/1366/1920; Home/Catalog/Detail/Marketplace/Cart/Library/Seller; cover 2:3, lazy load, 404 fallback và overflow.
+8. Production build, Compose config, web/AI image build và scan secret/image filesystem.
+9. Query demo read-only cuối lượt; không migration/import/backfill/seed/deploy.
+
+Không kết luận G2 hoàn thành nếu vẫn còn critical `PARTIAL`. Hiện invariant 3.046 work key chưa đạt vì chỉ có 3.044 work + 2 edition-only.
+
 ## 1. Mục tiêu
 
 Chứng minh bằng test tự động và PostgreSQL thật rằng BookVerse không oversell, không xử lý checkout trùng, rollback toàn bộ khi một item lỗi và chỉ hoàn kho đúng một lần. Tất cả fixture ghi dữ liệu chỉ được chạy trên `bookverse_ai_test` hoặc database rehearsal có tên cố định.

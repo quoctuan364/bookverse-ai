@@ -52,7 +52,7 @@ function statusLabel(status: string): string {
 
 function MiniBook({ item, href }: { item: LibraryBookItem; href: string }) {
   return (
-    <Link className="flex gap-3 rounded-xl border border-white/10 bg-white/[0.05] p-3 transition hover:bg-white/[0.08]" href={href}>
+    <Link className="flex min-w-0 gap-3 rounded-xl border border-white/10 bg-white/[0.05] p-3 transition hover:bg-white/[0.08]" href={href}>
       <BookCover
         alt={`Bìa sách ${item.title}`}
         author={item.author}
@@ -111,7 +111,7 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
         </div>
       </section>
 
-      <section className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:px-8">
+      <section className="mx-auto grid w-full min-w-0 max-w-7xl grid-cols-1 gap-6 px-4 py-8 sm:px-6 lg:px-8">
         {params?.error ? (
           <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {params.error}
@@ -124,13 +124,13 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
           </div>
         ) : null}
 
-        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <section className="rounded-2xl border border-white/10 bg-slate-950/72 p-5 shadow-[0_24px_90px_rgba(0,0,0,0.34)] backdrop-blur-2xl">
+        <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+          <section className="min-w-0 rounded-2xl border border-white/10 bg-slate-950/72 p-5 shadow-[0_24px_90px_rgba(0,0,0,0.34)] backdrop-blur-2xl">
             <h2 className="inline-flex items-center gap-2 text-xl font-black text-white">
               <BookOpen className="h-5 w-5 text-[#F2C14E]" aria-hidden="true" />
               Sách đang đọc
             </h2>
-            <div className="mt-5 grid gap-3 md:grid-cols-2">
+            <div className="mt-5 grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2">
               {data.reading.map((item) => (
                 <div className="rounded-xl border border-white/10 bg-white/[0.05] p-3" key={item.bookId}>
                   <MiniBook item={item} href={`/read/${item.bookId}`} />
@@ -150,12 +150,12 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-white/10 bg-slate-950/72 p-5 shadow-[0_24px_90px_rgba(0,0,0,0.34)] backdrop-blur-2xl">
+          <section className="min-w-0 rounded-2xl border border-white/10 bg-slate-950/72 p-5 shadow-[0_24px_90px_rgba(0,0,0,0.34)] backdrop-blur-2xl">
             <h2 className="inline-flex items-center gap-2 text-xl font-black text-white">
               <ReceiptText className="h-5 w-5 text-[#F2C14E]" aria-hidden="true" />
               Sách đã mua
             </h2>
-            <div className="mt-5 grid gap-3">
+            <div className="mt-5 grid min-w-0 grid-cols-1 gap-3">
               {data.purchased.map((item) => (
                 <div className="rounded-xl border border-white/10 bg-white/[0.05] p-3" key={`${item.orderId}-${item.bookId}`}>
                   <MiniBook item={item} href={`/book/${item.bookId}`} />
@@ -177,15 +177,15 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
           </section>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          <section className="rounded-2xl border border-white/10 bg-slate-950/72 p-5 shadow-[0_24px_90px_rgba(0,0,0,0.34)] backdrop-blur-2xl">
+        <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-3">
+          <section className="min-w-0 rounded-2xl border border-white/10 bg-slate-950/72 p-5 shadow-[0_24px_90px_rgba(0,0,0,0.34)] backdrop-blur-2xl">
             <h2 className="inline-flex items-center gap-2 text-xl font-black text-white">
               <Heart className="h-5 w-5 text-[#F2C14E]" aria-hidden="true" />
               Yêu thích
             </h2>
-            <div className="mt-5 grid gap-3">
+            <div className="mt-5 grid min-w-0 grid-cols-1 gap-3">
               {data.favorites.map((item) => (
-                <div className="rounded-xl border border-white/10 bg-white/[0.05] p-3" key={item.favoriteId}>
+                <div className="min-w-0 rounded-xl border border-white/10 bg-white/[0.05] p-3" key={item.favoriteId}>
                   <MiniBook item={item} href={`/book/${item.bookId}`} />
                   <div className="mt-3 flex items-center justify-between gap-2">
                     <span className="text-xs text-zinc-500">{formatDate(item.createdAt)}</span>
@@ -207,14 +207,14 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-white/10 bg-slate-950/72 p-5 shadow-[0_24px_90px_rgba(0,0,0,0.34)] backdrop-blur-2xl">
+          <section className="min-w-0 rounded-2xl border border-white/10 bg-slate-950/72 p-5 shadow-[0_24px_90px_rgba(0,0,0,0.34)] backdrop-blur-2xl">
             <h2 className="inline-flex items-center gap-2 text-xl font-black text-white">
               <BookMarked className="h-5 w-5 text-[#F2C14E]" aria-hidden="true" />
               Bookmark
             </h2>
-            <div className="mt-5 grid gap-3">
+            <div className="mt-5 grid min-w-0 grid-cols-1 gap-3">
               {data.bookmarks.map((item) => (
-                <div className="rounded-xl border border-white/10 bg-white/[0.05] p-3" key={item.bookmarkId}>
+                <div className="min-w-0 rounded-xl border border-white/10 bg-white/[0.05] p-3" key={item.bookmarkId}>
                   <MiniBook item={item} href={`/read/${item.bookId}`} />
                   <p className="mt-3 text-xs text-zinc-500">Trang {item.pageNumber} - {formatDate(item.createdAt)}</p>
                 </div>
@@ -227,12 +227,12 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-white/10 bg-slate-950/72 p-5 shadow-[0_24px_90px_rgba(0,0,0,0.34)] backdrop-blur-2xl">
+          <section className="min-w-0 rounded-2xl border border-white/10 bg-slate-950/72 p-5 shadow-[0_24px_90px_rgba(0,0,0,0.34)] backdrop-blur-2xl">
             <h2 className="inline-flex items-center gap-2 text-xl font-black text-white">
               <Highlighter className="h-5 w-5 text-[#F2C14E]" aria-hidden="true" />
               Highlight gần đây
             </h2>
-            <div className="mt-5 grid gap-3">
+            <div className="mt-5 grid min-w-0 grid-cols-1 gap-3">
               {data.highlights.map((item) => (
                 <Link
                   className="rounded-xl border border-white/10 bg-white/[0.05] p-4 transition hover:bg-white/[0.08]"

@@ -24,6 +24,15 @@
   border-color: hsl(var(--border));
 }
 
+/* Không để panel menu đang đóng tạo bounding box ngoài viewport khi audit responsive. */
+.bookverse-mobile-nav-panel {
+  display: none;
+}
+
+details[open] > .bookverse-mobile-nav-panel {
+  display: block;
+}
+
 body {
   min-height: 100vh;
   background:

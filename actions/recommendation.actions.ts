@@ -19,6 +19,12 @@ import {
   type RecommendationTrackingReason,
   type RecommendationTrackingStatus,
 } from "@/lib/recommendation-position-policy";
+import {
+  getRecommendationEvidenceStatus,
+  RECOMMENDATION_ALGORITHM_VERSION,
+  RECOMMENDATION_TAXONOMY_VERSION,
+  type RecommendationEvidenceStatus,
+} from "@/lib/recommendation-evidence-policy";
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL ?? "http://127.0.0.1:8000";
 const AI_TIMEOUT_MS = 4_000;
@@ -32,6 +38,8 @@ export type AIRecommendation = {
   bookId: string;
   score: number;
   evidence: string;
+  provenance?: unknown;
+  evidenceStatus?: RecommendationEvidenceStatus;
 };
 
 export interface RecommendedBook {
@@ -42,6 +50,7 @@ export interface RecommendedBook {
   price: number;
   recommendationScore?: number;
   recommendationEvidence?: string;
+  recommendationEvidenceStatus?: RecommendationEvidenceStatus;
 }
 
 export interface RecommendationBatch {
@@ -51,6 +60,7 @@ export interface RecommendationBatch {
   trackingStatus: RecommendationTrackingStatus;
   trackingReason: RecommendationTrackingReason;
   trackingNormalization: RecommendationNormalizationStats;
+  hasVerifiedPersonalization: boolean;
 }
 
 const EMPTY_NORMALIZATION: RecommendationNormalizationStats = {
@@ -84,13 +94,15 @@ function isAIRecommendation(value: unknown): value is AIRecommendation {
     bookId?: unknown;
     score?: unknown;
     evidence?: unknown;
+    provenance?: unknown;
   };
 
   return (
     typeof candidate.bookId === "string" &&
     typeof candidate.score === "number" &&
     Number.isFinite(candidate.score) &&
-    typeof candidate.evidence === "string"
+    typeof candidate.evidence === "string" &&
+    (candidate.provenance === undefined || (typeof candidate.provenance === "object" && candidate.provenance !== null))
   );
 }
 
@@ -125,6 +137,7 @@ async function fetchAIRecommendations(userId: string): Promise<AIRecommendation[
 
 async function getBooksByRecommendations(
   recommendations: AIRecommendation[],
+  userId: string,
 ): Promise<RecommendedBook[]> {
   const uniqueBookIds = [...new Set(recommendations.map((item) => item.bookId))].filter(Boolean);
   if (uniqueBookIds.length === 0) {
@@ -135,6 +148,10 @@ async function getBooksByRecommendations(
     where: {
       id: {
         in: uniqueBookIds,
+      },
+      // Catalog tuyển chọn chưa có interaction thật và không thuộc evaluation hiện tại.
+      sourceMetadata: {
+        is: null,
       },
     },
     select: {
@@ -160,6 +177,11 @@ async function getBooksByRecommendations(
       price: decimalToNumber(book.price),
       recommendationScore: recommendationById.get(book.id)?.score,
       recommendationEvidence: recommendationById.get(book.id)?.evidence,
+      recommendationEvidenceStatus: getRecommendationEvidenceStatus({
+        evidence: recommendationById.get(book.id)?.evidence,
+        provenance: recommendationById.get(book.id)?.provenance,
+        expectedUserId: userId,
+      }),
     }));
 }
 
@@ -178,7 +200,7 @@ async function persistRecommendations(
             userId,
             targetType: TargetType.BOOK,
             targetId: item.bookId,
-            algorithm: "fastapi_hybrid_v2",
+            algorithm: RECOMMENDATION_ALGORITHM_VERSION,
           },
         },
         update: {
@@ -193,7 +215,7 @@ async function persistRecommendations(
           userId,
           targetType: TargetType.BOOK,
           targetId: item.bookId,
-          algorithm: "fastapi_hybrid_v2",
+          algorithm: RECOMMENDATION_ALGORITHM_VERSION,
           score: item.score,
           rank: index + 1,
           reason: item.evidence,
@@ -219,7 +241,10 @@ async function persistRecommendations(
             sourceType: TargetType.BOOK,
             sourceId: item.bookId,
             metadata: {
-              algorithm: "fastapi_hybrid_v2",
+              algorithm: RECOMMENDATION_ALGORITHM_VERSION,
+              taxonomyVersion: RECOMMENDATION_TAXONOMY_VERSION,
+              evidenceStatus: item.evidenceStatus ?? "MISSING_PROVENANCE",
+              provenance: item.provenance ?? null,
             },
           },
         }),
@@ -233,6 +258,11 @@ async function persistRecommendations(
 
 async function getFallbackBooks(): Promise<RecommendedBook[]> {
   const books = await prisma.book.findMany({
+    where: {
+      sourceMetadata: {
+        is: null,
+      },
+    },
     orderBy: [
       {
         createdAt: "desc",
@@ -257,6 +287,7 @@ async function getFallbackBooks(): Promise<RecommendedBook[]> {
     author: book.authorName,
     coverImage: normalizeBookCoverUrl(book.coverPath),
     price: decimalToNumber(book.price),
+    recommendationEvidenceStatus: "POPULARITY_FALLBACK",
   }));
 }
 
@@ -310,6 +341,7 @@ export async function getRecommendedBooks(): Promise<RecommendationBatch> {
       trackingStatus: "DEGRADED",
       trackingReason: "REQUEST_VALIDATION_FAILED",
       trackingNormalization: EMPTY_NORMALIZATION,
+      hasVerifiedPersonalization: false,
     };
   }
 
@@ -329,8 +361,21 @@ export async function getRecommendedBooks(): Promise<RecommendationBatch> {
       FALLBACK_LIMIT,
     );
     const normalizedRecommendations = normalization.items.map((item) => item.payload);
-    await persistRecommendations(resolvedUserId, normalizedRecommendations);
-    const recommendedBooks = await getBooksByRecommendations(normalizedRecommendations);
+    const recommendationsWithStatus = normalizedRecommendations.map((item) => ({
+      ...item,
+      evidenceStatus: getRecommendationEvidenceStatus({
+        evidence: item.evidence,
+        provenance: item.provenance,
+        expectedUserId: resolvedUserId,
+      }),
+    }));
+    const recommendedBooks = await getBooksByRecommendations(recommendationsWithStatus, resolvedUserId);
+
+    const allowedBookIds = new Set(recommendedBooks.map((book) => book.id));
+    await persistRecommendations(
+      resolvedUserId,
+      recommendationsWithStatus.filter((item) => allowedBookIds.has(item.bookId)),
+    );
 
     if (recommendedBooks.length === 0) {
       return {
@@ -340,6 +385,7 @@ export async function getRecommendedBooks(): Promise<RecommendationBatch> {
         trackingStatus: "DEGRADED",
         trackingReason: "REQUEST_VALIDATION_FAILED",
         trackingNormalization: normalization.stats,
+        hasVerifiedPersonalization: false,
       };
     }
 
@@ -352,6 +398,7 @@ export async function getRecommendedBooks(): Promise<RecommendationBatch> {
       trackingReason:
         tracking.trackingStatus === "TRACKED" ? normalization.reason : tracking.trackingReason,
       trackingNormalization: normalization.stats,
+      hasVerifiedPersonalization: recommendedBooks.some((book) => book.recommendationEvidenceStatus === "VERIFIED_REAL_USER"),
     };
   } catch (error: unknown) {
     console.error("[getRecommendedBooks] Fallback vì AI service lỗi.");
@@ -362,6 +409,7 @@ export async function getRecommendedBooks(): Promise<RecommendationBatch> {
       trackingStatus: "DEGRADED",
       trackingReason: "PERSISTENCE_UNAVAILABLE",
       trackingNormalization: EMPTY_NORMALIZATION,
+      hasVerifiedPersonalization: false,
     };
   }
 }
@@ -389,10 +437,23 @@ export async function refreshRecommendationsForUser(
     FALLBACK_LIMIT,
   );
   const normalizedRecommendations = normalization.items.map((item) => item.payload);
-  await persistRecommendations(cleanUserId, normalizedRecommendations);
+  const recommendationsWithStatus = normalizedRecommendations.map((item) => ({
+    ...item,
+    evidenceStatus: getRecommendationEvidenceStatus({
+      evidence: item.evidence,
+      provenance: item.provenance,
+      expectedUserId: cleanUserId,
+    }),
+  }));
+  const allowedBooks = await getBooksByRecommendations(recommendationsWithStatus, cleanUserId);
+  const allowedBookIds = new Set(allowedBooks.map((book) => book.id));
+  const isolatedRecommendations = recommendationsWithStatus.filter((item) =>
+    allowedBookIds.has(item.bookId),
+  );
+  await persistRecommendations(cleanUserId, isolatedRecommendations);
 
   return {
-    count: normalizedRecommendations.length,
-    algorithm: "fastapi_hybrid_v2",
+    count: isolatedRecommendations.length,
+    algorithm: RECOMMENDATION_ALGORITHM_VERSION,
   };
 }

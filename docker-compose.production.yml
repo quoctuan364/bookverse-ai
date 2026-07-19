@@ -1,0 +1,28 @@
+name: bookverse-production
+
+services:
+  db:
+    restart: always
+    ports:
+      - "${BOOKVERSE_PRODUCTION_BIND_ADDRESS:?BOOKVERSE_PRODUCTION_BIND_ADDRESS is required}:${BOOKVERSE_PRODUCTION_POSTGRES_PORT:?BOOKVERSE_PRODUCTION_POSTGRES_PORT is required}:5432"
+
+  web:
+    restart: always
+    environment:
+      NODE_ENV: production
+      BOOKVERSE_CHAT_MOCK_ENABLED: "false"
+    ports:
+      - "${BOOKVERSE_PRODUCTION_BIND_ADDRESS:?BOOKVERSE_PRODUCTION_BIND_ADDRESS is required}:${BOOKVERSE_PRODUCTION_WEB_PORT:?BOOKVERSE_PRODUCTION_WEB_PORT is required}:3000"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  ai_service:
+    restart: always
+    ports:
+      - "${BOOKVERSE_PRODUCTION_BIND_ADDRESS:?BOOKVERSE_PRODUCTION_BIND_ADDRESS is required}:${BOOKVERSE_PRODUCTION_AI_PORT:?BOOKVERSE_PRODUCTION_AI_PORT is required}:8000"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

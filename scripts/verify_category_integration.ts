@@ -38,11 +38,12 @@ interface CountRow {
 
 interface VerificationReport {
   testDatabase: string;
-  legacyDatabase: string;
+  legacyDatabase: string | null;
   categoryCount: number;
   rootCount: number;
   childCount: number;
   bookCount: number;
+  catalogBookCount: number;
   relationCount: number;
   canonicalGroupCount: number;
   orphanCount: number;
@@ -51,8 +52,8 @@ interface VerificationReport {
   unmappedCount: number;
   parentFallback: FallbackRow;
   originalFallback: FallbackRow;
-  legacyCategoryColumnCount: number;
-  legacyBookCount: number;
+  legacyCategoryColumnCount: number | null;
+  legacyBookCount: number | null;
   checks: string[];
 }
 
@@ -81,6 +82,14 @@ const RECOMMENDATION_CATEGORY_QUERY = `
   ORDER BY b.id
 `;
 
+const SYNTHETIC_RECOMMENDATION_CATEGORY_QUERY = RECOMMENDATION_CATEGORY_QUERY.replace(
+  "  ORDER BY b.id",
+  `  WHERE NOT EXISTS (
+    SELECT 1 FROM book_source_metadata bsm WHERE bsm."bookId" = b.id
+  )
+  ORDER BY b.id`,
+);
+
 function invariant(condition: boolean, message: string): asserts condition {
   if (!condition) {
     throw new Error(message);
@@ -108,30 +117,34 @@ async function writeReport(report: VerificationReport): Promise<string> {
 }
 
 async function main(): Promise<void> {
+  const currentOnly = process.argv.includes("--current-only");
   const testDatabaseUrl = process.env.DATABASE_URL;
   const legacyDatabaseUrl = process.env.CATEGORY_LEGACY_DATABASE_URL;
   invariant(
     testDatabaseUrl !== undefined && testDatabaseUrl.length > 0,
     "Thiếu DATABASE_URL cho database test.",
   );
-  invariant(
-    legacyDatabaseUrl !== undefined && legacyDatabaseUrl.length > 0,
-    "Thiếu CATEGORY_LEGACY_DATABASE_URL cho schema demo cũ.",
-  );
+  if (!currentOnly) {
+    invariant(
+      legacyDatabaseUrl !== undefined && legacyDatabaseUrl.length > 0,
+      "Thiếu CATEGORY_LEGACY_DATABASE_URL cho schema demo cũ.",
+    );
+  }
   const testTarget = assertSafeDatabase({
     operation: "read-only",
     databaseUrl: testDatabaseUrl,
   });
-  const legacyTarget = assertSafeDatabase({
-    operation: "read-only",
-    databaseUrl: legacyDatabaseUrl,
-  });
+  const legacyTarget = legacyDatabaseUrl
+    ? assertSafeDatabase({ operation: "read-only", databaseUrl: legacyDatabaseUrl })
+    : null;
 
   invariant(testTarget.databaseName === "bookverse_ai_test", "Verifier chỉ được chạy hierarchy trên bookverse_ai_test.");
-  invariant(legacyTarget.databaseName === "bookverse_ai", "Legacy verifier phải trỏ tới bookverse_ai ở chế độ read-only.");
+  if (!currentOnly) {
+    invariant(legacyTarget?.databaseName === "bookverse_ai", "Legacy verifier phải trỏ tới bookverse_ai ở chế độ read-only.");
+  }
 
   const testClient = createClient(testDatabaseUrl);
-  const legacyClient = createClient(legacyDatabaseUrl);
+  const legacyClient = currentOnly ? null : createClient(legacyDatabaseUrl!);
 
   try {
     const categories = await testClient.$queryRaw<CategoryRow[]>`
@@ -142,10 +155,19 @@ async function main(): Promise<void> {
     const books = await testClient.$queryRaw<BookCategoryRow[]>`
       SELECT id AS "bookId", "categoryId" AS "originalCategoryId"
       FROM "Book"
+      WHERE NOT EXISTS (
+        SELECT 1 FROM book_source_metadata bsm WHERE bsm."bookId" = "Book".id
+      )
       ORDER BY id
     `;
+    const catalogBooks = await testClient.$queryRaw<BookCategoryRow[]>`
+      SELECT b.id AS "bookId", b."categoryId" AS "originalCategoryId"
+      FROM "Book" b
+      JOIN book_source_metadata bsm ON bsm."bookId" = b.id
+      ORDER BY b.id
+    `;
     const recommendationRows = await testClient.$queryRawUnsafe<RecommendationCategoryRow[]>(
-      RECOMMENDATION_CATEGORY_QUERY,
+      SYNTHETIC_RECOMMENDATION_CATEGORY_QUERY,
     );
 
     const categoryIds = new Set(categories.map((category) => category.id));
@@ -168,7 +190,9 @@ async function main(): Promise<void> {
     invariant(roots.length === 43, `Root phải bằng 43, thực tế ${roots.length}.`);
     invariant(children.length === 2_157, `Child phải bằng 2157, thực tế ${children.length}.`);
     invariant(books.length === 2_200, `Book phải bằng 2200, thực tế ${books.length}.`);
+    invariant(catalogBooks.length === 3_046, `Catalog tuyển chọn phải bằng 3046, thực tế ${catalogBooks.length}.`);
     invariant(books.every((book) => categoryIds.has(book.originalCategoryId)), "Có Book trỏ tới Category không tồn tại.");
+    invariant(catalogBooks.every((book) => categoryIds.has(book.originalCategoryId)), "Có catalog Book trỏ tới Category không tồn tại.");
     invariant(hierarchy.orphans.length === 0, "Category hierarchy có orphan.");
     invariant(hierarchy.cycles.length === 0, "Category hierarchy có cycle.");
     invariant(hierarchy.selfParents.length === 0, "Category hierarchy có self-parent.");
@@ -250,31 +274,38 @@ async function main(): Promise<void> {
       "Recommendation query không fallback về category gốc.",
     );
 
-    const legacyColumnRows = await legacyClient.$queryRaw<CountRow[]>`
-      SELECT COUNT(*)::int AS value
-      FROM information_schema.columns
-      WHERE table_schema = 'public'
-        AND table_name = 'Category'
-        AND column_name IN ('parentId', 'level', 'canonicalKey', 'canonicalName')
-    `;
-    const legacyRecommendationRows =
-      await legacyClient.$queryRawUnsafe<RecommendationCategoryRow[]>(RECOMMENDATION_CATEGORY_QUERY);
-    invariant(legacyColumnRows[0]?.value === 0, "Database demo không còn là legacy schema như kỳ vọng.");
-    invariant(legacyRecommendationRows.length > 0, "Legacy query không trả Book nào.");
-    invariant(
-      legacyRecommendationRows.every(
-        (row) => row.featureCategoryId === row.originalCategoryId && row.categoryName.length > 0,
-      ),
-      "Query tương thích schema cũ không fallback về category gốc.",
-    );
+    let legacyCategoryColumnCount: number | null = null;
+    let legacyBookCount: number | null = null;
+    if (legacyClient) {
+      const legacyColumnRows = await legacyClient.$queryRaw<CountRow[]>`
+        SELECT COUNT(*)::int AS value
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'Category'
+          AND column_name IN ('parentId', 'level', 'canonicalKey', 'canonicalName')
+      `;
+      const legacyRecommendationRows =
+        await legacyClient.$queryRawUnsafe<RecommendationCategoryRow[]>(RECOMMENDATION_CATEGORY_QUERY);
+      invariant(legacyColumnRows[0]?.value === 0, "Database demo không còn là legacy schema như kỳ vọng.");
+      invariant(legacyRecommendationRows.length > 0, "Legacy query không trả Book nào.");
+      invariant(
+        legacyRecommendationRows.every(
+          (row) => row.featureCategoryId === row.originalCategoryId && row.categoryName.length > 0,
+        ),
+        "Query tương thích schema cũ không fallback về category gốc.",
+      );
+      legacyCategoryColumnCount = legacyColumnRows[0].value;
+      legacyBookCount = legacyRecommendationRows.length;
+    }
 
     const report: VerificationReport = {
       testDatabase: testTarget.databaseName,
-      legacyDatabase: legacyTarget.databaseName,
+      legacyDatabase: legacyTarget?.databaseName ?? null,
       categoryCount: categories.length,
       rootCount: roots.length,
       childCount: children.length,
       bookCount: books.length,
+      catalogBookCount: catalogBooks.length,
       relationCount: books.filter((book) => categoryIds.has(book.originalCategoryId)).length,
       canonicalGroupCount: canonicalGroups.size,
       orphanCount: hierarchy.orphans.length,
@@ -283,16 +314,17 @@ async function main(): Promise<void> {
       unmappedCount: unmapped.length,
       parentFallback: parentFallback[0],
       originalFallback: originalFallback[0],
-      legacyCategoryColumnCount: legacyColumnRows[0].value,
-      legacyBookCount: legacyRecommendationRows.length,
+      legacyCategoryColumnCount,
+      legacyBookCount,
       checks: [
         "catalog-book-category",
+        "curated-catalog-category-existence",
         "root-child-hierarchy",
         "canonical-priority",
         "parent-fallback",
         "original-category-fallback",
         "book-id-existence",
-        "legacy-schema-compatibility",
+        ...(legacyClient ? ["legacy-schema-compatibility"] : []),
       ],
     };
     const reportPath = await writeReport(report);
@@ -300,7 +332,10 @@ async function main(): Promise<void> {
     console.log("[REPORT] " + path.relative(process.cwd(), reportPath));
     console.log(JSON.stringify(report, null, 2));
   } finally {
-    await Promise.all([testClient.$disconnect(), legacyClient.$disconnect()]);
+    await testClient.$disconnect();
+    if (legacyClient) {
+      await legacyClient.$disconnect();
+    }
   }
 }
 

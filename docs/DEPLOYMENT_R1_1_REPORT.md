@@ -1,5 +1,7 @@
 # Báo cáo triển khai BookVerse AI R1.1 — Checkpoint F1.1
 
+> **Historical checkpoint snapshot — không phản ánh toàn bộ trạng thái hiện tại.** Xem [`CURRENT_STATUS.md`](CURRENT_STATUS.md) trước khi dùng bất kỳ kết luận nào.
+
 Ngày triển khai: 15/07/2026. Phạm vi: hotfix code-only cho recommendation position và telemetry reliability.
 
 ## 1. Kết luận

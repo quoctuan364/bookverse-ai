@@ -11,6 +11,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
 
+from ai_service.catalog_scope import build_synthetic_catalog_predicate
 from ai_service.evaluation.taxonomy import map_legacy_interaction_event
 
 
@@ -103,6 +104,29 @@ def read_dataframe(query: str, params: dict[str, Any] | None = None) -> pd.DataF
         ) from error
 
 
+@lru_cache(maxsize=8)
+def _has_source_metadata_table(database_url: str) -> bool:
+    engine = create_engine(normalize_database_url(database_url), pool_pre_ping=True)
+    try:
+        with engine.connect() as connection:
+            table_name = connection.execute(
+                text("SELECT to_regclass('public.book_source_metadata')::text")
+            ).scalar_one_or_none()
+            return bool(table_name)
+    finally:
+        engine.dispose()
+
+
+def synthetic_catalog_predicate(table_alias: str = "b") -> str:
+    database_url = os.getenv("DATABASE_URL", "").strip()
+    if not database_url:
+        raise RuntimeError("DATABASE_URL is required for catalog scope checks.")
+    return build_synthetic_catalog_predicate(
+        table_alias,
+        _has_source_metadata_table(database_url),
+    )
+
+
 def min_max_normalize(series: pd.Series) -> pd.Series:
     if series.empty:
         return pd.Series(dtype=float)
@@ -117,6 +141,7 @@ def min_max_normalize(series: pd.Series) -> pd.Series:
 
 
 def get_books() -> pd.DataFrame:
+    catalog_predicate = synthetic_catalog_predicate()
     return read_dataframe(
         f"""
         SELECT
@@ -129,11 +154,13 @@ def get_books() -> pd.DataFrame:
         FROM "Book" b
         JOIN "Category" c ON c.id = b."categoryId"
         {CATEGORY_PARENT_JOIN_SQL}
+        WHERE {catalog_predicate}
         """
     )
 
 
 def get_user_reading_sessions(user_id: str) -> pd.DataFrame:
+    catalog_predicate = synthetic_catalog_predicate()
     return read_dataframe(
         f"""
         SELECT
@@ -148,7 +175,7 @@ def get_user_reading_sessions(user_id: str) -> pd.DataFrame:
         JOIN "Book" b ON b.id = rs."bookId"
         JOIN "Category" c ON c.id = b."categoryId"
         {CATEGORY_PARENT_JOIN_SQL}
-        WHERE rs."userId" = :user_id
+        WHERE rs."userId" = :user_id AND {catalog_predicate}
         GROUP BY
           rs."bookId", b.title, b."authorName",
           {CATEGORY_FEATURE_SQL}, {CATEGORY_NAME_SQL}
@@ -158,6 +185,7 @@ def get_user_reading_sessions(user_id: str) -> pd.DataFrame:
 
 
 def get_user_bookmarks(user_id: str) -> pd.DataFrame:
+    catalog_predicate = synthetic_catalog_predicate()
     return read_dataframe(
         f"""
         SELECT
@@ -171,7 +199,7 @@ def get_user_bookmarks(user_id: str) -> pd.DataFrame:
         JOIN "Book" b ON b.id = bm."bookId"
         JOIN "Category" c ON c.id = b."categoryId"
         {CATEGORY_PARENT_JOIN_SQL}
-        WHERE bm."userId" = :user_id
+        WHERE bm."userId" = :user_id AND {catalog_predicate}
         GROUP BY
           bm."bookId", b.title, b."authorName",
           {CATEGORY_FEATURE_SQL}, {CATEGORY_NAME_SQL}
@@ -181,6 +209,7 @@ def get_user_bookmarks(user_id: str) -> pd.DataFrame:
 
 
 def get_user_interaction_events(user_id: str) -> pd.DataFrame:
+    catalog_predicate = synthetic_catalog_predicate()
     interactions = read_dataframe(
         f"""
         SELECT
@@ -195,7 +224,7 @@ def get_user_interaction_events(user_id: str) -> pd.DataFrame:
         JOIN "Book" b ON b.id = ie."bookId"
         JOIN "Category" c ON c.id = b."categoryId"
         {CATEGORY_PARENT_JOIN_SQL}
-        WHERE ie."userId" = :user_id
+        WHERE ie."userId" = :user_id AND {catalog_predicate}
         GROUP BY
           ie."bookId", ie."actionType", b.title, b."authorName",
           {CATEGORY_FEATURE_SQL}, {CATEGORY_NAME_SQL}
@@ -226,6 +255,7 @@ def get_user_interaction_events(user_id: str) -> pd.DataFrame:
 
 
 def get_user_purchases(user_id: str) -> pd.DataFrame:
+    catalog_predicate = synthetic_catalog_predicate()
     return read_dataframe(
         f"""
         SELECT
@@ -240,7 +270,7 @@ def get_user_purchases(user_id: str) -> pd.DataFrame:
         JOIN "Book" b ON b.id = oi."bookId"
         JOIN "Category" c ON c.id = b."categoryId"
         {CATEGORY_PARENT_JOIN_SQL}
-        WHERE o."buyerId" = :user_id
+        WHERE o."buyerId" = :user_id AND {catalog_predicate}
         GROUP BY
           oi."bookId", b.title, b."authorName",
           {CATEGORY_FEATURE_SQL}, {CATEGORY_NAME_SQL}
@@ -250,8 +280,9 @@ def get_user_purchases(user_id: str) -> pd.DataFrame:
 
 
 def get_global_popularity() -> pd.DataFrame:
+    catalog_predicate = synthetic_catalog_predicate()
     return read_dataframe(
-        """
+        f"""
         SELECT
           b.id AS "bookId",
           COALESCE(ie."eventCount", 0) AS "eventCount",
@@ -285,6 +316,7 @@ def get_global_popularity() -> pd.DataFrame:
           FROM "OrderItem"
           GROUP BY "bookId"
         ) oi ON oi."bookId" = b.id
+        WHERE {catalog_predicate}
         """
     )
 

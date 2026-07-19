@@ -1,5 +1,7 @@
 # BookVerse AI Baseline Report
 
+> **Historical checkpoint snapshot — không phản ánh toàn bộ trạng thái hiện tại.** Xem [`CURRENT_STATUS.md`](CURRENT_STATUS.md) trước khi dùng bất kỳ kết luận nào.
+
 Ngày khảo sát: 11/07/2026  
 Phạm vi: chỉ Phase 0, khảo sát và thiết lập baseline. Không migration, không seed/reset, không backfill, không thay đổi schema, nghiệp vụ, AI hoặc UI.
 

@@ -269,7 +269,7 @@ def chatbot_tab(data: dict[str, pd.DataFrame], user_id: str) -> None:
 
 
 def seller_tab(data: dict[str, pd.DataFrame]) -> None:
-    st.subheader("AI hỗ trợ người bán")
+    st.subheader("Chấm chất lượng bài đăng theo quy tắc")
     scored = score_all_listings(data)
 
     c1, c2, c3 = st.columns(3)
@@ -288,7 +288,7 @@ def seller_tab(data: dict[str, pd.DataFrame]) -> None:
         image_path = cover_file(book)
         if image_path:
             st.image(str(image_path), width="stretch")
-        st.metric("Quality Score", f"{scored_one['quality_score']}/100")
+        st.metric("Điểm chất lượng theo quy tắc", f"{scored_one['quality_score']}/100")
         st.metric("Mức", scored_one["quality_level"])
     with right:
         st.write(f"**{listing['title']}**")

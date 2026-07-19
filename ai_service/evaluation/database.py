@@ -8,6 +8,7 @@ from urllib.parse import unquote, urlsplit
 import pandas as pd
 from sqlalchemy import create_engine, text
 
+from ai_service.catalog_scope import build_synthetic_catalog_predicate
 from ai_service.main import normalize_database_url
 
 
@@ -80,6 +81,13 @@ def load_evaluation_data(database_url: str) -> EvaluationData:
                 if str(read_only).lower() != "on":
                     raise RuntimeError("PostgreSQL transaction không ở chế độ read-only.")
 
+                has_source_metadata = bool(
+                    connection.execute(
+                        text("SELECT to_regclass('public.book_source_metadata')::text")
+                    ).scalar_one_or_none()
+                )
+                catalog_predicate = build_synthetic_catalog_predicate("b", has_source_metadata)
+
                 books = pd.read_sql_query(
                     text(
                         f"""
@@ -96,6 +104,7 @@ def load_evaluation_data(database_url: str) -> EvaluationData:
                         FROM "Book" b
                         JOIN "Category" c ON c.id = b."categoryId"
                         LEFT JOIN "Category" pc ON pc.id = NULLIF(to_jsonb(c)->>'parentId', '')
+                        WHERE {catalog_predicate}
                         ORDER BY b.id
                         """
                     ),

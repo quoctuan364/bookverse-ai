@@ -32,6 +32,14 @@ interface RecommendationSmokeRow {
   categoryName: string;
 }
 
+function parseDatabaseAllowlist(value: string | undefined, fallback: string[]): string[] {
+  const parsed = (value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return parsed.length > 0 ? parsed : fallback;
+}
+
 function invariant(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
@@ -86,13 +94,16 @@ async function main(): Promise<void> {
   const demoUrl = process.env.DEMO_DATABASE_URL;
   const rehearsalTarget = assertSafeDatabase({ operation: "read-only", databaseUrl: rehearsalUrl });
   const demoTarget = assertSafeDatabase({ operation: "read-only", databaseUrl: demoUrl });
+  const allowedRehearsalDatabases = parseDatabaseAllowlist(
+    process.env.STOCK_REHEARSAL_DATABASES,
+    ["bookverse_ai_deploy_rehearsal", "bookverse_ai_full_deploy_rehearsal", "bookverse_ai_test_stock_rehearsal"],
+  );
+  const allowedSourceDatabases = parseDatabaseAllowlist(process.env.STOCK_SOURCE_DATABASES, ["bookverse_ai"]);
   invariant(
-    ["bookverse_ai_deploy_rehearsal", "bookverse_ai_full_deploy_rehearsal"].includes(
-      rehearsalTarget.databaseName,
-    ),
+    allowedRehearsalDatabases.includes(rehearsalTarget.databaseName),
     "Verifier chỉ được đọc database rehearsal đã cho phép.",
   );
-  invariant(demoTarget.databaseName === "bookverse_ai", "Nguồn so sánh phải là database demo read-only.");
+  invariant(allowedSourceDatabases.includes(demoTarget.databaseName), "Nguồn so sánh không nằm trong STOCK_SOURCE_DATABASES.");
 
   const rehearsal = new PrismaClient({ datasources: { db: { url: rehearsalUrl } } });
   const demo = new PrismaClient({ datasources: { db: { url: demoUrl } } });
@@ -224,7 +235,7 @@ async function main(): Promise<void> {
 
     const blockers: string[] = [];
     if (JSON.stringify(demoCounts) !== JSON.stringify(rehearsalCounts)) {
-      blockers.push("Count clone sau cleanup không còn giống database demo.");
+      blockers.push("Count clone sau cleanup không còn giống database nguồn.");
     }
     if (demoIdentity.identityChecksum !== rehearsalIdentity.identityChecksum) {
       blockers.push("Checksum ID/name/slug Category khác database demo.");
@@ -245,8 +256,9 @@ async function main(): Promise<void> {
     if (catalogRows[0]?.value !== rehearsalCounts.books) {
       blockers.push("Catalog query không trả đủ Book ACTIVE có Category.");
     }
-    if (categoryFilterRows[0]?.value !== 50) {
-      blockers.push(`Category filter C001 phải trả 50 Book, thực tế ${categoryFilterRows[0]?.value}.`);
+    const sourceCategoryC001Count = await demo.book.count({ where: { categoryId: "C001" } });
+    if (categoryFilterRows[0]?.value !== sourceCategoryC001Count) {
+      blockers.push(`Category filter C001 khác nguồn: source=${sourceCategoryC001Count}, rehearsal=${categoryFilterRows[0]?.value}.`);
     }
     if ((marketplaceRows[0]?.value ?? 0) < 1) {
       blockers.push("Marketplace không còn listing APPROVED có stock > 0.");
@@ -263,14 +275,18 @@ async function main(): Promise<void> {
     }
     if (categoryBackfilled !== rehearsalCounts.categories) {
       blockers.push(
-        `Category backfill chưa tương thích clone legacy: ${categoryBackfilled}/${rehearsalCounts.categories} category có canonical mapping.`,
+        `Category mapping chưa đầy đủ trên clone: ${categoryBackfilled}/${rehearsalCounts.categories} category có canonical mapping.`,
       );
     }
-    if (detectedProfile.profile.profileName !== "legacy-demo-24") {
-      blockers.push(`Sai Category profile: ${detectedProfile.profile.profileName}.`);
+    const sourceProfile = detectCategoryProfile(demoIdentity.categories, profiles);
+    if (detectedProfile.profile.profileName !== sourceProfile.profile.profileName) {
+      blockers.push(`Sai Category profile: source=${sourceProfile.profile.profileName}, rehearsal=${detectedProfile.profile.profileName}.`);
     }
-    if (roots.length !== 24 || children.length !== 0) {
-      blockers.push(`Legacy hierarchy phải có 24 root/0 child, thực tế ${roots.length}/${children.length}.`);
+    const sourceCategoryHierarchy = await demo.category.findMany({ select: { parentId: true } });
+    const sourceRoots = sourceCategoryHierarchy.filter((category) => category.parentId === null).length;
+    const sourceChildren = sourceCategoryHierarchy.length - sourceRoots;
+    if (roots.length !== sourceRoots || children.length !== sourceChildren) {
+      blockers.push(`Hierarchy khác nguồn: source=${sourceRoots}/${sourceChildren}, rehearsal=${roots.length}/${children.length}.`);
     }
     if (unmapped.length !== 0) blockers.push(`Còn ${unmapped.length} Category chưa map canonical.`);
     if (
@@ -283,6 +299,7 @@ async function main(): Promise<void> {
     }
 
     const report = {
+      sourceDatabase: demoTarget.databaseName,
       demoDatabase: demoTarget.databaseName,
       rehearsalDatabase: rehearsalTarget.databaseName,
       demoCounts,
@@ -305,6 +322,7 @@ async function main(): Promise<void> {
       },
       category: {
         detectedProfile: detectedProfile.profile.profileName,
+        sourceProfile: sourceProfile.profile.profileName,
         sourceFingerprint: detectedProfile.fingerprint,
         identityChecksumMatchesDemo:
           demoIdentity.identityChecksum === rehearsalIdentity.identityChecksum,
@@ -325,6 +343,7 @@ async function main(): Promise<void> {
       smoke: {
         catalogBookCount: catalogRows[0]?.value ?? -1,
         categoryC001BookCount: categoryFilterRows[0]?.value ?? -1,
+        sourceCategoryC001BookCount: sourceCategoryC001Count,
         marketplaceVisibleCount: marketplaceRows[0]?.value ?? -1,
         recommendationRowCount: recommendationRows.length,
         recommendationUsesCanonical: recommendationRows.every((row) => {

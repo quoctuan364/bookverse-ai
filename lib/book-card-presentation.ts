@@ -1,28 +1,14 @@
-export interface RecommendationEvidencePresentation {
-  badgeLabel: "AI gợi ý" | "Sách trong danh mục";
-  evidenceLabel: "Vì sao:" | "Trạng thái:";
-  evidenceText: string;
-  hasVerifiedEvidence: boolean;
-}
+import {
+  getRecommendationEvidenceDisplay,
+  type RecommendationEvidenceDisplay,
+  type RecommendationEvidenceStatus,
+} from "@/lib/recommendation-evidence-policy";
+
+export type RecommendationEvidencePresentation = RecommendationEvidenceDisplay;
 
 export function getRecommendationEvidencePresentation(
   recommendationEvidence?: string | null,
+  status?: RecommendationEvidenceStatus,
 ): RecommendationEvidencePresentation {
-  const evidence = recommendationEvidence?.trim();
-
-  if (evidence) {
-    return {
-      badgeLabel: "AI gợi ý",
-      evidenceLabel: "Vì sao:",
-      evidenceText: evidence,
-      hasVerifiedEvidence: true,
-    };
-  }
-
-  return {
-    badgeLabel: "Sách trong danh mục",
-    evidenceLabel: "Trạng thái:",
-    evidenceText: "Chưa có giải thích cá nhân hóa đã được xác minh.",
-    hasVerifiedEvidence: false,
-  };
+  return getRecommendationEvidenceDisplay({ evidence: recommendationEvidence, status });
 }

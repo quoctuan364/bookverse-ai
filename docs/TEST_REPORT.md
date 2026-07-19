@@ -1,6 +1,28 @@
 # Báo cáo kiểm thử Checkpoint A.2 — Deployment Readiness
 
+> **Historical checkpoint snapshot — không phản ánh toàn bộ trạng thái hiện tại.** Xem [`CURRENT_STATUS.md`](CURRENT_STATUS.md) trước khi dùng bất kỳ kết luận nào.
+
 > **HISTORICAL SNAPSHOT ngày 14/07/2026:** đây không phải test report của source hiện tại. Trạng thái/test mới nhất xem [`CURRENT_STATUS.md`](CURRENT_STATUS.md). Không dùng số PASS cũ thay cho command chạy trên HEAD hiện tại.
+
+## Kết quả hiện hành — Checkpoint G2 ngày 16/07/2026
+
+| Gate | Trạng thái | Bằng chứng rút gọn |
+|---|---|---|
+| Artifact | PARTIAL | 3.046 source record, nhưng 3.044 work + 2 edition-only; 34 thiếu language |
+| Prisma/typecheck | VERIFIED | validate/generate/typecheck exit 0 |
+| Unit | VERIFIED | TypeScript 112/112; Python 23 pass, 1 integration skip mặc định |
+| Python DB integration | VERIFIED | Bật cờ riêng: 1/1 pass |
+| Import/idempotency | VERIFIED | 3.046 insert; lượt hai 3.046 unchanged |
+| Catalog integration | VERIFIED | real 3.046, demo 2.200, VI 259, ISBN 2.343, missing language 34; count hành vi không đổi |
+| Recommendation parity | VERIFIED | 30/30, max delta 0 |
+| Stock/Assistant/Telemetry | VERIFIED | 11/11; assistant local degraded không mock; telemetry cleanup |
+| Browser G2 | VERIFIED | 5 viewport × 7 surface; 404 fallback 24/24 |
+| Browser cover toàn hệ thống | VERIFIED | 60/60 lượt; cart empty state không có cover để xác minh |
+| Production build | VERIFIED | `npm run build` exit 0 |
+| Docker image | VERIFIED | Web/AI build exit 0; secret value match 0 |
+| Demo deployment | NOT_VERIFIED | Không deploy; demo không có bảng metadata G2 |
+
+Không dùng các PASS kỹ thuật này để suy ra cover license, CTR, UAT/SUS, OpenAI/Gemini provider thật hoặc production readiness.
 
 Ngày chạy: 14/07/2026.
 
@@ -264,6 +286,24 @@ Fixture ba user `U0792`, `U1734`, `U0864` được chụp từ baseline commit `
 ## E.5. Bảng command/exit code
 
 Chỉ lượt command cuối có exit code 0 được ghi PASS.
+
+## G2.2 current source note — 19/07/2026
+
+Các bảng PASS cũ trong file này là historical snapshot nếu không có command G2.2 tương ứng. Kết quả hiện hành của source sau G2.2:
+
+| Command | Exit | Kết luận |
+|---|---:|---|
+| `npm run typecheck` | 0 | VERIFIED |
+| `npm run test:unit` | 0 | VERIFIED, 123/123 |
+| `npm run catalog:real:validate` | 0 | PARTIAL, 3.044 WORK + 2 EDITION_ONLY |
+| `npm run catalog:real:audit-covers -- --delay-ms=250 --timeout-ms=15000` | 0 | PARTIAL, 687 verified / 2.335 redirect rejected / 24 dimension |
+| `npm run catalog:real:review-cover-dimensions` | 0 | VERIFIED, 24/24 reviewed |
+| `npm run catalog:real:review-category-low` | 0 | VERIFIED, 8/8 LOW reviewed |
+| `npm run test:recommendation-evidence-provenance` | 0 | PARTIAL, 8.400 evidence thiếu provenance, read-only test DB |
+
+Một lượt cover audit G2.2 trước khi sửa fail-closed redirect đã FAILED với `UND_ERR_SOCKET` ở khoảng 200 record. Không dùng output lỗi đó làm số liệu cuối; auditor sau sửa chạy resume đủ 3.046 exit 0.
+
+Browser G2.2 đã thêm recommendation API vào surface audit nhưng chưa được ghi VERIFIED trước khi chạy lại sau build. Không dùng kết quả browser G2.1 7 surface để thay cho cổng 8 surface mới.
 
 | Command/nhóm lệnh | Exit code | Trạng thái | Bằng chứng |
 |---|---:|---|---|

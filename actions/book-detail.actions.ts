@@ -43,6 +43,22 @@ export interface BookDetail {
   } | null;
   isFavorite: boolean;
   reviews: BookDetailReview[];
+  sourceMetadata: {
+    sourceProvider: string;
+    sourcePageUrl: string;
+    dataLabel: string;
+    coverRightsStatus: string;
+    priceStatus: string;
+    languageProfile: string;
+    languages: string[];
+    isbn: string | null;
+    publisher: string | null;
+    descriptionStatus: string;
+    sourceRatingAverage: number | null;
+    sourceRatingCount: number | null;
+    isVietnameseEdition: boolean;
+    authorNationality: string;
+  } | null;
 }
 
 export interface BookReviewResult {
@@ -114,6 +130,24 @@ export async function getBookById(id: string): Promise<BookDetail | null> {
             condition: true,
           },
         },
+        sourceMetadata: {
+          select: {
+            sourceProvider: true,
+            sourcePageUrl: true,
+            dataLabel: true,
+            coverRightsStatus: true,
+            priceStatus: true,
+            languageProfile: true,
+            languages: true,
+            isbn: true,
+            publisher: true,
+            descriptionStatus: true,
+            sourceRatingAverage: true,
+            sourceRatingCount: true,
+            isVietnameseEdition: true,
+            authorNationality: true,
+          },
+        },
       },
     });
 
@@ -164,6 +198,7 @@ export async function getBookById(id: string): Promise<BookDetail | null> {
           name: review.user.name,
         },
       })),
+      sourceMetadata: book.sourceMetadata,
     };
   } catch (error: unknown) {
     logActionError("getBookById", error);

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Bot, BookOpen, Search, Sparkles, Store } from "lucide-react";
+import { getCuratedBooks } from "@/actions/book.actions";
 import { getRecommendedBooks } from "@/actions/recommendation.actions";
 import { RecommendationTrackedLink } from "@/components/recommendation/RecommendationTrackedLink";
 import { BookCard } from "@/components/shared/BookCard";
@@ -13,8 +14,13 @@ export default async function HomePage() {
   const userId = currentUser && !currentUser.isLocked ? currentUser.id : undefined;
   const userName = currentUser && !currentUser.isLocked ? currentUser.name ?? "bạn" : "bạn";
   const recommendationBatch = await getRecommendedBooks();
+  const curatedBooks = await getCuratedBooks();
   const recommendedBooks = recommendationBatch.books;
-  const sectionTitle = userId ? `Gợi ý dành riêng cho bạn, ${userName}` : "Sách nổi bật hôm nay";
+  const sectionTitle = recommendationBatch.hasVerifiedPersonalization
+    ? `Gợi ý dành riêng cho bạn, ${userName}`
+    : userId
+      ? "Khám phá thêm cho bạn"
+      : "Sách nổi bật hôm nay";
   const heroBooks = recommendedBooks.slice(0, 5);
 
   return (
@@ -24,7 +30,7 @@ export default async function HomePage() {
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-bold text-[#FFFDF8] shadow-[0_12px_34px_rgba(0,0,0,0.12)]">
               <Sparkles className="h-4 w-4 text-[#F2C14E]" aria-hidden="true" />
-              Gợi ý AI
+              {recommendationBatch.hasVerifiedPersonalization ? "Gợi ý AI" : "Khám phá sách"}
             </div>
 
             <h1 className="mt-6 max-w-3xl text-4xl font-black leading-tight tracking-tight sm:text-5xl lg:text-6xl">
@@ -107,6 +113,37 @@ export default async function HomePage() {
         </div>
       </section>
 
+      <section className="mx-auto w-full max-w-7xl px-4 pt-12 sm:px-6 lg:px-8">
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm font-black uppercase tracking-[0.16em] text-[#0F766E]">Open Library</p>
+            <h2 className="mt-2 text-2xl font-black text-[#17202A] sm:text-3xl">Sách tuyển chọn</h2>
+          </div>
+          <div className="max-w-xl text-sm leading-6 text-[#66706B]">
+            Metadata thư mục tuyển chọn từ Open Library. Giá hiển thị là giá demo; rating nguồn không phải
+            đánh giá người dùng BookVerse.
+          </div>
+        </div>
+
+        {curatedBooks.length > 0 ? (
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            {curatedBooks.map((book) => (
+              <BookCard book={book} key={book.id} />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-lg border border-[#17191F]/10 bg-[#FFFDF8] p-6 text-sm text-[#66706B] shadow-[0_12px_34px_rgba(39,44,51,0.08)]">
+            Catalog tuyển chọn chưa được triển khai trên database đang kết nối.
+          </div>
+        )}
+
+        <div className="mt-5 text-right">
+          <Link className="text-sm font-black text-[#0F766E] hover:underline" href="/catalog?source=real">
+            Xem toàn bộ catalog tuyển chọn
+          </Link>
+        </div>
+      </section>
+
       <section className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -117,9 +154,11 @@ export default async function HomePage() {
           </div>
 
           <p className="max-w-xl text-sm leading-6 text-[#66706B]">
-            {userId
-              ? "Dữ liệu được lấy từ microservice Python và sắp xếp theo hành vi của tài khoản hiện tại."
-              : "Bạn chưa đăng nhập, hệ thống đang hiển thị danh sách fallback từ cơ sở dữ liệu."}
+            {recommendationBatch.hasVerifiedPersonalization
+              ? "Dữ liệu được lấy từ microservice Python và có provenance người dùng hợp lệ."
+              : userId
+                ? "Hệ thống đang hiển thị danh sách khám phá; chưa có provenance người dùng đủ để khẳng định cá nhân hóa."
+                : "Bạn chưa đăng nhập, hệ thống đang hiển thị danh sách fallback từ cơ sở dữ liệu."}
           </p>
         </div>
 

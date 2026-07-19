@@ -241,15 +241,15 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
         </div>
       </section>
 
-      <section className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:px-8">
-        <form className="bv-card grid gap-3 rounded-lg p-4 lg:grid-cols-[1fr_repeat(5,160px)_auto]" method="get">
+      <section className="mx-auto grid w-full min-w-0 max-w-7xl grid-cols-1 gap-6 px-4 py-8 sm:px-6 lg:px-8">
+        <form className="bv-card grid min-w-0 grid-cols-1 gap-3 rounded-lg p-4 lg:grid-cols-[1fr_repeat(5,160px)_auto]" method="get">
           <Input
             className="h-10"
             defaultValue={params?.q ?? ""}
             name="q"
             placeholder="Tìm user, sách, listing, order..."
           />
-          <select className="rounded-lg border border-[#D8D0C2] px-3 text-sm font-semibold" defaultValue={params?.role ?? "ALL"} name="role">
+          <select className="w-full min-w-0 rounded-lg border border-[#D8D0C2] px-3 text-sm font-semibold" defaultValue={params?.role ?? "ALL"} name="role">
             <option value="ALL">Tất cả role</option>
             {Object.values(UserRole).map((role) => (
               <option key={role} value={role}>
@@ -257,12 +257,12 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
               </option>
             ))}
           </select>
-          <select className="rounded-lg border border-[#D8D0C2] px-3 text-sm font-semibold" defaultValue={params?.userStatus ?? "all"} name="userStatus">
+          <select className="w-full min-w-0 rounded-lg border border-[#D8D0C2] px-3 text-sm font-semibold" defaultValue={params?.userStatus ?? "all"} name="userStatus">
             <option value="all">Tất cả user</option>
             <option value="active">Active</option>
             <option value="locked">Locked</option>
           </select>
-          <select className="rounded-lg border border-[#D8D0C2] px-3 text-sm font-semibold" defaultValue={params?.bookStatus ?? "ALL"} name="bookStatus">
+          <select className="w-full min-w-0 rounded-lg border border-[#D8D0C2] px-3 text-sm font-semibold" defaultValue={params?.bookStatus ?? "ALL"} name="bookStatus">
             <option value="ALL">Tất cả sách</option>
             {Object.values(BookStatus).map((status) => (
               <option key={status} value={status}>
@@ -270,7 +270,7 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
               </option>
             ))}
           </select>
-          <select className="rounded-lg border border-[#D8D0C2] px-3 text-sm font-semibold" defaultValue={params?.listingStatus ?? "ALL"} name="listingStatus">
+          <select className="w-full min-w-0 rounded-lg border border-[#D8D0C2] px-3 text-sm font-semibold" defaultValue={params?.listingStatus ?? "ALL"} name="listingStatus">
             <option value="ALL">Tất cả listing</option>
             {Object.values(ListingStatus).map((status) => (
               <option key={status} value={status}>
@@ -278,7 +278,7 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
               </option>
             ))}
           </select>
-          <select className="rounded-lg border border-[#D8D0C2] px-3 text-sm font-semibold" defaultValue={params?.orderStatus ?? "ALL"} name="orderStatus">
+          <select className="w-full min-w-0 rounded-lg border border-[#D8D0C2] px-3 text-sm font-semibold" defaultValue={params?.orderStatus ?? "ALL"} name="orderStatus">
             <option value="ALL">Tất cả order</option>
             {Object.values(OrderStatus).map((status) => (
               <option key={status} value={status}>
@@ -291,7 +291,7 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
           </Button>
         </form>
 
-        <nav className="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
+        <nav className="grid min-w-0 grid-cols-1 gap-2 md:grid-cols-3 xl:grid-cols-6">
           {[
             ["#users", "Users", UserCog],
             ["#books", "Books", BookOpen],
@@ -314,7 +314,7 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
           })}
         </nav>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {data.metrics.map((metric) => (
             <article className="bv-card rounded-lg p-5" key={metric.label}>
               <p className="text-sm font-bold text-[#66706B]">{metric.label}</p>
@@ -323,7 +323,7 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
           ))}
         </div>
 
-        <section className="bv-card rounded-lg p-5" id="users">
+        <section className="bv-card min-w-0 overflow-hidden rounded-lg p-5" id="users">
           {sectionTitle(<UserCog className="h-5 w-5" aria-hidden="true" />, "Admin Users", "Tìm kiếm, đổi role, khóa/mở khóa và xem hoạt động gần đây của user.")}
           <div className="overflow-x-auto">
             <table className="w-full min-w-[980px] text-left text-sm">
@@ -411,7 +411,7 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
           </div>
         </section>
 
-        <section className="bv-card rounded-lg p-5" id="books">
+        <section className="bv-card min-w-0 overflow-hidden rounded-lg p-5" id="books">
           {sectionTitle(<BookOpen className="h-5 w-5" aria-hidden="true" />, "Admin Books", "Kiểm tra sách thiếu cover/mô tả/embedding và cập nhật trạng thái mềm.")}
           <div className="grid gap-3 lg:grid-cols-2">
             {data.books.map((book) => (
@@ -468,7 +468,7 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
           </div>
         </section>
 
-        <section className="bv-card rounded-lg p-5" id="marketplace">
+        <section className="bv-card min-w-0 overflow-hidden rounded-lg p-5" id="marketplace">
           {sectionTitle(<Store className="h-5 w-5" aria-hidden="true" />, "Admin Marketplace", "Duyệt, từ chối hoặc ẩn listing; xem điểm chất lượng theo quy tắc và lý do từ chối.")}
           <div className="space-y-3">
             {data.listings.map((listing) => (
@@ -505,7 +505,7 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
           </div>
         </section>
 
-        <section className="bv-card rounded-lg p-5" id="orders">
+        <section className="bv-card min-w-0 overflow-hidden rounded-lg p-5" id="orders">
           {sectionTitle(<Truck className="h-5 w-5" aria-hidden="true" />, "Admin Orders", "Theo dõi đơn hàng và ghi timeline/notification khi đổi trạng thái.")}
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-left text-sm">

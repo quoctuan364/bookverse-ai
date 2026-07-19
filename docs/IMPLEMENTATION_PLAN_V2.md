@@ -9,8 +9,8 @@ Tài liệu này chia việc nâng cấp thành các lượt có checkpoint và 
 - Đã xóa `BookCard.buildMockEvidence`; thiếu evidence hiển thị trạng thái trung tính.
 - Đã xóa `buildMockSellerAiScore`; production UI/API dùng “Điểm chất lượng theo quy tắc” deterministic `seller-quality-v1` và có test.
 - Production assistant mock guard là `ALREADY_FIXED_VERIFIED`; không còn mock flag có hiệu lực ở production.
-- Cover V2 dùng `BookCover` chung cho null/path sai/load error; fallback có 8 artwork/6 layout deterministic. Audit dataset hiện có 2.200 bìa synthetic cũ và 0 bìa thật được phê duyệt; browser-smoke toàn bộ surface đang chờ database demo hoạt động.
-- Docker/Compose/FastAPI không còn credential hard-code trong production source; image candidate không chứa `.env` hoặc secret trong config/history.
+- Cover V2 dùng `BookCover` chung cho null/path sai/load error; fallback có 8 artwork/6 layout deterministic. Audit dataset hiện có 2.200 bìa synthetic cũ và 0 bìa thật được phê duyệt. Browser smoke G1 chạy trên `bookverse_ai_test`, không dùng demo DB để ghi.
+- Docker/Compose/FastAPI không còn credential hard-code trong production source; local/test/production Compose đã tách. Candidate image có startup fail-fast và chưa được deploy/rotate secret.
 - AI metric offline vẫn thấp; dữ liệu chủ yếu synthetic/demo; CTR thật `NOT_AVAILABLE`.
 
 Trạng thái ngày 14/07/2026:
@@ -76,8 +76,8 @@ Review unique là migration riêng trong Lượt 1: trước tiên phải lập 
 3. Regenerate dữ liệu temporal hoặc thu thập log có thời gian thật; split train/test theo mốc thời gian.
 4. Thêm Popularity và Content-only baseline; báo Precision@K, Recall@K, NDCG@K, HitRate@K và Coverage.
 5. Lưu config, seed, query window, commit/build identifier và output JSON để tái lập.
-6. **P0 VERIFIED 16/07/2026:** thay **buildMockSellerAiScore** bằng điểm chất lượng theo quy tắc deterministic; không còn gọi là AI Score.
-7. **P0 VERIFIED 16/07/2026:** bỏ **BookCard.buildMockEvidence**; hiển thị evidence thật hoặc trạng thái “chưa có giải thích cá nhân hóa đã được xác minh”.
+6. **P0 VERIFIED 16/07/2026:** thay **buildMockSellerAiScore** bằng điểm chất lượng theo quy tắc deterministic; không còn gọi là AI Score. Đây là điểm quy tắc, không phải metric AI đã được benchmark.
+7. **P0 PARTIAL (re-audit G2.1, 18/07/2026):** không còn `BookCard.buildMockEvidence`, nhưng presentation hiện chỉ kiểm tra chuỗi evidence không rỗng. Evidence từ interaction synthetic/fixture chưa có provenance `REAL_USER_DATA`, vì vậy UI không được trình bày là giải thích cá nhân hóa đã được xác minh cho người dùng thật.
 8. Chatbot phải báo rõ degraded/unavailable; mock chỉ được bật bằng cờ development/test.
 9. Reader không được trình bày demo page như ebook thật.
 

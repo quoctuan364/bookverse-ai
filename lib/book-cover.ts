@@ -1,4 +1,5 @@
 import realCoverSourceManifest from "@/config/real-cover-sources.json";
+import { isUsableCoverDimensions } from "@/lib/cover-policy";
 
 export type BookCoverSourceKind = "EMPTY" | "LOCAL" | "REMOTE" | "INVALID";
 
@@ -127,6 +128,11 @@ export function isApprovedRealCover(bookId: string, value?: string | null): bool
   );
 }
 
+/** Đồng bộ với cover HTTP audit: ảnh quá nhỏ hoặc không có dáng bìa sẽ dùng fallback. */
+export function isUsableBookCoverDimensions(width: number, height: number): boolean {
+  return isUsableCoverDimensions(width, height);
+}
+
 /** FNV-1a 32-bit: cùng bookId luôn cho cùng layout/artwork trên mọi trang. */
 export function stableBookCoverSeed(bookId: string): number {
   let hash = 0x811c9dc5;
@@ -143,7 +149,11 @@ export function sanitizeFallbackTitle(title: string): string {
 
 export function sanitizeFallbackAuthor(author?: string | null): string {
   if (!author?.trim()) return "Tác giả chưa cập nhật";
-  return author.trim().replace(/\s+\d{4,}\b$/u, "").replace(/\s{2,}/g, " ").trim();
+  return author
+    .trim()
+    .replace(/\s+\d{4,}(?=\s*,|\s*$)/gu, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 export function getDemoCoverArt(input: {
@@ -151,21 +161,11 @@ export function getDemoCoverArt(input: {
   title: string;
   category?: string | null;
 }): DemoCoverArt {
-  const searchableTitle = sanitizeFallbackTitle(input.title).toLocaleLowerCase("vi");
-  const searchableCategory = input.category?.toLocaleLowerCase("vi") ?? "";
-
-  // Ưu tiên tiêu đề vì tiêu đề có mặt nhất quán ở mọi màn hình.
-  for (const art of DEMO_COVER_ART) {
-    if (COVER_KEYWORDS[art].some((keyword) => searchableTitle.includes(keyword))) {
-      return art;
-    }
-  }
-  for (const art of DEMO_COVER_ART) {
-    if (COVER_KEYWORDS[art].some((keyword) => searchableCategory.includes(keyword))) {
-      return art;
-    }
-  }
-
+  // Artwork phải bất biến theo bookId. Category/title có thể được hydrate khác nhau giữa
+  // Home, Catalog và Detail; dùng chúng làm seed sẽ làm cùng một Book đổi bìa giữa các trang.
+  // Giữ input title/category để API tương thích, nhưng không dùng chúng để chọn artwork.
+  void input.title;
+  void input.category;
   return DEMO_COVER_ART[stableBookCoverSeed(input.bookId) % DEMO_COVER_ART.length];
 }
 

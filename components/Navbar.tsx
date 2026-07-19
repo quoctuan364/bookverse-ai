@@ -89,7 +89,7 @@ export async function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/78 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-2xl">
-      <nav className="mx-auto flex min-h-[72px] w-full max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
+      <nav className="mx-auto flex min-h-[72px] w-full max-w-[1800px] items-center gap-4 px-4 sm:px-6 lg:px-8">
         <Link className="flex shrink-0 items-center gap-3 text-zinc-50" href="/">
           <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#0F766E] text-[#FFFDF8] shadow-[0_14px_30px_rgba(15,118,110,0.24)]">
             <BookOpen className="h-5 w-5" aria-hidden="true" />
@@ -211,7 +211,7 @@ export async function Navbar() {
             <Menu className="h-5 w-5" aria-hidden="true" />
             <span className="sr-only">Mở menu</span>
           </summary>
-          <div className="absolute left-0 right-0 top-[73px] border-t border-white/10 bg-slate-950/95 px-4 py-4 shadow-lg backdrop-blur-2xl">
+          <div className="bookverse-mobile-nav-panel absolute left-0 right-0 top-[73px] border-t border-white/10 bg-slate-950/95 px-4 py-4 shadow-lg backdrop-blur-2xl">
             <form action="/catalog" className="relative">
               <Search
                 className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#66706B]"

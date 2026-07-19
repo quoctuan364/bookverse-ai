@@ -1,5 +1,7 @@
 # Runbook triển khai và biên bản Deployment R1
 
+> Candidate hardening G1 ngày 16/07/2026 **chưa được deploy và chưa rotate secret**. `docker-compose.local.yml`, `docker-compose.test.yml` và `docker-compose.production.yml` chỉ là cấu hình đã validate local. Quy trình rotation mới nằm ở [`../SECURITY.md`](../SECURITY.md).
+
 Ngày xác minh gần nhất: 15/07/2026. Deployment R1 lên `bookverse_ai` đã được phê duyệt riêng và hoàn tất theo [biên bản Deployment R1](DEPLOYMENT_R1_REPORT.md). Các lệnh ghi trong tài liệu này vẫn phải có phê duyệt theo từng deployment; kết quả R1 không phải quyền ghi mặc định cho lần sau.
 
 ## 1. Trạng thái readiness đã chứng minh

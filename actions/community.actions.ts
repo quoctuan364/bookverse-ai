@@ -79,6 +79,9 @@ export async function getAllPosts(): Promise<CommunityPost[]> {
       orderBy: {
         createdAt: "desc",
       },
+      // Trang feed chỉ tải một lát cắt mới nhất để không render hàng nghìn card trong một request.
+      // Cursor pagination đầy đủ được giữ cho P1; dữ liệu gốc không bị thay đổi.
+      take: 20,
       include: {
         author: {
           select: {

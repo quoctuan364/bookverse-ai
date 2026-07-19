@@ -1,5 +1,7 @@
 # BookVerse AI Category Report
 
+> **Historical checkpoint snapshot — không phản ánh toàn bộ trạng thái hiện tại.** Xem [`CURRENT_STATUS.md`](CURRENT_STATUS.md) trước khi dùng bất kỳ kết luận nào.
+
 > **HISTORICAL SNAPSHOT:** số liệu phân tích/rehearsal trong tài liệu này được tạo ngày 13–14/07/2026. Trạng thái source/database hiện hành xem [`CURRENT_STATUS.md`](CURRENT_STATUS.md); không dùng câu kết cũ về demo như bằng chứng hiện tại.
 
 Ngày tạo: 2026-07-13T17:45:50.935Z

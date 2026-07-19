@@ -1,5 +1,7 @@
 # Báo cáo kiểm thử Checkpoint D — Assistant Service Boundary
 
+> **Historical checkpoint snapshot — không phản ánh toàn bộ trạng thái hiện tại.** Xem [`CURRENT_STATUS.md`](CURRENT_STATUS.md) trước khi dùng bất kỳ kết luận nào.
+
 Ngày kiểm tra: 14/07/2026
 
 Nhánh: `checkpoint-d-assistant-boundary`

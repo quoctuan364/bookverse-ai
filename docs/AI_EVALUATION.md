@@ -1,5 +1,7 @@
 # Đánh giá recommendation theo thời gian — Checkpoint E
 
+> Đây là evaluation snapshot trên `SYNTHETIC_DATA`, không phải đo lường người dùng production. Trạng thái hiện hành xem [`CURRENT_STATUS.md`](CURRENT_STATUS.md); Hybrid chưa vượt baseline và CTR vẫn `NOT_AVAILABLE`.
+
 Ngày đánh giá: 14/07/2026.
 
 Database: `bookverse_ai_test` ở chế độ transaction `READ ONLY`.
@@ -142,6 +144,10 @@ CTR không được suy từ purchase/recommendation count:
 
 ```text
 CTR: NOT_AVAILABLE — chưa có impression/exposure log đáng tin cậy.
+
+### G2.2 provenance guard
+
+Evidence recommendation không được coi là cá nhân hóa chỉ vì chuỗi `reason` không rỗng. Policy hiện yêu cầu `REAL_USER_DATA`, interaction ID, owner user, event type, source book/category/author, timestamp, taxonomy version và algorithm version. Audit read-only trên `bookverse_ai_test` ngày 19/07/2026 đọc 8.400 evidence: 0 verified real-user, 8.400 missing provenance. Vì vậy các màn hình hiện hiển thị trạng thái trung tính; không dùng kết quả này để tạo CTR/UAT hoặc tuyên bố recommendation hiệu quả.
 ```
 
 ## 9. Kết quả thật — cohort all

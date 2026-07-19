@@ -4,6 +4,14 @@ BookVerse AI là đồ án tốt nghiệp xây dựng nền tảng sách điện
 
 > Trạng thái hiện hành: xem [`docs/CURRENT_STATUS.md`](docs/CURRENT_STATUS.md). Các báo cáo checkpoint cũ chỉ là historical snapshot, không tự động chứng minh source hiện tại. AI metric offline còn thấp, dữ liệu chủ yếu là `SYNTHETIC_DATA`/`DEMO_DATA`, CTR production hiện `NOT_AVAILABLE` và chưa có UAT/SUS người dùng thật.
 
+## Catalog tuyển chọn G2
+
+Source hiện có pipeline riêng cho 3.046 bibliographic record tuyển chọn từ Open Library. Trên `bookverse_ai_test`, catalog này được tách khỏi ultra-2200 bằng bảng 1–1 `BookSourceMetadata`; Home có khu vực “Sách tuyển chọn”, Catalog có filter/phân trang 24 sách và Detail hiển thị metadata nguồn.
+
+Trạng thái trung thực là `PARTIAL`: 3.044 record có work key hợp lệ, 2 record chỉ có edition key và 34 record thiếu language. 259 record là **ấn bản tiếng Việt**, không phải 259 tác giả Việt Nam. Strict audit HTTP mới kiểm tra 3.046/3.046 cover: 687 đạt host/content/dimension policy, 2.335 redirect cuối ngoài allowlist và 24 sai dimension; cover rights là `NOT_VERIFIED`, mọi giá là `SYNTHETIC_DEMO_PRICE`, không có review/order/interaction thật đi kèm và database demo chưa được import.
+
+Tài liệu chi tiết: [`docs/REAL_CATALOG_REPORT.md`](docs/REAL_CATALOG_REPORT.md) và [`docs/REAL_CATALOG_CATEGORY_MAPPING.md`](docs/REAL_CATALOG_CATEGORY_MAPPING.md).
+
 ## Công nghệ sử dụng
 
 - Next.js 15 App Router, React 19, TypeScript strict.
@@ -22,7 +30,7 @@ BookVerse AI là đồ án tốt nghiệp xây dựng nền tảng sách điện
 - Sổ địa chỉ giao hàng hỗ trợ thêm/sửa/xóa/đặt mặc định, checkout lưu snapshot địa chỉ vào đơn hàng.
 - Thư viện cá nhân hiển thị sách đang đọc, đã mua, yêu thích, bookmark và highlight từ database thật.
 - Notification Center có filter tất cả/chưa đọc, thông báo listing, đơn hàng, cộng đồng, bảo mật và AI.
-- Trang chủ chỉ hiển thị lý do cá nhân hóa khi có evidence; danh sách dự phòng dùng trạng thái trung tính “chưa có giải thích cá nhân hóa đã được xác minh”.
+- Trang chủ, profile và recommendation API chỉ hiển thị claim cá nhân hóa khi evidence có provenance `REAL_USER_DATA` đầy đủ; audit hiện tại chưa có dòng nào được xác minh nên UI giữ trạng thái trung tính.
 - Danh mục sách tìm kiếm sách theo tên, tác giả, mô tả, thể loại và thẻ.
 - Trang chi tiết sách có tracking `VIEW`, đọc thử, yêu thích, thêm giỏ, mua demo qua checkout và viết review thật.
 - Chợ sách cũ cho người bán đăng tin, quản trị viên duyệt/từ chối, người mua thêm giỏ hoặc mua ngay.
@@ -47,6 +55,7 @@ D:\Doantotnghiep
 ├─ prisma/              # Prisma schema, migrations, seed
 ├─ data/demo/           # CSV demo nhỏ, không xóa dữ liệu gốc
 ├─ data/json/           # Dataset lớn 2.200 sách để import khi cần
+├─ data/real-catalog/   # Artifact catalog G2 đã lọc; không chứa audit/cache tải hàng loạt
 ├─ public/covers/       # Artwork fallback V2; bìa synthetic cũ chỉ giữ làm dữ liệu lịch sử
 ├─ public/ebooks/       # Ebook HTML/JSON cho reader
 ├─ ai_service/          # FastAPI service cho gợi ý sách
@@ -69,10 +78,10 @@ Cài dependency:
 npm install
 ```
 
-Khởi động PostgreSQL:
+Khởi động PostgreSQL local bằng Compose tách môi trường:
 
 ```powershell
-docker compose up -d db
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d db
 ```
 
 Tạo schema database:
@@ -205,7 +214,7 @@ Nếu chưa có pgvector, embedding hoặc khóa provider, chatbot vẫn hoạt 
 Quy tắc vận hành:
 
 - RAG chatbot tiếp tục nằm ở Next.js; FastAPI hiện chỉ phục vụ recommendation. Chưa chuyển chat sang FastAPI vì chưa có benchmark chứng minh lợi ích.
-- OpenAI/Gemini có timeout cấu hình bằng `BOOKVERSE_CHAT_TIMEOUT_MS`; khi provider, embedding hoặc vector lỗi, hệ thống hạ về catalog thật và gắn trạng thái degraded.
+- OpenAI/Gemini có timeout cấu hình bằng `BOOKVERSE_CHAT_TIMEOUT_MS`; khi provider, embedding hoặc vector lỗi, hệ thống hạ về catalog có ID đã xác minh và gắn trạng thái degraded. Đây không phải bằng chứng provider thật đã PASS.
 - `BOOKVERSE_CHAT_MOCK_ENABLED=true` chỉ có hiệu lực trong development/test. Production luôn vô hiệu mock, kể cả khi `BOOKVERSE_LLM_PROVIDER=mock`.
 - Khách ẩn danh không được tiếp tục session do client cung cấp. User đăng nhập chỉ tiếp tục session thuộc chính mình; user bị khóa bị chặn.
 - Feedback chỉ nhận cho assistant message thuộc session của user đăng nhập. API không trả raw database/provider error cho client.
@@ -452,10 +461,20 @@ Ba mapping MEDIUM (`C013`, `C023`, `C024`) đã được review bằng 15 Book m
 
 ## Chạy bằng Docker Compose
 
-Chạy toàn bộ hệ thống:
+Không dùng chung project/volume giữa local, test và production. Sao chép `.env.example` thành `.env`, thay toàn bộ placeholder bằng giá trị riêng của máy và không commit `.env`.
+
+Chạy local:
 
 ```powershell
-docker compose up --build
+docker compose -f docker-compose.yml -f docker-compose.local.yml config --quiet
+docker compose -f docker-compose.yml -f docker-compose.local.yml up --build
+```
+
+Kiểm tra cấu hình test hoặc production:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.test.yml config --quiet
+docker compose -f docker-compose.yml -f docker-compose.production.yml config --quiet
 ```
 
 Các service:
@@ -467,7 +486,7 @@ Các service:
 Nếu đã từng chạy Docker trước đó và route mới như `/marketplace` vẫn trả 404, hãy rebuild lại image web:
 
 ```powershell
-docker compose up -d --build web
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build web
 ```
 
 ## Kịch bản demo DATN
@@ -513,12 +532,17 @@ npm run test:unit
 npm run test:assistant-integration
 npm run test:category-integration
 npm run test:stock-integration
+npm run catalog:real:validate
+npm run catalog:real:dry-run
+npm run test:real-catalog-integration
 npm run build
 python -m compileall -q ai_service
 docker compose config --quiet
+npm run test:production-env
+npm run test:production-mock-policy
 ```
 
-Lệnh `data:import` phải dùng biến `DATABASE_URL` của `bookverse_ai_test`; không chạy import để kiểm thử trên database demo.
+Lệnh `data:import` và `catalog:real:import` phải dùng biến `DATABASE_URL` của `bookverse_ai_test` cùng allowlist phù hợp; không chạy import để kiểm thử trên database demo. `catalog:real:validate` không ghi database, còn `catalog:real:dry-run` chỉ đọc và lập kế hoạch.
 
 ## Migration mới của Phase 2
 
@@ -540,12 +564,15 @@ Lệnh `data:import` phải dùng biến `DATABASE_URL` của `bookverse_ai_test
 
 - Không xóa hoặc ghi đè file dữ liệu gốc trong `data/demo`.
 - Ebook HTML/JSON đã được thêm vào `public/ebooks`. Cover SVG cũ là `SYNTHETIC_DATA`, không được dùng như bìa thật; UI hiện dùng `BookCover` và fallback V2 có nhãn “BookVerse Demo”.
+- Browser smoke Cover V2 dùng Playwright trên database test riêng; test giỏ hàng tạo `TEST_FIXTURE` có ID riêng và phải cleanup về baseline.
 
 ### Trạng thái bìa sách
 
 - `2.200/2.200` URL trong dataset ultra là bìa synthetic cũ, trạng thái `NOT_VERIFIED`.
 - Có 8 artwork fallback nguyên bản, 6 layout deterministic, tỷ lệ `2:3`; đây là `GENERATED_DEMO_ASSET`, không phải bìa nhà xuất bản.
 - Số bìa thật có nguồn/giấy phép đã duyệt: `0` (`NOT_AVAILABLE`).
+- Có 20 bìa `EXTERNAL_PROVIDER_ASSET` khớp ISBN/metadata cho bộ `data/demo/books.csv`; quyền tái phân phối từng ảnh vẫn `NOT_VERIFIED` và bộ này chưa được nhập vào database Next.js 1.200 sách synthetic.
+- Tải/kiểm tra lại bộ curated bằng `npm run covers:download-curated`; manifest ở `config/curated-demo-cover-sources.json`, dữ liệu dẫn xuất ở `data/derived/demo-books-with-local-covers.csv`.
 - Danh sách 120 sách ưu tiên cần bìa thật: `docs/REAL_COVER_CANDIDATES.csv`.
 - Audit và hướng dẫn: `docs/COVER_SYSTEM.md`; bằng chứng triển khai: `docs/COVER_V2_REPORT.md`; chạy `npm run covers:audit`.
 - Script `prisma/seed.ts` seed demo nhỏ và đặt mật khẩu `123456` cho user mẫu.

@@ -13,6 +13,10 @@ import {
   normalizeRecommendationCandidates,
   type RecommendationNormalizationResult,
 } from "@/lib/recommendation-position-policy";
+import {
+  getRecommendationEvidenceDisplay,
+  getRecommendationEvidenceStatus,
+} from "@/lib/recommendation-evidence-policy";
 
 type DecimalLike = {
   toNumber: () => number;
@@ -75,16 +79,45 @@ type EvidenceRow = {
   weight: number;
   sourceType: string | null;
   sourceId: string | null;
+  metadata?: unknown;
 };
 
-function serializeEvidence(evidence: EvidenceRow[]) {
+function evidenceProvenance(metadata: unknown): unknown {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return undefined;
+  return (metadata as { provenance?: unknown }).provenance;
+}
+
+function displayRecommendationReason(reason: string | null, evidence: EvidenceRow[], userId: string): string {
+  const first = evidence[0];
+  const status = getRecommendationEvidenceStatus({
+    evidence: reason ?? first?.label,
+    provenance: evidenceProvenance(first?.metadata),
+    expectedUserId: userId,
+    fallback: reason || first ? undefined : "POPULARITY_FALLBACK",
+  });
+  return getRecommendationEvidenceDisplay({ evidence: reason ?? first?.label, status }).evidenceText;
+}
+
+function serializeEvidence(evidence: EvidenceRow[], userId: string) {
   return dedupeRecommendationEvidence(evidence).map((item) => ({
     id: item.id,
     type: item.type,
-    text: item.label,
+    text: getRecommendationEvidenceDisplay({
+      evidence: item.label,
+      status: getRecommendationEvidenceStatus({
+        evidence: item.label,
+        provenance: evidenceProvenance(item.metadata),
+        expectedUserId: userId,
+      }),
+    }).evidenceText,
     weight: item.weight,
     sourceType: item.sourceType,
     sourceId: item.sourceId,
+    status: getRecommendationEvidenceStatus({
+      evidence: item.label,
+      provenance: evidenceProvenance(item.metadata),
+      expectedUserId: userId,
+    }),
   }));
 }
 
@@ -129,6 +162,11 @@ export async function GET(request: Request) {
     const dailyRecommendations = await prisma.dailyRecommendation.findMany({
       where: {
         userId,
+        book: {
+          sourceMetadata: {
+            is: null,
+          },
+        },
         OR: [
           {
             expiresAt: null,
@@ -184,6 +222,7 @@ export async function GET(request: Request) {
             weight: true,
             sourceType: true,
             sourceId: true,
+            metadata: true,
           },
         },
       },
@@ -222,7 +261,7 @@ export async function GET(request: Request) {
             rank: recommendation.rank,
             position,
             score: recommendation.score,
-            reason: recommendation.reason ?? recommendation.evidence[0]?.label ?? null,
+            reason: displayRecommendationReason(recommendation.reason, recommendation.evidence, userId),
             algorithm: recommendation.algorithm,
             generatedAt: recommendation.generatedAt.toISOString(),
             expiresAt: recommendation.expiresAt?.toISOString() ?? null,
@@ -235,7 +274,7 @@ export async function GET(request: Request) {
               rating: recommendation.book.rating ? decimalToNumber(recommendation.book.rating) : null,
               category: recommendation.book.category,
             },
-            evidence: serializeEvidence(recommendation.evidence),
+            evidence: serializeEvidence(recommendation.evidence, userId),
           })),
           meta: {
             count: normalization.items.length,
@@ -282,6 +321,7 @@ export async function GET(request: Request) {
             weight: true,
             sourceType: true,
             sourceId: true,
+            metadata: true,
           },
         },
       },
@@ -291,6 +331,9 @@ export async function GET(request: Request) {
       where: {
         id: {
           in: bookIds,
+        },
+        sourceMetadata: {
+          is: null,
         },
       },
       select: {
@@ -352,7 +395,7 @@ export async function GET(request: Request) {
               rank: recommendation.rank,
               position,
               score: recommendation.score,
-              reason: recommendation.reason ?? recommendation.evidence[0]?.label ?? null,
+              reason: displayRecommendationReason(recommendation.reason, recommendation.evidence, userId),
               algorithm: recommendation.algorithm,
               generatedAt: recommendation.generatedAt.toISOString(),
               expiresAt: recommendation.expiresAt?.toISOString() ?? null,
@@ -365,7 +408,7 @@ export async function GET(request: Request) {
                 rating: book.rating ? decimalToNumber(book.rating) : null,
                 category: book.category,
               },
-              evidence: serializeEvidence(recommendation.evidence),
+              evidence: serializeEvidence(recommendation.evidence, userId),
             };
           })
           .filter((item): item is NonNullable<typeof item> => Boolean(item)),

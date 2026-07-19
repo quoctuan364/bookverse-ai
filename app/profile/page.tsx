@@ -158,16 +158,16 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
         </div>
       </section>
 
-      <section className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:px-8">
+      <section className="mx-auto grid w-full min-w-0 max-w-7xl grid-cols-1 gap-6 px-4 py-8 sm:px-6 lg:px-8">
         {params?.message ? (
           <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
             {params.message}
           </div>
         ) : null}
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {data.metrics.map((metric) => (
-            <article className="bv-card rounded-lg p-5" key={metric.label}>
+            <article className="bv-card min-w-0 rounded-lg p-5" key={metric.label}>
               <p className="text-sm font-bold text-[#66706B]">{metric.label}</p>
               <p className="mt-3 text-3xl font-black text-[#17202A]">
                 {metric.value.toLocaleString("vi-VN")}
@@ -212,15 +212,15 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
           </section>
         ) : null}
 
-        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          <section className="bv-card rounded-lg p-5">
+        <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+          <section className="bv-card min-w-0 rounded-lg p-5">
             <div className="mb-5 flex items-center gap-2 text-[#17202A]">
               <BookOpen className="h-5 w-5" aria-hidden="true" />
               <h2 className="text-xl font-black">Đang đọc</h2>
             </div>
 
             {data.reading.length > 0 ? (
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
                 {data.reading.map((item) => (
                   <Link
                     className="flex gap-4 rounded-lg bg-[#F7F4ED] p-3 transition hover:bg-[#EAF2EF]"
@@ -231,7 +231,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                       alt={`Bìa sách ${item.title}`}
                       author={item.author}
                       bookId={item.bookId}
-                      className="h-28 w-20 shrink-0 rounded-lg object-cover shadow-[0_10px_22px_rgba(39,44,51,0.12)]"
+                      className="h-[120px] w-20 shrink-0 rounded-lg object-cover shadow-[0_10px_22px_rgba(39,44,51,0.12)]"
                       src={item.coverImage}
                       title={item.title}
                     />
@@ -278,7 +278,9 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                     <p className="line-clamp-1 font-black text-[#17202A]">{item.title}</p>
                     <p className="mt-1 text-sm font-medium text-[#66706B]">{item.author}</p>
                     <p className="mt-2 line-clamp-2 text-xs leading-5 text-[#66706B]">
-                      {item.reason ?? `Điểm phù hợp: ${item.score.toFixed(2)}`}
+                      {item.evidenceStatus === "VERIFIED_REAL_USER"
+                        ? item.reason
+                        : "Chưa có bằng chứng cá nhân hóa đã được xác minh."}
                     </p>
                   </Link>
                 ))}
@@ -291,7 +293,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
           </section>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-3">
           <section className="bv-card rounded-lg p-5">
             <div className="mb-5 flex items-center gap-2 text-[#17202A]">
               <ReceiptText className="h-5 w-5" aria-hidden="true" />

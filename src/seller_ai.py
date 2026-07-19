@@ -4,6 +4,7 @@ from .recommender import split_tokens
 
 
 def score_listing(listing: pd.Series, book: pd.Series | None = None) -> dict:
+    """Heuristic deterministic của prototype CSV; không phải model AI hoặc uy tín seller."""
     score = 0
     suggestions = []
 
@@ -91,4 +92,3 @@ def score_all_listings(data: dict[str, pd.DataFrame]) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows).sort_values("quality_score", ascending=False).reset_index(drop=True)
-

@@ -4,6 +4,8 @@
 !.env.example
 .next
 node_modules
+.venv
+**/.venv
 outputs
 backups
 .pytest_cache

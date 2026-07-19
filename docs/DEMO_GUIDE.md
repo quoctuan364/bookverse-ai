@@ -9,6 +9,18 @@ BookVerse AI được demo như một hệ thống có 4 vai trò:
 - Admin/Moderator: quản lý user, sách, listing, order, report, AI feedback và audit log.
 - AI System: chatbot RAG, recommendation có evidence và feedback.
 
+## Luồng demo Catalog tuyển chọn G2
+
+1. Chạy demo trên `bookverse_ai_test` đã apply migration/import G2; database demo mặc định chưa có catalog này.
+2. Mở Home và chỉ vào khu vực **Sách tuyển chọn**. Nói rõ metadata từ Open Library, không phải hành vi người dùng thật.
+3. Mở `/catalog?source=real`; thử filter ngôn ngữ, năm, ISBN, rating nguồn và chuyển trang. Mỗi trang chỉ có 24 sách.
+4. Mở `/book/RB00001`; chỉ ra badge **Metadata tuyển chọn**, **Ấn bản tiếng Việt**, publisher, năm, trang, ISBN và link nguồn.
+5. Nói rõ **Giá demo** không phải giá thị trường; rating nguồn không phải đánh giá người dùng BookVerse.
+6. Nếu remote cover lỗi, chứng minh fallback `BookVerse Demo`; không nói cover đã có license.
+7. Chuyển filter sang `Dữ liệu demo` để chứng minh ultra-2200 vẫn tách riêng.
+
+Không được nói “3.046 work key”: dữ liệu hiện là 3.044 work + 2 edition-only. Không được nói “259 tác giả Việt Nam”; chỉ có 259 ấn bản tiếng Việt theo metadata.
+
 ## Route Quan Trọng
 
 - `/`: Trang chủ và gợi ý sách.
@@ -123,7 +135,7 @@ Phase 4 chọn cách an toàn và dễ demo: mỗi checkout chỉ chứa item c�
 Chạy schema/database chuẩn:
 
 ```powershell
-docker compose up -d db
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d db
 npx prisma migrate deploy
 npx prisma generate
 ```
@@ -172,7 +184,9 @@ npm run typecheck
 npm test
 npm run test:assistant-integration
 npm run build
-docker compose config
+docker compose -f docker-compose.yml -f docker-compose.local.yml config --quiet
+npm run test:production-env
+npm run test:production-mock-policy
 ```
 
 ## Ghi Chú Hiện Trạng

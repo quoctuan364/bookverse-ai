@@ -12,6 +12,7 @@ import {
   getDemoCoverLayout,
   getInitialCoverStatus,
   isLegacySyntheticCover,
+  isUsableBookCoverDimensions,
   normalizeBookCoverUrl,
   sanitizeFallbackAuthor,
   sanitizeFallbackTitle,
@@ -52,10 +53,22 @@ test("bìa synthetic cũ và Picsum không được dùng như bìa thật", () 
   assert.equal(isLegacySyntheticCover("https://publisher.example/cover.webp"), false);
 });
 
+test("ảnh chỉ được dùng làm bìa khi kích thước và tỷ lệ hợp lệ", () => {
+  assert.equal(isUsableBookCoverDimensions(320, 480), true);
+  assert.equal(isUsableBookCoverDimensions(500, 500), false);
+  assert.equal(isUsableBookCoverDimensions(500, 346), false);
+  assert.equal(isUsableBookCoverDimensions(79, 480), false);
+  assert.equal(isUsableBookCoverDimensions(320, 119), false);
+});
+
 test("fallback deterministic theo bookId", () => {
   const firstArt = getDemoCoverArt({ bookId: "B0668", title: "Sổ tay AI #0668" });
   const firstLayout = getDemoCoverLayout("B0668");
   assert.equal(getDemoCoverArt({ bookId: "B0668", title: "Sổ tay AI #0668" }), firstArt);
+  assert.equal(
+    getDemoCoverArt({ bookId: "B0668", title: "Tiêu đề khác", category: "Kinh doanh" }),
+    firstArt,
+  );
   assert.equal(getDemoCoverLayout("B0668"), firstLayout);
   assert.ok(firstLayout >= 0 && firstLayout < 6);
 });
@@ -66,6 +79,10 @@ test("fallback loại mã synthetic nhưng không sửa dữ liệu gốc", () =
   assert.equal(sanitizeFallbackTitle(sourceTitle), "Thiết kế sản phẩm số thực chiến");
   assert.equal(sanitizeFallbackAuthor(sourceAuthor), "Nguyễn Minh An");
   assert.equal(sourceTitle, "Thiết kế sản phẩm số thực chiến #0668");
+  assert.equal(
+    sanitizeFallbackAuthor("Nguyễn Minh An 0668, Lê Gia Uyên 1682, Phạm Hà"),
+    "Nguyễn Minh An, Lê Gia Uyên, Phạm Hà",
+  );
 });
 
 test("local cover chỉ thành LOCAL_VALID sau sự kiện load", () => {

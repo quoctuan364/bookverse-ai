@@ -198,7 +198,7 @@ export default async function CartPage({ searchParams }: CartPageProps) {
                 >
                   <div className="flex flex-col gap-4 sm:flex-row">
                     <Link
-                      className="aspect-[2/3] w-28 shrink-0 overflow-hidden rounded-lg bg-[#EDE3D5] shadow-[0_12px_26px_rgba(39,44,51,0.12)]"
+                      className="aspect-[2/3] w-28 shrink-0 self-start overflow-hidden rounded-lg bg-[#EDE3D5] shadow-[0_12px_26px_rgba(39,44,51,0.12)]"
                       href={`/book/${item.book.id}`}
                     >
                       <BookCover
@@ -213,7 +213,7 @@ export default async function CartPage({ searchParams }: CartPageProps) {
 
                     <div className="min-w-0 flex-1">
                       <Link
-                        className="line-clamp-2 text-lg font-black text-[#17202A] hover:underline"
+                        className="line-clamp-2 break-words text-lg font-black text-[#17202A] [overflow-wrap:anywhere] hover:underline"
                         href={`/book/${item.book.id}`}
                       >
                         {item.listingTitle ?? item.book.title}

@@ -1,6 +1,20 @@
 # BookVerse AI Dataset Report
 
+> **Historical checkpoint snapshot — không phản ánh toàn bộ trạng thái hiện tại.** Xem [`CURRENT_STATUS.md`](CURRENT_STATUS.md) trước khi dùng bất kỳ kết luận nào.
+
 > **HISTORICAL SNAPSHOT:** báo cáo này mô tả dataset/analyzer tại ngày tạo. Trạng thái triển khai hiện hành xem [`CURRENT_STATUS.md`](CURRENT_STATUS.md). Dataset ultra-2200 là `SYNTHETIC_DATA`, không phải dữ liệu người dùng thật.
+
+## Bổ sung hiện hành — Real Curated Catalog G2
+
+| Dataset | Nhãn | Trạng thái | Số liệu đã xác minh |
+|---|---|---|---|
+| Ultra-2200 | `SYNTHETIC_DATA` | VERIFIED như snapshot kỹ thuật | 2.200 Book; giữ riêng cho test/evaluation |
+| Open Library curated | bibliographic metadata tuyển chọn | PARTIAL | 3.046 record = 3.044 work + 2 edition-only; 2.343 ISBN; 259 ấn bản tiếng Việt; 34 thiếu language |
+| Giá catalog curated | `SYNTHETIC_DEMO_PRICE` | VERIFIED | 3.046/3.046 record |
+| Cover catalog curated | `RIGHTS_NOT_VERIFIED` | VERIFIED về nhãn, NOT_VERIFIED về quyền | 3.046 cover ID/URL, không tải hàng loạt khi import |
+| Hành vi người dùng catalog curated | `REAL_USER_DATA` | NOT_AVAILABLE | 0 dữ liệu import kèm theo |
+
+Hai dataset chỉ cùng tồn tại trên `bookverse_ai_test`; `BookSourceMetadata` phân biệt nguồn. Không trộn catalog curated vào temporal evaluation cũ. Database demo vẫn có 1.200 Book và chưa có bảng metadata G2. Xem [`REAL_CATALOG_REPORT.md`](REAL_CATALOG_REPORT.md).
 
 Ngày tạo: 2026-07-12T12:05:19.571Z
 

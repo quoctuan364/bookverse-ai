@@ -1,5 +1,7 @@
 # Báo cáo triển khai Book Cover V2
 
+> **Historical checkpoint snapshot — không phản ánh toàn bộ trạng thái hiện tại.** Xem [`CURRENT_STATUS.md`](CURRENT_STATUS.md) trước khi dùng bất kỳ kết luận nào.
+
 Ngày: 16/07/2026.
 
 ## 1. Kết luận
