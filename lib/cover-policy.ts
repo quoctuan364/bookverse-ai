@@ -50,7 +50,16 @@ export function isAllowedCoverSourceUrl(value: string): boolean {
 }
 
 export function isAllowedFinalCoverUrl(value: string): boolean {
-  return isAllowedCoverSourceUrl(value);
+  if (isAllowedCoverSourceUrl(value)) return true;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || url.username || url.password) return false;
+    return COVER_POLICY.followedStorageRedirectAllowlist.some(
+      (hostname) => url.hostname === hostname || url.hostname.endsWith(`.${hostname}`),
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function isUsableCoverDimensions(width: number, height: number): boolean {

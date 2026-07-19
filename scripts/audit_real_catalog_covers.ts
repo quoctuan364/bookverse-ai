@@ -61,7 +61,8 @@ interface CoverAuditRow {
 const root = process.cwd();
 const sourcePath = path.join(root, "data", "real-catalog", "bookverse_real_catalog.json");
 const outputDirectory = path.join(root, "outputs", "real-catalog-cover-audit");
-const statePath = path.join(outputDirectory, "cover-audit-state.jsonl");
+// Policy thay đổi phải dùng state riêng; không được tái sử dụng redirect classification cũ.
+const statePath = path.join(outputDirectory, "cover-audit-state-v2.jsonl");
 const USER_AGENT = "BookVerse-Academic-Cover-Audit/1.2 (graduation-project; rate-limited)";
 const MAX_CONCURRENCY = COVER_POLICY.maxConcurrency;
 const MAX_RETRIES = COVER_POLICY.maxRetries;
@@ -229,9 +230,8 @@ async function main(): Promise<void> {
             const nextUrl = new URL(location, currentUrl).toString();
             redirectChain.push(nextUrl);
             await response.body?.cancel();
-            // Host ngoài policy được ghi nhận ngay tại Location thực tế.
-            // Không truy cập tiếp archive/provider chưa được duyệt vì không có
-            // bằng chứng rights và một redirect lỗi không được làm crash audit.
+            // Chỉ tiếp tục tới storage host đã được allowlist; rights vẫn tách riêng
+            // và không được suy ra từ việc tải ảnh thành công.
             if (!isAllowedFinalCoverUrl(nextUrl)) {
               return withStatus({ ...base, attempts: attempt, httpStatus: response.status, finalUrl: nextUrl, finalHost: hostOf(nextUrl), redirectCount: redirectChain.length - 1, redirectChain, redirectClassification: "EXTERNAL", errorCode: "REDIRECT_FINAL_HOST_NOT_ALLOWLISTED", checkedAt: new Date().toISOString() }, "REDIRECT_EXTERNAL", "REDIRECT_FINAL_HOST_NOT_ALLOWLISTED");
             }

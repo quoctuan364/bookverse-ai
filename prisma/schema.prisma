@@ -334,6 +334,53 @@ model BookSourceMetadata {
   @@map("book_source_metadata")
 }
 
+// Catalog metadata có nguồn, tách khỏi Book/listing/giá/stock của marketplace.
+model GoldCatalogRecord {
+  catalogId             String   @id
+  recordType            String
+  title                 String
+  subtitle              String?
+  authors               String[] @default([])
+  description           String?
+  language              String?
+  publisher             String?
+  publishedDate         String?
+  publishedYear         Int?
+  isbn10                String?
+  isbn13                String?
+  pageCount             Int?
+  sourceCategories      String[] @default([])
+  canonicalCategoryKeys String[] @default([])
+  coverUrl              String?
+  coverProvider         String?
+  coverFinalUrl         String?
+  coverWidth            Int?
+  coverHeight           Int?
+  coverHttpStatus       Int?
+  coverContentType      String?
+  coverTechnicalStatus  String
+  coverRightsStatus     String
+  provider              String
+  providerBookId        String?
+  providerWorkId        String?
+  providerEditionId     String?
+  sourceUrl             String?
+  retrievedAt           DateTime
+  rawChecksum           String?
+  normalizedChecksum    String
+  metadataQualityScore  Int
+  qualityTier           String
+  rejectionReasons      String[] @default([])
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([provider, providerBookId])
+  @@index([qualityTier])
+  @@index([language])
+  @@index([publishedYear])
+  @@map("gold_catalog_records")
+}
+
 model Listing {
   id              String           @id
   sellerId        String

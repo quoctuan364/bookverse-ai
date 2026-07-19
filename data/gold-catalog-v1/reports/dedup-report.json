@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "gold-catalog-dedup.v1",
+  "policy": [
+    "ISBN13",
+    "ISBN10",
+    "PROVIDER_EDITION_ID",
+    "PROVIDER_WORK_ID_PLUS_NORMALIZED_TITLE_AUTHOR"
+  ],
+  "selectedCount": 300,
+  "duplicateGroups": {
+    "isbn13": [],
+    "isbn10": [],
+    "providerEditionId": [],
+    "providerWorkId": []
+  },
+  "duplicateGroupCount": 0,
+  "fuzzyMatches": "NOT_RUN; fuzzy match chỉ đưa vào review, không tự merge"
+}

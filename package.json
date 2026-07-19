@@ -60,7 +60,10 @@
     "test:image-secrets": "pwsh -NoProfile -File scripts/audit_docker_image_secrets.ps1",
     "catalog:real:dry-run": "tsx scripts/import_real_catalog.ts --dry-run",
     "catalog:real:import": "tsx scripts/import_real_catalog.ts --execute",
-    "test:real-catalog-integration": "tsx scripts/verify_real_catalog_integration.ts"
+    "test:real-catalog-integration": "tsx scripts/verify_real_catalog_integration.ts",
+    "gold:pilot:build": "tsx scripts/build_gold_catalog_pilot.ts",
+    "gold:pilot:validate": "tsx scripts/validate_gold_catalog.ts",
+    "gold:pilot:import": "tsx scripts/import_gold_catalog.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

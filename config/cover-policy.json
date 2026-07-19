@@ -12,7 +12,9 @@
       }
     }
   ],
-  "followedStorageRedirectAllowlist": [],
+  "followedStorageRedirectAllowlist": [
+    "archive.org"
+  ],
   "maxRedirects": 5,
   "maxConcurrency": 2,
   "maxRetries": 2,

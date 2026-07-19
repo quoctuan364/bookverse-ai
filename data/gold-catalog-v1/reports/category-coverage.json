@@ -1,0 +1,379 @@
+{
+  "schemaVersion": "gold-catalog-category-coverage.v1",
+  "sourceMappingChecksum": "1783c538f562b9bf5e0ba37d47a7443c24f5e4c15d078ed861d20149d91bc49b",
+  "selectedCount": 300,
+  "bySourceCategory": [
+    {
+      "sourceSlug": "fiction",
+      "reviewerStatus": "APPROVED",
+      "count": 13,
+      "sampleTitleEvidence": [
+        "2666",
+        "Dặm Dài Đã Qua",
+        "Trò chơi vương quyền"
+      ]
+    },
+    {
+      "sourceSlug": "classics",
+      "reviewerStatus": "APPROVED",
+      "count": 11,
+      "sampleTitleEvidence": [
+        "A Man with a Maid",
+        "A strange disappearance",
+        "Atlas shrugged"
+      ]
+    },
+    {
+      "sourceSlug": "fantasy",
+      "reviewerStatus": "APPROVED",
+      "count": 12,
+      "sampleTitleEvidence": [
+        "A Court of Silver Flames",
+        "A Spell for Chameleon",
+        "Bezkres magii"
+      ]
+    },
+    {
+      "sourceSlug": "science-fiction",
+      "reviewerStatus": "APPROVED",
+      "count": 11,
+      "sampleTitleEvidence": [
+        "2001",
+        "2010",
+        "A deepness in the sky"
+      ]
+    },
+    {
+      "sourceSlug": "mystery",
+      "reviewerStatus": "APPROVED",
+      "count": 11,
+      "sampleTitleEvidence": [
+        "Mười người da đen nhỏ",
+        "A Is for Alibi (Kinsey Millhone Mysteries)",
+        "A Pocket Full of Rye"
+      ]
+    },
+    {
+      "sourceSlug": "thriller",
+      "reviewerStatus": "APPROVED",
+      "count": 14,
+      "sampleTitleEvidence": [
+        "61 hours",
+        "A Certain Hunger",
+        "A Savage Adoration"
+      ]
+    },
+    {
+      "sourceSlug": "horror",
+      "reviewerStatus": "APPROVED",
+      "count": 12,
+      "sampleTitleEvidence": [
+        "Books of Blood",
+        "Cabal",
+        "Carrie"
+      ]
+    },
+    {
+      "sourceSlug": "romance",
+      "reviewerStatus": "APPROVED",
+      "count": 12,
+      "sampleTitleEvidence": [
+        "A High Price to Pay",
+        "A Man Possessed",
+        "A Reason for Being"
+      ]
+    },
+    {
+      "sourceSlug": "poetry",
+      "reviewerStatus": "APPROVED",
+      "count": 9,
+      "sampleTitleEvidence": [
+        "A Light in the Attic",
+        "A poetry handbook",
+        "Ariel"
+      ]
+    },
+    {
+      "sourceSlug": "children",
+      "reviewerStatus": "APPROVED",
+      "count": 12,
+      "sampleTitleEvidence": [
+        "Are You My Mother?",
+        "Artemis Fowl: The Eternity Code",
+        "Be careful what you wish for"
+      ]
+    },
+    {
+      "sourceSlug": "young-adult",
+      "reviewerStatus": "APPROVED",
+      "count": 12,
+      "sampleTitleEvidence": [
+        "1:35 AM (Five Nights at Freddy's: Fazbear Frights #3)",
+        "Again, but Better",
+        "Akarnae"
+      ]
+    },
+    {
+      "sourceSlug": "history",
+      "reviewerStatus": "APPROVED",
+      "count": 17,
+      "sampleTitleEvidence": [
+        "Hắc thư về chủ nghĩa cộng sản, hay, Hồ sơ tội ác các đảng cộng sản trên thế giới",
+        "1776",
+        "21 Lessons for the 21st Century"
+      ]
+    },
+    {
+      "sourceSlug": "biography",
+      "reviewerStatus": "APPROVED",
+      "count": 12,
+      "sampleTitleEvidence": [
+        "Surely You're Joking, Mr. Feynman!",
+        "A Beautiful Mind",
+        "A chance to die"
+      ]
+    },
+    {
+      "sourceSlug": "psychology",
+      "reviewerStatus": "APPROVED",
+      "count": 11,
+      "sampleTitleEvidence": [
+        "101 Essays That Will Change The Way You Think",
+        "12 Rules for Life",
+        "Abnormal Psychology"
+      ]
+    },
+    {
+      "sourceSlug": "philosophy",
+      "reviewerStatus": "APPROVED",
+      "count": 8,
+      "sampleTitleEvidence": [
+        "101 Essays That Will Change The Way You Think",
+        "12 Rules for Life",
+        "A history of Western philosophy"
+      ]
+    },
+    {
+      "sourceSlug": "science",
+      "reviewerStatus": "NEEDS_REVIEW",
+      "count": 15,
+      "sampleTitleEvidence": [
+        "2001",
+        "2010",
+        "A deepness in the sky"
+      ]
+    },
+    {
+      "sourceSlug": "technology",
+      "reviewerStatus": "APPROVED",
+      "count": 9,
+      "sampleTitleEvidence": [
+        "Abundance",
+        "All Tomorrow's Parties",
+        "Bad Blood"
+      ]
+    },
+    {
+      "sourceSlug": "programming",
+      "reviewerStatus": "APPROVED",
+      "count": 13,
+      "sampleTitleEvidence": [
+        "Advanced C programming by example",
+        "Automate the Boring Stuff with Python",
+        "Beautiful Code"
+      ]
+    },
+    {
+      "sourceSlug": "artificial-intelligence",
+      "reviewerStatus": "APPROVED",
+      "count": 10,
+      "sampleTitleEvidence": [
+        "AI Engineering",
+        "AI superpowers",
+        "All Systems Red: The Murderbot Diaries"
+      ]
+    },
+    {
+      "sourceSlug": "data-science",
+      "reviewerStatus": "APPROVED",
+      "count": 2,
+      "sampleTitleEvidence": [
+        "Data Science at the Command Line",
+        "Data and Text Processing for Health and Life Sciences"
+      ]
+    },
+    {
+      "sourceSlug": "business",
+      "reviewerStatus": "APPROVED",
+      "count": 11,
+      "sampleTitleEvidence": [
+        "$100M Offers",
+        "12 Months to $1 Million",
+        "Anything You Want"
+      ]
+    },
+    {
+      "sourceSlug": "economics",
+      "reviewerStatus": "NEEDS_REVIEW",
+      "count": 6,
+      "sampleTitleEvidence": [
+        "Atomic Habits",
+        "Bad Blood",
+        "Bullshit Jobs"
+      ]
+    },
+    {
+      "sourceSlug": "finance",
+      "reviewerStatus": "APPROVED",
+      "count": 7,
+      "sampleTitleEvidence": [
+        "A zebra in lion country",
+        "Analysis for financial management",
+        "Art of Currency Trading"
+      ]
+    },
+    {
+      "sourceSlug": "marketing",
+      "reviewerStatus": "APPROVED",
+      "count": 8,
+      "sampleTitleEvidence": [
+        "A Framework for Marketing Management",
+        "All Marketers Are Liars",
+        "Building a Story Brand"
+      ]
+    },
+    {
+      "sourceSlug": "management",
+      "reviewerStatus": "APPROVED",
+      "count": 8,
+      "sampleTitleEvidence": [
+        "General and industrial management =",
+        "Beyond entrepreneurship",
+        "Built to last"
+      ]
+    },
+    {
+      "sourceSlug": "education",
+      "reviewerStatus": "APPROVED",
+      "count": 9,
+      "sampleTitleEvidence": [
+        "$100M Offers",
+        "Letter from Your Teacher",
+        "A taxonomy for learning, teaching, and assessing"
+      ]
+    },
+    {
+      "sourceSlug": "medicine",
+      "reviewerStatus": "APPROVED",
+      "count": 13,
+      "sampleTitleEvidence": [
+        "ACSM's Guidelines for Exercise Testing and Prescription",
+        "Advances in Medicine and Biology",
+        "African holistic health"
+      ]
+    },
+    {
+      "sourceSlug": "health",
+      "reviewerStatus": "APPROVED",
+      "count": 7,
+      "sampleTitleEvidence": [
+        "A Gentle Reminder",
+        "The Essential Ageless Body, Timeless Mind",
+        "Burnout"
+      ]
+    },
+    {
+      "sourceSlug": "art",
+      "reviewerStatus": "APPROVED",
+      "count": 10,
+      "sampleTitleEvidence": [
+        "1000 Chairs",
+        "A History of Art in Africa",
+        "A history of Far Eastern art"
+      ]
+    },
+    {
+      "sourceSlug": "design",
+      "reviewerStatus": "APPROVED",
+      "count": 13,
+      "sampleTitleEvidence": [
+        "1000 Chairs",
+        "A guide to fashion sewing",
+        "Meggs' history of graphic design"
+      ]
+    },
+    {
+      "sourceSlug": "architecture",
+      "reviewerStatus": "NEEDS_REVIEW",
+      "count": 4,
+      "sampleTitleEvidence": [
+        "A history of Western architecture",
+        "Architecture",
+        "Architecture"
+      ]
+    },
+    {
+      "sourceSlug": "sociology",
+      "reviewerStatus": "NEEDS_REVIEW",
+      "count": 0,
+      "sampleTitleEvidence": []
+    },
+    {
+      "sourceSlug": "politics",
+      "reviewerStatus": "NEEDS_REVIEW",
+      "count": 1,
+      "sampleTitleEvidence": [
+        "A history of Western philosophy"
+      ]
+    },
+    {
+      "sourceSlug": "law",
+      "reviewerStatus": "APPROVED",
+      "count": 11,
+      "sampleTitleEvidence": [
+        "A Husband of Convenience (Harlequin Presents, No. 2052)",
+        "A theory of justice",
+        "About Law"
+      ]
+    },
+    {
+      "sourceSlug": "environment",
+      "reviewerStatus": "APPROVED",
+      "count": 3,
+      "sampleTitleEvidence": [
+        "Apocalypse Never",
+        "Chemistry",
+        "Classics in environmental studies"
+      ]
+    },
+    {
+      "sourceSlug": "travel",
+      "reviewerStatus": "APPROVED",
+      "count": 15,
+      "sampleTitleEvidence": [
+        "84 Charing Cross Road / The Duchess of Bloomsbury Street",
+        "A field guide to getting lost",
+        "A Short Walk in the Hindu Kush"
+      ]
+    },
+    {
+      "sourceSlug": "cooking",
+      "reviewerStatus": "NEEDS_REVIEW",
+      "count": 0,
+      "sampleTitleEvidence": []
+    },
+    {
+      "sourceSlug": "religion",
+      "reviewerStatus": "NEEDS_REVIEW",
+      "count": 0,
+      "sampleTitleEvidence": []
+    },
+    {
+      "sourceSlug": "vietnamese-books",
+      "reviewerStatus": "NEEDS_REVIEW",
+      "count": 0,
+      "sampleTitleEvidence": []
+    }
+  ],
+  "lowNeedsReviewCount": 8
+}

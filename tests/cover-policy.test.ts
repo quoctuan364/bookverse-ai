@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { classifyCoverDimension, COVER_POLICY, isAllowedCoverSourceUrl, isUsableCoverDimensions } from "@/lib/cover-policy";
+import { classifyCoverDimension, COVER_POLICY, isAllowedCoverSourceUrl, isAllowedFinalCoverUrl, isUsableCoverDimensions } from "@/lib/cover-policy";
 
 test("cover policy dùng cùng allowlist Open Library và fail-closed redirect", () => {
   assert.equal(isAllowedCoverSourceUrl("https://covers.openlibrary.org/b/id/123-L.jpg?default=false"), true);
   assert.equal(isAllowedCoverSourceUrl("https://archive.org/download/x/cover.jpg"), false);
-  assert.equal(COVER_POLICY.followedStorageRedirectAllowlist.length, 0);
+  assert.equal(isAllowedFinalCoverUrl("https://archive.org/download/x/cover.jpg"), true);
+  assert.equal(isAllowedFinalCoverUrl("https://example.com/x/cover.jpg"), false);
+  assert.deepEqual(COVER_POLICY.followedStorageRedirectAllowlist, ["archive.org"]);
 });
 
 test("dimension policy phân biệt cover không chuẩn, quá nhỏ và landscape", () => {
