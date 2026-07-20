@@ -90,6 +90,14 @@ export function normalizeBookCoverUrl(value?: string | null): string | null {
   return `/${normalized}`;
 }
 
+/**
+ * Đường dẫn cover local của catalog Open Library đã tải về.
+ * Chỉ tạo path cho ID RBxxxxx của catalog thật; sách demo cũ vẫn đi theo src hiện tại.
+ */
+export function getRealCatalogLocalCoverPath(bookId: string): string | null {
+  return /^RB\d{5}$/.test(bookId) ? `/covers/real-catalog-local/${bookId}.jpg` : null;
+}
+
 /** Các bìa demo cũ không được dùng như bìa thật, dù file vẫn còn để bảo toàn dữ liệu gốc. */
 export function isLegacySyntheticCover(value?: string | null): boolean {
   const normalized = normalizeBookCoverUrl(value)?.toLowerCase();
@@ -175,21 +183,31 @@ export function getDemoCoverLayout(bookId: string): number {
 
 export interface BookCoverLoadState {
   normalizedSource: string | null;
+  remoteSource: string | null;
   settled: boolean;
   showFallback: boolean;
   status: BookCoverAuditStatus;
 }
 
 export type BookCoverLoadEvent =
-  | { type: "RESET"; source?: string | null }
+  | { type: "RESET"; source?: string | null; localSource?: string | null }
   | { type: "SOURCE_LOADED"; approvedReal?: boolean }
   | { type: "SOURCE_FAILED"; reason: "ERROR" | "HTTP_404" | "TIMEOUT" };
 
-export function createBookCoverLoadState(source?: string | null): BookCoverLoadState {
-  const normalizedSource = normalizeBookCoverUrl(source);
+export function createBookCoverLoadState(
+  source?: string | null,
+  localSource?: string | null,
+): BookCoverLoadState {
+  const normalizedRemoteSource = normalizeBookCoverUrl(source);
+  const normalizedLocalSource = normalizeBookCoverUrl(localSource);
+  const normalizedSource = normalizedLocalSource ?? normalizedRemoteSource;
   const showFallback = !normalizedSource || isLegacySyntheticCover(normalizedSource);
   return {
     normalizedSource,
+    remoteSource:
+      normalizedRemoteSource && normalizedRemoteSource !== normalizedLocalSource
+        ? normalizedRemoteSource
+        : null,
     settled: showFallback,
     showFallback,
     status:
@@ -205,7 +223,7 @@ export function bookCoverLoadReducer(
   event: BookCoverLoadEvent,
 ): BookCoverLoadState {
   if (event.type === "RESET") {
-    return createBookCoverLoadState(event.source);
+    return createBookCoverLoadState(event.source, event.localSource);
   }
 
   if (state.settled) {
@@ -221,6 +239,18 @@ export function bookCoverLoadReducer(
         : event.approvedReal
           ? "REAL_VALID"
           : "NOT_VERIFIED",
+    };
+  }
+
+  // Nếu local asset thiếu/lỗi, thử đúng một lần remote URL gốc trước khi fallback.
+  if (state.normalizedSource?.startsWith("/") && state.remoteSource) {
+    return {
+      ...state,
+      normalizedSource: state.remoteSource,
+      remoteSource: null,
+      settled: false,
+      showFallback: false,
+      status: "NOT_VERIFIED",
     };
   }
 

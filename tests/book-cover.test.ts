@@ -10,6 +10,7 @@ import {
   createBookCoverLoadState,
   getDemoCoverArt,
   getDemoCoverLayout,
+  getRealCatalogLocalCoverPath,
   getInitialCoverStatus,
   isLegacySyntheticCover,
   isUsableBookCoverDimensions,
@@ -91,6 +92,22 @@ test("local cover chỉ thành LOCAL_VALID sau sự kiện load", () => {
   const loaded = bookCoverLoadReducer(initial, { type: "SOURCE_LOADED" });
   assert.equal(loaded.status, "LOCAL_VALID");
   assert.equal(loaded.showFallback, false);
+});
+
+test("catalog thật ưu tiên local và chỉ thử remote một lần khi local lỗi", () => {
+  assert.equal(getRealCatalogLocalCoverPath("RB00001"), "/covers/real-catalog-local/RB00001.jpg");
+  assert.equal(getRealCatalogLocalCoverPath("B00001"), null);
+  const localFirst = createBookCoverLoadState(
+    "https://covers.openlibrary.org/b/id/123-L.jpg",
+    "/covers/real-catalog-local/RB00001.jpg",
+  );
+  assert.equal(localFirst.normalizedSource, "/covers/real-catalog-local/RB00001.jpg");
+  const remote = bookCoverLoadReducer(localFirst, { type: "SOURCE_FAILED", reason: "HTTP_404" });
+  assert.equal(remote.normalizedSource, "https://covers.openlibrary.org/b/id/123-L.jpg");
+  assert.equal(remote.showFallback, false);
+  const fallback = bookCoverLoadReducer(remote, { type: "SOURCE_FAILED", reason: "TIMEOUT" });
+  assert.equal(fallback.showFallback, true);
+  assert.equal(bookCoverLoadReducer(fallback, { type: "SOURCE_FAILED", reason: "ERROR" }), fallback);
 });
 
 test("remote chỉ thành REAL_VALID khi manifest giấy phép đã phê duyệt", () => {

@@ -30,6 +30,10 @@ public/covers/flat/
 
 # Docker/runtime bundle cục bộ của lượt audit, không stage hoặc commit.
 .tmp-.tmp-bookverse-web-g2-1-local-20880.tar189125015
+/.runtime/
+
+# Ảnh cover tải cục bộ phục vụ demo; artifact được quản lý ngoài Git.
+/public/covers/real-catalog-local/
 
 # Cache raw provenance Open Library của Gold pilot; artifact normalized/reports mới được review và commit.
 /data/gold-catalog-v1/raw/

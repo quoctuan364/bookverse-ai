@@ -47,6 +47,7 @@
     "embeddings:books": "tsx scripts/generate_book_embeddings.ts",
     "covers:build-art": "python scripts/build_cover_art_assets.py --source assets/cover-art-v2/contact-sheet.png --out-dir public/covers/demo-art-v2",
     "covers:audit": "tsx scripts/audit_book_covers.ts",
+    "covers:validate-local-pack": "tsx scripts/validate_real_cover_local_pack.ts",
     "covers:candidates": "tsx scripts/build_real_cover_candidates.ts",
     "covers:download-curated": "tsx scripts/download_curated_demo_covers.ts",
     "catalog:real:validate": "tsx scripts/validate_real_catalog.ts",
