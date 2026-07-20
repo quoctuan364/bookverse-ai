@@ -6,6 +6,7 @@ export type BookCoverSourceKind = "EMPTY" | "LOCAL" | "REMOTE" | "INVALID";
 export type BookCoverAuditStatus =
   | "REAL_VALID"
   | "LOCAL_VALID"
+  | "VALID_LOCAL_NORMALIZED"
   | "MISSING"
   | "MALFORMED"
   | "LOAD_FAILED"
@@ -98,6 +99,13 @@ export function getRealCatalogLocalCoverPath(bookId: string): string | null {
   return /^RB\d{5}$/.test(bookId) ? `/covers/real-catalog-local/${bookId}.jpg` : null;
 }
 
+/** Derivative 2:3 giữ nguyên toàn bộ source, chỉ dùng khi local portrait không có/lỗi. */
+export function getRealCatalogNormalizedCoverPath(bookId: string): string | null {
+  return /^RB\d{5}$/.test(bookId)
+    ? `/covers/real-catalog-local-normalized/${bookId}.webp`
+    : null;
+}
+
 /** Các bìa demo cũ không được dùng như bìa thật, dù file vẫn còn để bảo toàn dữ liệu gốc. */
 export function isLegacySyntheticCover(value?: string | null): boolean {
   const normalized = normalizeBookCoverUrl(value)?.toLowerCase();
@@ -183,35 +191,42 @@ export function getDemoCoverLayout(bookId: string): number {
 
 export interface BookCoverLoadState {
   normalizedSource: string | null;
-  remoteSource: string | null;
+  remainingSources: string[];
   settled: boolean;
   showFallback: boolean;
   status: BookCoverAuditStatus;
 }
 
 export type BookCoverLoadEvent =
-  | { type: "RESET"; source?: string | null; localSource?: string | null }
+  | {
+      type: "RESET";
+      source?: string | null;
+      localSource?: string | null;
+      normalizedSource?: string | null;
+    }
   | { type: "SOURCE_LOADED"; approvedReal?: boolean }
   | { type: "SOURCE_FAILED"; reason: "ERROR" | "HTTP_404" | "TIMEOUT" };
 
 export function createBookCoverLoadState(
   source?: string | null,
   localSource?: string | null,
+  normalizedSource?: string | null,
 ): BookCoverLoadState {
   const normalizedRemoteSource = normalizeBookCoverUrl(source);
   const normalizedLocalSource = normalizeBookCoverUrl(localSource);
-  const normalizedSource = normalizedLocalSource ?? normalizedRemoteSource;
-  const showFallback = !normalizedSource || isLegacySyntheticCover(normalizedSource);
+  const normalizedDerivativeSource = normalizeBookCoverUrl(normalizedSource);
+  const candidates = [normalizedLocalSource, normalizedDerivativeSource, normalizedRemoteSource].filter(
+    (candidate, index, values): candidate is string => Boolean(candidate) && values.indexOf(candidate) === index,
+  );
+  const activeSource = candidates[0] ?? null;
+  const showFallback = !activeSource || (isLegacySyntheticCover(activeSource) && candidates.length === 1);
   return {
-    normalizedSource,
-    remoteSource:
-      normalizedRemoteSource && normalizedRemoteSource !== normalizedLocalSource
-        ? normalizedRemoteSource
-        : null,
+    normalizedSource: activeSource,
+    remainingSources: candidates.slice(1),
     settled: showFallback,
     showFallback,
     status:
-      showFallback && isLegacySyntheticCover(normalizedSource)
+      showFallback && isLegacySyntheticCover(activeSource)
         ? "NOT_VERIFIED"
         : getInitialCoverStatus(source),
   };
@@ -223,7 +238,7 @@ export function bookCoverLoadReducer(
   event: BookCoverLoadEvent,
 ): BookCoverLoadState {
   if (event.type === "RESET") {
-    return createBookCoverLoadState(event.source, event.localSource);
+    return createBookCoverLoadState(event.source, event.localSource, event.normalizedSource);
   }
 
   if (state.settled) {
@@ -234,20 +249,23 @@ export function bookCoverLoadReducer(
     return {
       ...state,
       settled: true,
-      status: state.normalizedSource?.startsWith("/")
-        ? "LOCAL_VALID"
+      status: state.normalizedSource?.includes("/covers/real-catalog-local-normalized/")
+        ? "VALID_LOCAL_NORMALIZED"
+        : state.normalizedSource?.startsWith("/")
+          ? "LOCAL_VALID"
         : event.approvedReal
           ? "REAL_VALID"
           : "NOT_VERIFIED",
     };
   }
 
-  // Nếu local asset thiếu/lỗi, thử đúng một lần remote URL gốc trước khi fallback.
-  if (state.normalizedSource?.startsWith("/") && state.remoteSource) {
+  // Local portrait lỗi thì thử derivative, sau đó remote đúng record; mỗi nguồn chỉ thử một lần.
+  if (state.remainingSources.length > 0) {
+    const [nextSource, ...remainingSources] = state.remainingSources;
     return {
       ...state,
-      normalizedSource: state.remoteSource,
-      remoteSource: null,
+      normalizedSource: nextSource,
+      remainingSources,
       settled: false,
       showFallback: false,
       status: "NOT_VERIFIED",

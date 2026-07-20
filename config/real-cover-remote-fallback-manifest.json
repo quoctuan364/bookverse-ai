@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "rightsStatus": "RIGHTS_NOT_VERIFIED",
+  "records": [
+    {
+      "bookId": "RB00583",
+      "isbn": "9781417934621",
+      "workKey": "/works/OL8461625M",
+      "editionKey": "/books/OL8461625M",
+      "oldUrl": "https://covers.openlibrary.org/b/id/1789919-L.jpg?default=false",
+      "sourcePage": "https://openlibrary.org/books/OL8461625M",
+      "finalUrl": "https://ia801401.us.archive.org/view_archive.php?archive=/7/items/olcovers178/olcovers178-L.zip&file=1789919-L.jpg",
+      "httpStatus": 503,
+      "mime": null,
+      "width": null,
+      "height": null,
+      "checksumSha256": null,
+      "status": "REMOTE_UNAVAILABLE",
+      "matchEvidence": "Open Library edition JSON exact ISBN13, edition key and cover ID; image endpoint returned 503",
+      "retrievedAt": "2026-07-20",
+      "rightsStatus": "RIGHTS_NOT_VERIFIED"
+    },
+    {
+      "bookId": "RB01287",
+      "isbn": "9780735273696",
+      "workKey": "/works/OL20743870W",
+      "editionKey": "/books/OL28930538M",
+      "oldUrl": "https://covers.openlibrary.org/b/id/14627916-L.jpg?default=false",
+      "sourcePage": "https://openlibrary.org/books/OL28930538M",
+      "finalUrl": "https://ia800505.us.archive.org/view_archive.php?archive=/35/items/l_covers_0014/l_covers_0014_62.zip&file=0014627916-L.jpg",
+      "httpStatus": 503,
+      "mime": null,
+      "width": null,
+      "height": null,
+      "checksumSha256": null,
+      "status": "REMOTE_UNAVAILABLE",
+      "matchEvidence": "Open Library edition JSON exact ISBN13, edition key and cover ID; image endpoint returned 503",
+      "retrievedAt": "2026-07-20",
+      "rightsStatus": "RIGHTS_NOT_VERIFIED"
+    },
+    {
+      "bookId": "RB02062",
+      "isbn": "9780141982656",
+      "workKey": "/works/OL17887158W",
+      "editionKey": "/books/OL28701875M",
+      "oldUrl": "https://covers.openlibrary.org/b/id/14628335-L.jpg?default=false",
+      "sourcePage": "https://openlibrary.org/books/OL28701875M",
+      "finalUrl": "https://ia600505.us.archive.org/view_archive.php?archive=/35/items/l_covers_0014/l_covers_0014_62.zip&file=0014628335-L.jpg",
+      "httpStatus": 503,
+      "mime": null,
+      "width": null,
+      "height": null,
+      "checksumSha256": null,
+      "status": "REMOTE_UNAVAILABLE",
+      "matchEvidence": "Open Library edition JSON exact ISBN13, edition key and cover ID; image endpoint returned 503",
+      "retrievedAt": "2026-07-20",
+      "rightsStatus": "RIGHTS_NOT_VERIFIED"
+    }
+  ]
+}

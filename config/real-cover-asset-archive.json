@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "archivePath": "backups/cover-assets/bookverse-real-covers-3046-r1.zip",
+  "archiveSha256": "044b188c8f330b4dfce6b49389ddc17e16f8607b99373861bf222894c03b60a5",
+  "archiveBytes": 241204624,
+  "originalPortraitCount": 2940,
+  "normalizedDerivativeCount": 103,
+  "fallbackOnlyCount": 3,
+  "rightsStatus": "RIGHTS_NOT_VERIFIED",
+  "databaseAccess": "NONE",
+  "gitPolicy": "ARCHIVE_AND_BINARY_ASSETS_OUTSIDE_GIT"
+}

@@ -34,6 +34,7 @@ public/covers/flat/
 
 # Ảnh cover tải cục bộ phục vụ demo; artifact được quản lý ngoài Git.
 /public/covers/real-catalog-local/
+/public/covers/real-catalog-local-normalized/
 
 # Cache raw provenance Open Library của Gold pilot; artifact normalized/reports mới được review và commit.
 /data/gold-catalog-v1/raw/

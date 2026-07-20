@@ -8,6 +8,7 @@ import {
   getDemoCoverArt,
   getDemoCoverLayout,
   getRealCatalogLocalCoverPath,
+  getRealCatalogNormalizedCoverPath,
   isApprovedRealCover,
   isUsableBookCoverDimensions,
   sanitizeFallbackAuthor,
@@ -56,11 +57,12 @@ export function BookCover({
   title,
 }: BookCoverProps) {
   const localSource = useMemo(() => getRealCatalogLocalCoverPath(bookId), [bookId]);
+  const normalizedSource = useMemo(() => getRealCatalogNormalizedCoverPath(bookId), [bookId]);
   const [loadState, dispatch] = useReducer(
     bookCoverLoadReducer,
-    { source: src, localSource },
-    ({ source, localSource: initialLocalSource }) =>
-      createBookCoverLoadState(source, initialLocalSource),
+    { source: src, localSource, normalizedSource },
+    ({ source, localSource: initialLocalSource, normalizedSource: initialNormalizedSource }) =>
+      createBookCoverLoadState(source, initialLocalSource, initialNormalizedSource),
   );
   const sourceImageRef = useRef<HTMLImageElement>(null);
   const previousSourceRef = useRef<{ bookId: string; src?: string | null }>({ bookId, src });
@@ -72,8 +74,8 @@ export function BookCover({
   useEffect(() => {
     if (previousSourceRef.current.bookId === bookId && previousSourceRef.current.src === src) return;
     previousSourceRef.current = { bookId, src };
-    dispatch({ type: "RESET", source: src, localSource });
-  }, [bookId, localSource, src]);
+    dispatch({ type: "RESET", source: src, localSource, normalizedSource });
+  }, [bookId, localSource, normalizedSource, src]);
 
   useEffect(() => {
     if (loadState.settled || loadState.showFallback || !loadState.normalizedSource) return;

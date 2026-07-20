@@ -11,6 +11,7 @@ import {
   getDemoCoverArt,
   getDemoCoverLayout,
   getRealCatalogLocalCoverPath,
+  getRealCatalogNormalizedCoverPath,
   getInitialCoverStatus,
   isLegacySyntheticCover,
   isUsableBookCoverDimensions,
@@ -96,13 +97,22 @@ test("local cover chỉ thành LOCAL_VALID sau sự kiện load", () => {
 
 test("catalog thật ưu tiên local và chỉ thử remote một lần khi local lỗi", () => {
   assert.equal(getRealCatalogLocalCoverPath("RB00001"), "/covers/real-catalog-local/RB00001.jpg");
+  assert.equal(
+    getRealCatalogNormalizedCoverPath("RB00015"),
+    "/covers/real-catalog-local-normalized/RB00015.webp",
+  );
   assert.equal(getRealCatalogLocalCoverPath("B00001"), null);
   const localFirst = createBookCoverLoadState(
     "https://covers.openlibrary.org/b/id/123-L.jpg",
     "/covers/real-catalog-local/RB00001.jpg",
+    "/covers/real-catalog-local-normalized/RB00001.webp",
   );
   assert.equal(localFirst.normalizedSource, "/covers/real-catalog-local/RB00001.jpg");
-  const remote = bookCoverLoadReducer(localFirst, { type: "SOURCE_FAILED", reason: "HTTP_404" });
+  const normalized = bookCoverLoadReducer(localFirst, { type: "SOURCE_FAILED", reason: "HTTP_404" });
+  assert.equal(normalized.normalizedSource, "/covers/real-catalog-local-normalized/RB00001.webp");
+  const normalizedLoaded = bookCoverLoadReducer(normalized, { type: "SOURCE_LOADED" });
+  assert.equal(normalizedLoaded.status, "VALID_LOCAL_NORMALIZED");
+  const remote = bookCoverLoadReducer(normalized, { type: "SOURCE_FAILED", reason: "HTTP_404" });
   assert.equal(remote.normalizedSource, "https://covers.openlibrary.org/b/id/123-L.jpg");
   assert.equal(remote.showFallback, false);
   const fallback = bookCoverLoadReducer(remote, { type: "SOURCE_FAILED", reason: "TIMEOUT" });
