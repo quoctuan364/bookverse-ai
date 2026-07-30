@@ -45,34 +45,53 @@ export function RecommendationTrackedLink({
     if (!requestId || !element || typeof IntersectionObserver === "undefined") return;
 
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let meetsVisibilityThreshold = false;
     const clearVisibilityTimer = () => {
       if (timer) clearTimeout(timer);
       timer = null;
     };
+    const startVisibilityTimer = () => {
+      if (
+        timer ||
+        impressionSent.current ||
+        !meetsVisibilityThreshold ||
+        document.hidden
+      ) {
+        return;
+      }
+      timer = setTimeout(() => {
+        impressionSent.current = true;
+        sendTelemetry(requestId, bookId, "IMPRESSION");
+        timer = null;
+      }, IMPRESSION_MINIMUM_MS);
+    };
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (
-          !impressionSent.current &&
+        meetsVisibilityThreshold = Boolean(
           entry?.isIntersecting &&
-          entry.intersectionRatio >= IMPRESSION_VISIBILITY_RATIO
-        ) {
-          if (!timer) {
-            timer = setTimeout(() => {
-              impressionSent.current = true;
-              sendTelemetry(requestId, bookId, "IMPRESSION");
-              timer = null;
-            }, IMPRESSION_MINIMUM_MS);
-          }
+            entry.intersectionRatio >= IMPRESSION_VISIBILITY_RATIO,
+        );
+        if (meetsVisibilityThreshold) {
+          startVisibilityTimer();
         } else {
           clearVisibilityTimer();
         }
       },
       { threshold: [IMPRESSION_VISIBILITY_RATIO] },
     );
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        clearVisibilityTimer();
+      } else {
+        startVisibilityTimer();
+      }
+    };
     observer.observe(element);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       clearVisibilityTimer();
       observer.disconnect();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [bookId, requestId]);
 

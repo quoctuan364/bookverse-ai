@@ -82,7 +82,7 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
             </p>
           </div>
           <form action={markAllReadAction}>
-            <Button className="h-10 gap-2 bg-[#D6A84F] text-slate-950 hover:bg-[#F2C14E]" disabled={data.unreadCount === 0} type="submit">
+            <Button className="min-h-11 gap-2 bg-[#D6A84F] text-slate-950 hover:bg-[#F2C14E]" disabled={data.unreadCount === 0} type="submit">
               <CheckCheck className="h-4 w-4" aria-hidden="true" />
               Đánh dấu đã đọc
             </Button>
@@ -95,7 +95,7 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
             { value: "unread", label: "Chưa đọc", href: "/notifications?filter=unread" },
           ].map((item) => (
             <Link
-              className={`inline-flex h-10 items-center justify-center rounded-xl px-4 text-sm font-black transition ${
+              className={`inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-black transition ${
                 filter === item.value
                   ? "bg-[#D6A84F] text-slate-950"
                   : "border border-white/10 bg-white/[0.07] text-zinc-100 hover:bg-white/[0.12]"
@@ -138,7 +138,7 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
                   <div className="flex shrink-0 flex-wrap gap-2">
                     {notification.href ? (
                       <Link
-                        className="inline-flex h-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.07] px-3 text-xs font-bold text-zinc-100 transition hover:bg-white/[0.12]"
+                        className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.07] px-3 text-xs font-bold text-zinc-100 transition hover:bg-white/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D6A84F]"
                         href={notification.href}
                       >
                         Mở
@@ -147,7 +147,7 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
                     {!notification.readAt ? (
                       <form action={markReadAction}>
                         <input name="notificationId" type="hidden" value={notification.id} />
-                        <button className="h-9 rounded-xl border border-white/10 bg-white/[0.07] px-3 text-xs font-bold text-zinc-100 transition hover:bg-white/[0.12]" type="submit">
+                        <button className="min-h-11 cursor-pointer rounded-xl border border-white/10 bg-white/[0.07] px-3 text-xs font-bold text-zinc-100 transition hover:bg-white/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D6A84F]" type="submit">
                           Đã đọc
                         </button>
                       </form>

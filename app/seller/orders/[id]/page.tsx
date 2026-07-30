@@ -68,7 +68,7 @@ export default async function SellerOrderDetailPage({ params, searchParams }: Se
     : [];
 
   return (
-    <main className="bv-page">
+    <main className="bv-page bv-seller">
       <SellerHero
         description="Chi tiết chỉ gồm item thuộc seller hiện tại; các item của seller khác trong cùng đơn không được hiển thị ở trang này."
         title={order?.id ?? "Chi tiết đơn seller"}

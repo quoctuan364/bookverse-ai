@@ -9,6 +9,7 @@ import {
   classifyBookCoverSource,
   createBookCoverLoadState,
   getDemoCoverArt,
+  getDemoCoverArtPath,
   getDemoCoverLayout,
   getRealCatalogLocalCoverPath,
   getRealCatalogNormalizedCoverPath,
@@ -30,6 +31,22 @@ test("cover local được chuẩn hóa về public path tuyệt đối", () => 
   assert.equal(normalizeBookCoverUrl("\\covers\\flat\\book.svg"), "/covers/flat/book.svg");
 });
 
+test("sách tuyển chọn vẫn ưu tiên đúng bìa thật đã tải về", () => {
+  const html = renderToStaticMarkup(
+    createElement(BookCover, {
+      author: "Elisabeth Elliot",
+      bookId: "RB00336",
+      src: "/covers/real-catalog-local/RB00336.jpg",
+      title: "A chance to die",
+      useBookVerseArtwork: true,
+    }),
+  );
+
+  assert.match(html, /real-catalog-local\/RB00336\.jpg/);
+  assert.doesNotMatch(html, /bookverse-editions\/RB00336\.webp/);
+  assert.doesNotMatch(html, /demo-art-v2/);
+});
+
 test("cover remote chỉ nhận HTTP hoặc HTTPS hợp lệ", () => {
   assert.equal(classifyBookCoverSource("https://example.com/book.jpg"), "REMOTE");
   assert.equal(normalizeBookCoverUrl("http://example.com/book.jpg"), "http://example.com/book.jpg");
@@ -48,11 +65,13 @@ test("trạng thái null và malformed được phân loại rõ", () => {
   assert.equal(getInitialCoverStatus("javascript:alert(1)"), "MALFORMED");
 });
 
-test("bìa synthetic cũ và Picsum không được dùng như bìa thật", () => {
-  assert.equal(isLegacySyntheticCover("/covers/flat/book-0668.svg"), true);
+test("bộ SVG 2.200 sách được giữ, chỉ loại PNG thử nghiệm cũ và Picsum", () => {
+  assert.equal(isLegacySyntheticCover("/covers/flat/book-0668.svg"), false);
+  assert.equal(isLegacySyntheticCover("/covers/3d/book-0668.svg"), false);
   assert.equal(isLegacySyntheticCover("/covers/B001.png"), true);
   assert.equal(isLegacySyntheticCover("https://picsum.photos/320/480"), true);
   assert.equal(isLegacySyntheticCover("https://publisher.example/cover.webp"), false);
+  assert.equal(createBookCoverLoadState("/covers/flat/book-0668.svg").showFallback, false);
 });
 
 test("ảnh chỉ được dùng làm bìa khi kích thước và tỷ lệ hợp lệ", () => {
@@ -73,6 +92,10 @@ test("fallback deterministic theo bookId", () => {
   );
   assert.equal(getDemoCoverLayout("B0668"), firstLayout);
   assert.ok(firstLayout >= 0 && firstLayout < 6);
+  assert.equal(
+    getDemoCoverArtPath({ bookId: "B0668", title: "Sổ tay AI #0668" }),
+    `/covers/demo-art-v2/${firstArt}.webp`,
+  );
 });
 
 test("fallback loại mã synthetic nhưng không sửa dữ liệu gốc", () => {
@@ -152,7 +175,7 @@ test("sau khi fallback, reducer không retry hoặc đổi trạng thái", () =>
   );
 });
 
-test("tiêu đề dài dùng tối đa ba dòng và fallback không chứa mã/giá/edition", () => {
+test("sách thiếu ảnh dùng bìa minh họa BookVerse và không chứa mã/giá/edition", () => {
   const html = renderToStaticMarkup(
     createElement(BookCover, {
       author: "Tác giả Demo 0668",
@@ -161,7 +184,11 @@ test("tiêu đề dài dùng tối đa ba dòng và fallback không chứa mã/g
       title: "Một tiêu đề rất dài để kiểm tra cách xuống dòng của bìa sách #0668",
     }),
   );
-  assert.match(html, /line-clamp-3/);
+  assert.match(html, /line-clamp-4/);
   assert.doesNotMatch(html, /#0668|EBOOK EDITION|₫|VND/);
-  assert.match(html, /BookVerse Demo/);
+  assert.doesNotMatch(html, /Ảnh bìa đang cập nhật/);
+  assert.match(html, /Bìa minh họa BookVerse/);
+  assert.match(html, /Minh họa BookVerse/);
+  assert.match(html, /\/covers\/demo-art-v2\/[a-z-]+\.webp/);
+  assert.doesNotMatch(html, /BookVerse Demo/);
 });

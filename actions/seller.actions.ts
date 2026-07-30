@@ -9,6 +9,7 @@ import {
   Prisma,
   UserRole,
 } from "@prisma/client";
+import { grantEbookEntitlementsForOrder } from "@/lib/ebook-entitlement";
 import { recordAuditLog } from "@/lib/audit";
 import { normalizeBookCoverUrl } from "@/lib/book-cover";
 import { createNotification, createNotifications } from "@/lib/notifications";
@@ -1611,6 +1612,8 @@ export async function updateSellerOrderStatus(
       if (claimed.count !== 1) {
         throw new Error("ORDER_STATUS_CONFLICT");
       }
+
+      await grantEbookEntitlementsForOrder(tx, order.id);
 
       await tx.orderTimelineEvent.create({
         data: {

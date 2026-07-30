@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-import sharp from "sharp";
+import sharp, { type Metadata } from "sharp";
 
 import {
   COVER_POLICY,
@@ -266,7 +266,7 @@ async function main(): Promise<void> {
           const buffer = await readResponseBuffer(response);
           const contentSha256 = createHash("sha256").update(buffer).digest("hex");
           if (!isValidCoverImageBytes(buffer.length)) return withStatus({ ...common, bytes: buffer.length, contentSha256, placeholderSuspected: true, errorCode: "IMAGE_TOO_SMALL" }, "INVALID_CONTENT", "IMAGE_TOO_SMALL");
-          let metadata: sharp.Metadata;
+          let metadata: Metadata;
           try {
             metadata = await sharp(buffer, { failOn: "error" }).metadata();
           } catch {

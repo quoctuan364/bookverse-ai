@@ -11,6 +11,7 @@ import {
 } from "@prisma/client";
 
 import { recordAuditLog } from "@/lib/audit";
+import { grantEbookEntitlementsForOrder } from "@/lib/ebook-entitlement";
 import { createNotifications } from "@/lib/notifications";
 import prisma from "@/lib/prisma";
 import { validateRequestedQuantity } from "@/lib/stock-policy";
@@ -136,6 +137,7 @@ export async function checkoutOrder(command: CheckoutCommand): Promise<CheckoutR
                     select: {
                       id: true,
                       bookId: true,
+                      editionId: true,
                       sellerId: true,
                       status: true,
                       price: true,
@@ -294,7 +296,7 @@ export async function checkoutOrder(command: CheckoutCommand): Promise<CheckoutR
           const totalPrice = unitPrice * item.quantity;
           await tx.orderItem.update({
             where: { id: item.id },
-            data: { unitPrice, totalPrice },
+            data: { editionId: listing.editionId, unitPrice, totalPrice },
           });
           await tx.listing.update({
             where: { id: listing.id },
@@ -345,6 +347,10 @@ export async function checkoutOrder(command: CheckoutCommand): Promise<CheckoutR
             },
           },
         });
+
+        if (checkoutStatus === OrderStatus.PAID_DEMO) {
+          await grantEbookEntitlementsForOrder(tx, order.id);
+        }
 
         const sellerId = [...sellerIds][0];
         await createNotifications(

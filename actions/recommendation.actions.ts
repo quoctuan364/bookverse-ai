@@ -9,6 +9,10 @@ import { normalizeBookCoverUrl } from "@/lib/book-cover";
 import { getCurrentUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
 import {
+  catalogBookQualityWhere,
+  publicBookQualityWhere,
+} from "@/lib/public-book-policy";
+import {
   createRecommendationRequestSnapshotResult,
   syncRecommendationConversionsForUser,
   type RecommendationTrackingResult,
@@ -25,8 +29,10 @@ import {
   RECOMMENDATION_TAXONOMY_VERSION,
   type RecommendationEvidenceStatus,
 } from "@/lib/recommendation-evidence-policy";
+import { diversifyRecommendationCandidates } from "@/lib/recommendation-diversity";
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL ?? "http://127.0.0.1:8000";
+const AI_SERVICE_TOKEN = process.env.BOOKVERSE_AI_SERVICE_TOKEN?.trim();
 const AI_TIMEOUT_MS = 4_000;
 const FALLBACK_LIMIT = 10;
 
@@ -51,6 +57,8 @@ export interface RecommendedBook {
   recommendationScore?: number;
   recommendationEvidence?: string;
   recommendationEvidenceStatus?: RecommendationEvidenceStatus;
+  availableListingId?: string | null;
+  isFavorite?: boolean;
 }
 
 export interface RecommendationBatch {
@@ -117,6 +125,7 @@ async function fetchAIRecommendations(userId: string): Promise<AIRecommendation[
   try {
     const response = await fetch(`${AI_SERVICE_URL}/recommend/${encodeURIComponent(userId)}`, {
       cache: "no-store",
+      headers: AI_SERVICE_TOKEN ? { "X-BookVerse-Service-Token": AI_SERVICE_TOKEN } : undefined,
       signal: controller.signal,
     });
 
@@ -144,35 +153,50 @@ async function getBooksByRecommendations(
     return [];
   }
 
+  const hasPublicRealCatalog =
+    (await prisma.book.count({ where: publicBookQualityWhere(), take: 1 })) > 0;
   const books = await prisma.book.findMany({
     where: {
-      id: {
-        in: uniqueBookIds,
-      },
-      // Catalog tuyển chọn chưa có interaction thật và không thuộc evaluation hiện tại.
-      sourceMetadata: {
-        is: null,
-      },
+      AND: [
+        catalogBookQualityWhere(hasPublicRealCatalog),
+        { id: { in: uniqueBookIds } },
+      ],
     },
     select: {
       id: true,
       title: true,
       authorName: true,
+      categoryId: true,
       coverPath: true,
       price: true,
+      listings: {
+        where: {
+          status: "APPROVED",
+          stock: { gt: 0 },
+        },
+        orderBy: { price: "asc" },
+        take: 1,
+        select: { id: true },
+      },
+      favoriteBooks: {
+        where: { userId },
+        take: 1,
+        select: { id: true },
+      },
     },
   });
 
   const bookById = new Map(books.map((book) => [book.id, book]));
   const recommendationById = new Map(recommendations.map((item) => [item.bookId, item]));
 
-  return uniqueBookIds
+  const candidates = uniqueBookIds
     .map((bookId) => bookById.get(bookId))
     .filter((book): book is NonNullable<typeof book> => Boolean(book))
     .map((book) => ({
       id: book.id,
       title: book.title,
       author: book.authorName,
+      categoryId: book.categoryId,
       coverImage: normalizeBookCoverUrl(book.coverPath),
       price: decimalToNumber(book.price),
       recommendationScore: recommendationById.get(book.id)?.score,
@@ -182,7 +206,26 @@ async function getBooksByRecommendations(
         provenance: recommendationById.get(book.id)?.provenance,
         expectedUserId: userId,
       }),
+      availableListingId: book.listings[0]?.id ?? null,
+      isFavorite: book.favoriteBooks.length > 0,
     }));
+
+  return diversifyRecommendationCandidates(candidates, {
+    limit: FALLBACK_LIMIT,
+    maxPerCategory: 2,
+    maxPerAuthor: 1,
+  }).map((candidate): RecommendedBook => ({
+    id: candidate.id,
+    title: candidate.title,
+    author: candidate.author,
+    coverImage: candidate.coverImage,
+    price: candidate.price,
+    recommendationScore: candidate.recommendationScore,
+    recommendationEvidence: candidate.recommendationEvidence,
+    recommendationEvidenceStatus: candidate.recommendationEvidenceStatus,
+    availableListingId: candidate.availableListingId,
+    isFavorite: candidate.isFavorite,
+  }));
 }
 
 async function persistRecommendations(
@@ -250,19 +293,17 @@ async function persistRecommendations(
         }),
       ]);
     }
-  } catch (error: unknown) {
+  } catch {
     // Không log raw Prisma error vì có thể chứa SQL hoặc connection string.
     console.error("[persistRecommendations] Không thể lưu recommendation/evidence.");
   }
 }
 
-async function getFallbackBooks(): Promise<RecommendedBook[]> {
+async function getFallbackBooks(userId?: string): Promise<RecommendedBook[]> {
+  const hasPublicRealCatalog =
+    (await prisma.book.count({ where: publicBookQualityWhere(), take: 1 })) > 0;
   const books = await prisma.book.findMany({
-    where: {
-      sourceMetadata: {
-        is: null,
-      },
-    },
+    where: catalogBookQualityWhere(hasPublicRealCatalog),
     orderBy: [
       {
         createdAt: "desc",
@@ -278,6 +319,20 @@ async function getFallbackBooks(): Promise<RecommendedBook[]> {
       authorName: true,
       coverPath: true,
       price: true,
+      listings: {
+        where: {
+          status: "APPROVED",
+          stock: { gt: 0 },
+        },
+        orderBy: { price: "asc" },
+        take: 1,
+        select: { id: true },
+      },
+      favoriteBooks: {
+        where: { userId: userId ?? "__BOOKVERSE_GUEST__" },
+        take: 1,
+        select: { id: true },
+      },
     },
   });
 
@@ -288,13 +343,15 @@ async function getFallbackBooks(): Promise<RecommendedBook[]> {
     coverImage: normalizeBookCoverUrl(book.coverPath),
     price: decimalToNumber(book.price),
     recommendationEvidenceStatus: "POPULARITY_FALLBACK",
+    availableListingId: book.listings[0]?.id ?? null,
+    isFavorite: book.favoriteBooks.length > 0,
   }));
 }
 
-async function getFallbackBooksSafely(context: string): Promise<RecommendedBook[]> {
+async function getFallbackBooksSafely(context: string, userId?: string): Promise<RecommendedBook[]> {
   try {
-    return await getFallbackBooks();
-  } catch (error: unknown) {
+    return await getFallbackBooks(userId);
+  } catch {
     console.error(`[getRecommendedBooks] Không thể lấy fallback (${context}).`);
     return [];
   }
@@ -316,7 +373,7 @@ async function createRequestSnapshotSafely(
     userId,
     algorithmVersion: "fastapi_hybrid_v2",
     surface: RecommendationSurface.HOME,
-    candidateProfile: "active-not-deleted-current-catalog",
+    candidateProfile: "active-not-deleted-current-catalog-diversity-v1",
     filterProfile: "exclude-user-history-production",
     items: books.map((book, index) => ({
       bookId: book.id,
@@ -324,6 +381,7 @@ async function createRequestSnapshotSafely(
       score: book.recommendationScore ?? 0,
       evidence: book.recommendationEvidence ?? null,
       source: "CURRENT",
+      sourceComponent: "HYBRID_PRODUCTION",
       productionOrder: index,
     })),
   });
@@ -371,15 +429,21 @@ export async function getRecommendedBooks(): Promise<RecommendationBatch> {
     }));
     const recommendedBooks = await getBooksByRecommendations(recommendationsWithStatus, resolvedUserId);
 
-    const allowedBookIds = new Set(recommendedBooks.map((book) => book.id));
+    const displayedRecommendationIds = recommendedBooks.map((book) => book.id);
+    const recommendationByBookId = new Map(
+      recommendationsWithStatus.map((item) => [item.bookId, item]),
+    );
+    const displayedRecommendations = displayedRecommendationIds
+      .map((bookId) => recommendationByBookId.get(bookId))
+      .filter((item): item is NonNullable<typeof item> => Boolean(item));
     await persistRecommendations(
       resolvedUserId,
-      recommendationsWithStatus.filter((item) => allowedBookIds.has(item.bookId)),
+      displayedRecommendations,
     );
 
     if (recommendedBooks.length === 0) {
       return {
-        books: await getFallbackBooks(),
+        books: await getFallbackBooks(resolvedUserId),
         requestId: null,
         source: "fallback",
         trackingStatus: "DEGRADED",
@@ -400,10 +464,10 @@ export async function getRecommendedBooks(): Promise<RecommendationBatch> {
       trackingNormalization: normalization.stats,
       hasVerifiedPersonalization: recommendedBooks.some((book) => book.recommendationEvidenceStatus === "VERIFIED_REAL_USER"),
     };
-  } catch (error: unknown) {
+  } catch {
     console.error("[getRecommendedBooks] Fallback vì AI service lỗi.");
     return {
-      books: await getFallbackBooksSafely("ai_error"),
+      books: await getFallbackBooksSafely("ai_error", resolvedUserId),
       requestId: null,
       source: "fallback",
       trackingStatus: "DEGRADED",

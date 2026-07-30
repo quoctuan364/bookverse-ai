@@ -31,8 +31,9 @@ COPY --from=builder /app/package-lock.json ./package-lock.json
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/prisma/schema.prisma ./prisma/schema.prisma
+COPY --from=builder /app/prisma ./prisma
 COPY scripts/validate-production-env.mjs ./scripts/validate-production-env.mjs
+COPY scripts/prepare_demo_reader.mjs ./scripts/prepare_demo_reader.mjs
 
 EXPOSE 3000
 

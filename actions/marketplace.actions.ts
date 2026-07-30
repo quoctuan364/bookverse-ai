@@ -11,9 +11,11 @@ import {
   UserRole,
 } from "@prisma/client";
 import { normalizeBookCoverUrl } from "@/lib/book-cover";
+import { normalizeCatalogLanguageFilter } from "@/lib/book-language";
 import { createNotifications } from "@/lib/notifications";
 import { PermissionError, requireAuthenticatedUser, requireSellerUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
+import { publicBookQualityWhere } from "@/lib/public-book-policy";
 import { loadSellerQualityScores } from "@/lib/seller-quality-data";
 
 type DecimalLike = {
@@ -70,6 +72,7 @@ export interface MarketplacePageData {
 export interface MarketplacePageFilters {
   query?: string;
   condition?: string;
+  language?: string;
 }
 
 export interface ActionResult {
@@ -151,9 +154,20 @@ function permissionReason(error: PermissionError): ActionResult["reason"] {
 }
 
 function buildMarketplaceWhere(filters: MarketplacePageFilters = {}): Prisma.ListingWhereInput {
+  const languageCode = normalizeCatalogLanguageFilter(filters.language);
   const where: Prisma.ListingWhereInput = {
     status: ListingStatus.APPROVED,
     stock: { gt: 0 },
+    book: {
+      is: {
+        ...publicBookQualityWhere(),
+        ...(filters.language === "NOT_AVAILABLE"
+          ? { languageCode: null }
+          : languageCode
+            ? { languageCode }
+            : {}),
+      },
+    },
   };
   const condition = parseOptionalCondition(filters.condition);
   const query = filters.query?.trim();
@@ -227,9 +241,7 @@ export async function getMarketplacePageData(
     const [listings, bookOptions, totalListings] = await Promise.all([
       prisma.listing.findMany({
         where,
-        orderBy: {
-          createdAt: "desc",
-        },
+        orderBy: [{ createdAt: "desc" }, { id: "asc" }],
         take: 40,
         include: {
           seller: {
@@ -250,6 +262,9 @@ export async function getMarketplacePageData(
         },
       }),
       prisma.book.findMany({
+        where: {
+          ...publicBookQualityWhere(),
+        },
         orderBy: {
           title: "asc",
         },
@@ -261,10 +276,7 @@ export async function getMarketplacePageData(
         },
       }),
       prisma.listing.count({
-        where: {
-          status: ListingStatus.APPROVED,
-          stock: { gt: 0 },
-        },
+        where,
       }),
     ]);
 
@@ -424,6 +436,7 @@ export async function addListingToCart(listingId: string): Promise<ActionResult>
       select: {
         id: true,
         bookId: true,
+        editionId: true,
         price: true,
         sellerId: true,
         status: true,
@@ -559,6 +572,7 @@ export async function addListingToCart(listingId: string): Promise<ActionResult>
           data: {
             orderId: cartOrder.id,
             bookId: listingBookId,
+            editionId: listing.editionId,
             listingId: listing.id,
             quantity: 1,
             unitPrice: price,

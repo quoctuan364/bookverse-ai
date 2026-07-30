@@ -3,6 +3,13 @@
 import { createHash, randomBytes } from "node:crypto";
 import bcrypt from "bcrypt";
 import { headers } from "next/headers";
+import { deliverPasswordResetLink } from "@/lib/password-reset-delivery";
+import {
+  PASSWORD_MIN_LENGTH,
+  PasswordResetRateLimiter,
+  resolvePasswordResetOrigin,
+  shouldExposePasswordResetLink,
+} from "@/lib/password-reset-policy";
 import prisma from "@/lib/prisma";
 
 export interface PasswordResetActionResult {
@@ -12,6 +19,7 @@ export interface PasswordResetActionResult {
 }
 
 const RESET_TOKEN_EXPIRES_MINUTES = 30;
+const resetRateLimiter = new PasswordResetRateLimiter();
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -25,27 +33,13 @@ function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-function shouldExposeResetLink(): boolean {
-  return process.env.NODE_ENV !== "production" || process.env.BOOKVERSE_SHOW_RESET_LINK === "true";
-}
-
-async function getRequestMeta() {
+async function getRequestIp(): Promise<string | null> {
   try {
     const requestHeaders = await headers();
-    const host = requestHeaders.get("host") ?? "";
-    const protocol = requestHeaders.get("x-forwarded-proto") ?? "http";
     const forwardedFor = requestHeaders.get("x-forwarded-for") ?? "";
-    const requestedIp = forwardedFor.split(",")[0]?.trim() || requestHeaders.get("x-real-ip") || null;
-
-    return {
-      origin: host ? `${protocol}://${host}` : "",
-      requestedIp,
-    };
+    return forwardedFor.split(",")[0]?.trim() || requestHeaders.get("x-real-ip") || null;
   } catch {
-    return {
-      origin: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
-      requestedIp: null,
-    };
+    return null;
   }
 }
 
@@ -62,6 +56,13 @@ export async function requestPasswordReset(email: string): Promise<PasswordReset
   }
 
   try {
+    const requestedIp = await getRequestIp();
+    const emailAllowed = resetRateLimiter.allow(`email:${cleanEmail}`);
+    const ipAllowed = requestedIp ? resetRateLimiter.allow(`ip:${requestedIp}`) : true;
+    if (!emailAllowed || !ipAllowed) {
+      return { success: true, message: genericMessage };
+    }
+
     const user = await prisma.user.findUnique({
       where: {
         email: cleanEmail,
@@ -83,9 +84,9 @@ export async function requestPasswordReset(email: string): Promise<PasswordReset
     const tokenHash = hashToken(token);
     const now = new Date();
     const expiresAt = new Date(now.getTime() + RESET_TOKEN_EXPIRES_MINUTES * 60 * 1000);
-    const requestMeta = await getRequestMeta();
+    const origin = resolvePasswordResetOrigin(process.env.NEXT_PUBLIC_APP_URL, process.env.NODE_ENV);
     const resetPath = `/reset-password?token=${encodeURIComponent(token)}`;
-    const resetUrl = requestMeta.origin ? `${requestMeta.origin}${resetPath}` : resetPath;
+    const resetUrl = `${origin}${resetPath}`;
 
     await prisma.$transaction(async (tx) => {
       await tx.passwordResetToken.updateMany({
@@ -103,17 +104,34 @@ export async function requestPasswordReset(email: string): Promise<PasswordReset
           userId: user.id,
           tokenHash,
           expiresAt,
-          requestedIp: requestMeta.requestedIp,
+          requestedIp,
         },
       });
     });
 
-    console.log(`[password-reset] ${cleanEmail}: ${resetUrl}`);
+    if (process.env.NODE_ENV === "production") {
+      try {
+        await deliverPasswordResetLink({
+          email: cleanEmail,
+          resetUrl,
+          expiresMinutes: RESET_TOKEN_EXPIRES_MINUTES,
+        });
+      } catch {
+        // Không log email/token và vô hiệu hóa token chưa giao được.
+        await prisma.passwordResetToken.update({
+          where: { tokenHash },
+          data: { usedAt: new Date() },
+        });
+        console.error("[password-reset] Không thể gửi liên kết đặt lại mật khẩu.");
+      }
+    } else {
+      console.info(`[password-reset][development] ${resetUrl}`);
+    }
 
     return {
       success: true,
       message: genericMessage,
-      resetUrl: shouldExposeResetLink() ? resetUrl : undefined,
+      resetUrl: shouldExposePasswordResetLink(process.env.NODE_ENV) ? resetUrl : undefined,
     };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Lỗi không xác định.";
@@ -140,10 +158,10 @@ export async function resetPassword(
     };
   }
 
-  if (password.length < 8) {
+  if (password.length < PASSWORD_MIN_LENGTH) {
     return {
       success: false,
-      message: "Mật khẩu mới phải có ít nhất 8 ký tự.",
+      message: `Mật khẩu mới phải có ít nhất ${PASSWORD_MIN_LENGTH} ký tự.`,
     };
   }
 

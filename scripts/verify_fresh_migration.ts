@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { PrismaClient } from "@prisma/client";
@@ -48,6 +48,10 @@ async function main(): Promise<void> {
   );
   const client = new PrismaClient();
   try {
+    const migrationEntries = await readdir(path.resolve(process.cwd(), "prisma", "migrations"), {
+      withFileTypes: true,
+    });
+    const expectedMigrationCount = migrationEntries.filter((entry) => entry.isDirectory()).length;
     const [migrationCount, failedMigrationCount, vectorExtension, categoryColumns, categoryIndexes] =
       await Promise.all([
         scalarCount(
@@ -82,12 +86,47 @@ async function main(): Promise<void> {
         scalarCount(client, `SELECT COUNT(*)::int AS value FROM pg_constraint WHERE conname='Category_parentId_fkey'`),
       ]);
 
-    invariant(migrationCount === 11, `Phải có 11 migration thành công, thực tế ${migrationCount}.`);
+    const [
+      sourceMetadataTable,
+      sourceMetadataForeignKey,
+      goldCatalogTable,
+      recommendationReadinessColumns,
+      recommendationReadinessConstraint,
+    ] = await Promise.all([
+      scalarCount(client, `SELECT COUNT(*)::int AS value FROM information_schema.tables WHERE table_schema='public' AND table_name='book_source_metadata'`),
+      scalarCount(client, `SELECT COUNT(*)::int AS value FROM pg_constraint WHERE conname='book_source_metadata_bookId_fkey'`),
+      scalarCount(client, `SELECT COUNT(*)::int AS value FROM information_schema.tables WHERE table_schema='public' AND table_name='gold_catalog_records'`),
+      scalarCount(
+        client,
+        `SELECT COUNT(*)::int AS value
+         FROM information_schema.columns
+         WHERE table_schema='public'
+           AND (
+             (table_name='recommendation_requests' AND column_name IN ('collectionContext','pilotId','consentVersion','experimentGroup'))
+             OR (table_name='recommendation_request_items' AND column_name='sourceComponent')
+             OR (table_name='recommendation_telemetry_events' AND column_name='deviceClass')
+           )`,
+      ),
+      scalarCount(
+        client,
+        `SELECT COUNT(*)::int AS value
+         FROM pg_constraint
+         WHERE conname='recommendation_requests_pilot_consent_check'`,
+      ),
+    ]);
+
+    invariant(migrationCount === expectedMigrationCount, `Phải có ${expectedMigrationCount} migration thành công, thực tế ${migrationCount}.`);
     invariant(failedMigrationCount === 0, `Còn ${failedMigrationCount} migration failed/pending.`);
     invariant(vectorExtension === 1, "Thiếu extension vector.");
     invariant(embeddingTypeRows[0]?.value === "vector", "book_embeddings.embedding không phải vector.");
     invariant(categoryColumns === 4 && categoryIndexes === 3 && categoryFk === 1, "Category schema chưa đủ.");
     invariant(stockConstraint === 1 && stockIndex === 1 && checkoutUnique === 1, "Stock/checkout schema chưa đủ.");
+    invariant(sourceMetadataTable === 1 && sourceMetadataForeignKey === 1, "BookSourceMetadata schema chưa đủ.");
+    invariant(goldCatalogTable === 1, "GoldCatalogRecord schema chưa đủ.");
+    invariant(
+      recommendationReadinessColumns === 6 && recommendationReadinessConstraint === 1,
+      "Schema thu thập dữ liệu recommendation chưa đủ hoặc thiếu ràng buộc consent.",
+    );
 
     try {
       await client.$transaction(async (tx) => {
@@ -110,6 +149,40 @@ async function main(): Promise<void> {
             authorName: "BookVerse",
             price: "100000",
             categoryId: "FRESH-CATEGORY",
+          },
+        });
+        await tx.bookSourceMetadata.create({
+          data: {
+            bookId: "FRESH-BOOK",
+            sourceProvider: "SMOKE",
+            sourceRecordKey: "FRESH-RECORD",
+            sourceRecordType: "TEST_FIXTURE",
+            sourcePageUrl: "https://example.invalid/fresh-book",
+            dataLabel: "TEST_FIXTURE",
+            metadataQuality: "TEST",
+            coverRightsStatus: "NOT_AVAILABLE",
+            priceStatus: "NOT_AVAILABLE",
+            languageProfile: "unknown",
+            sourceFormat: "TEST",
+            descriptionStatus: "NOT_AVAILABLE",
+            sourceRatingStatus: "NOT_AVAILABLE",
+            primarySourceCategoryId: "FRESH-CATEGORY",
+            primarySourceCategoryName: "Fresh migration category",
+            authorNationality: "NOT_AVAILABLE",
+          },
+        });
+        await tx.goldCatalogRecord.create({
+          data: {
+            catalogId: "FRESH-GOLD",
+            recordType: "TEST_FIXTURE",
+            title: "Fresh gold record",
+            coverTechnicalStatus: "NOT_AVAILABLE",
+            coverRightsStatus: "NOT_AVAILABLE",
+            provider: "SMOKE",
+            retrievedAt: new Date(0),
+            normalizedChecksum: "fresh-smoke-checksum",
+            metadataQualityScore: 0,
+            qualityTier: "TEST",
           },
         });
         await tx.listing.create({
@@ -145,8 +218,10 @@ async function main(): Promise<void> {
         (SELECT COUNT(*) FROM "User" WHERE id='FRESH-USER') +
         (SELECT COUNT(*) FROM "Category" WHERE id='FRESH-CATEGORY') +
         (SELECT COUNT(*) FROM "Book" WHERE id='FRESH-BOOK') +
+        (SELECT COUNT(*) FROM "book_source_metadata" WHERE "bookId"='FRESH-BOOK') +
         (SELECT COUNT(*) FROM "Listing" WHERE id='FRESH-LISTING') +
-        (SELECT COUNT(*) FROM "book_embeddings" WHERE id='FRESH-EMBEDDING')
+        (SELECT COUNT(*) FROM "book_embeddings" WHERE id='FRESH-EMBEDDING') +
+        (SELECT COUNT(*) FROM "gold_catalog_records" WHERE "catalogId"='FRESH-GOLD')
       )::int AS value`,
     );
     invariant(fixtureCount === 0, "Fresh smoke fixture không rollback hoàn toàn.");
@@ -155,11 +230,21 @@ async function main(): Promise<void> {
       status: "PASS",
       databaseName: target.databaseName,
       migrationCount,
+      expectedMigrationCount,
       failedMigrationCount,
       vector: { extension: vectorExtension, embeddingColumnType: embeddingTypeRows[0]?.value },
       category: { columns: categoryColumns, indexes: categoryIndexes, selfForeignKey: categoryFk },
       stock: { nonNegativeConstraint: stockConstraint, statusStockIndex: stockIndex },
       checkout: { idempotencyUnique: checkoutUnique },
+      catalogMetadata: {
+        sourceMetadataTable,
+        sourceMetadataForeignKey,
+        goldCatalogTable,
+      },
+      recommendationDataReadiness: {
+        columns: recommendationReadinessColumns,
+        pilotConsentConstraint: recommendationReadinessConstraint,
+      },
       prismaSmoke: { status: "PASS", transactionRolledBack: true, fixtureCount },
     };
     const reportPath = await writeReport(report);

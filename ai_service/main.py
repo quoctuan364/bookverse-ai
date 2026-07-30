@@ -1,10 +1,12 @@
 import os
+import logging
+from hmac import compare_digest
 from functools import lru_cache
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sklearn.preprocessing import MinMaxScaler
 from sqlalchemy import create_engine, text
@@ -16,6 +18,7 @@ from ai_service.evaluation.taxonomy import map_legacy_interaction_event
 
 
 MAX_RECOMMENDATIONS = 10
+logger = logging.getLogger("bookverse.ai")
 
 READING_CATEGORY_WEIGHT = 12.0
 READING_AUTHOR_WEIGHT = 6.0
@@ -54,12 +57,38 @@ app = FastAPI(
     description="Hybrid Recommendation có Explainability cho BookVerse AI.",
 )
 
+def configured_cors_origins() -> list[str]:
+    configured = os.getenv("BOOKVERSE_AI_ALLOWED_ORIGINS", "").strip()
+    if configured:
+        return [origin.strip() for origin in configured.split(",") if origin.strip()]
+    if os.getenv("NODE_ENV", "development").lower() == "production":
+        raise RuntimeError("BOOKVERSE_AI_ALLOWED_ORIGINS is required in production.")
+    return ["http://127.0.0.1:3000", "http://localhost:3000"]
+
+
+def is_authorized_service_request(presented: str | None, expected: str, production: bool) -> bool:
+    if production and not expected:
+        return False
+    if not expected:
+        return True
+    return bool(presented) and compare_digest(presented, expected)
+
+
+def require_service_token(
+    x_bookverse_service_token: str | None = Header(default=None),
+) -> None:
+    expected = os.getenv("BOOKVERSE_AI_SERVICE_TOKEN", "").strip()
+    production = os.getenv("NODE_ENV", "development").lower() == "production"
+    if not is_authorized_service_request(x_bookverse_service_token, expected, production):
+        raise HTTPException(status_code=401, detail="AI service authentication failed.")
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=configured_cors_origins(),
+    allow_credentials=False,
+    allow_methods=["GET"],
+    allow_headers=["Content-Type", "X-BookVerse-Service-Token"],
 )
 
 
@@ -98,9 +127,10 @@ def read_dataframe(query: str, params: dict[str, Any] | None = None) -> pd.DataF
         with get_engine().connect() as connection:
             return pd.read_sql_query(text(query), connection, params=params or {})
     except SQLAlchemyError as error:
+        logger.exception("Database query failed in recommendation service.")
         raise HTTPException(
             status_code=500,
-            detail=f"Lỗi truy vấn database: {error}",
+            detail="Recommendation database is temporarily unavailable.",
         ) from error
 
 
@@ -555,7 +585,7 @@ def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/recommend/{user_id}")
+@app.get("/recommend/{user_id}", dependencies=[Depends(require_service_token)])
 def recommend_books(user_id: str) -> list[dict[str, Any]]:
     clean_user_id = user_id.strip()
     if not clean_user_id:
@@ -608,7 +638,8 @@ def recommend_books(user_id: str) -> list[dict[str, Any]]:
     except HTTPException:
         raise
     except Exception as error:
+        logger.exception("Recommendation generation failed.")
         raise HTTPException(
             status_code=500,
-            detail=f"Không thể tạo gợi ý sách: {error}",
+            detail="Không thể tạo gợi ý sách lúc này.",
         ) from error

@@ -5,16 +5,16 @@ import type { SellerGateData } from "@/actions/seller.actions";
 import { cn } from "@/lib/utils";
 
 export const primaryButton =
-  "inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-black text-white transition hover:bg-[#0F5F59]";
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-black text-[#FFFDF8] transition hover:bg-[#0F5F59] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E]";
 export const secondaryButton =
-  "inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.07] px-4 py-2 text-sm font-black text-zinc-100 transition hover:bg-white/[0.12]";
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.07] px-4 py-2 text-sm font-black text-zinc-100 transition hover:bg-white/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E]";
 export const dangerButton =
-  "inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm font-black text-red-200 transition hover:bg-red-500/20";
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm font-black text-red-200 transition hover:bg-red-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500";
 export const neutralButton =
-  "inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#D8D0C2] bg-[#FFFDF8] px-4 py-2 text-sm font-black text-[#17202A] transition hover:bg-[#EAF2EF]";
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#D8D0C2] bg-[#FFFDF8] px-4 py-2 text-sm font-black text-[#17202A] transition hover:bg-[#EAF2EF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E]";
 
 export const selectClass =
-  "h-10 w-full rounded-lg border border-[#D8D0C2] bg-[#FFFDF8] px-3 text-sm font-semibold text-[#17202A] outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E]/30";
+  "h-11 w-full rounded-lg border border-[#D8D0C2] bg-[#FFFDF8] px-3 text-sm font-semibold text-[#17202A] outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E]/30";
 export const textareaClass =
   "min-h-36 w-full resize-y rounded-lg border border-[#D8D0C2] bg-[#FFFDF8] px-3 py-3 text-sm leading-6 text-[#17202A] outline-none transition placeholder:text-[#7A817C] focus-visible:ring-2 focus-visible:ring-[#0F766E]/30";
 
@@ -168,7 +168,7 @@ export function SellerHero({
 
 export function SellerNav() {
   return (
-    <nav className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+    <nav className="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-4">
       {sellerLinks.map((item) => {
         const Icon = item.icon;
 

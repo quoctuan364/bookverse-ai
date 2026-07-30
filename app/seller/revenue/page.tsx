@@ -19,7 +19,7 @@ export default async function SellerRevenuePage() {
   const data = await getSellerRevenueData();
 
   return (
-    <main className="bv-page">
+    <main className="bv-page bv-seller">
       <SellerHero
         description="Doanh thu chỉ tính các order COMPLETED và chỉ cộng item thuộc listing của seller hiện tại."
         title="Doanh thu seller"
@@ -28,7 +28,7 @@ export default async function SellerRevenuePage() {
       {data.gate.status !== "SELLER" ? (
         <SellerGatePanel gate={data.gate} />
       ) : (
-        <section className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:px-8">
+        <section className="mx-auto grid min-w-0 w-full max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <SellerNav />
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -46,8 +46,8 @@ export default async function SellerRevenuePage() {
             ))}
           </div>
 
-          <section className="grid gap-6 lg:grid-cols-[1fr_420px]">
-            <div className="bv-card rounded-lg p-5">
+          <section className="grid min-w-0 gap-6 lg:grid-cols-[1fr_420px]">
+            <div className="bv-card min-w-0 rounded-lg p-5">
               <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="inline-flex items-center gap-2 text-xl font-black text-white">
@@ -99,7 +99,7 @@ export default async function SellerRevenuePage() {
             </aside>
           </section>
 
-          <section className="bv-card rounded-lg p-5">
+          <section className="bv-card min-w-0 rounded-lg p-5">
             <h2 className="inline-flex items-center gap-2 text-xl font-black text-white">
               <ReceiptText className="h-5 w-5 text-[#F2C14E]" aria-hidden="true" />
               Giao dịch gần đây

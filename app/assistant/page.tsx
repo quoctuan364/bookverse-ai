@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Bot, Search, Sparkles } from "lucide-react";
 import { askBookAssistant } from "@/actions/assistant.actions";
+import { getMyAssistantHistory } from "@/actions/assistant-history.actions";
 import { AssistantPageClient } from "@/components/assistant/AssistantPageClient";
 import { BookCover } from "@/components/shared/BookCover";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +30,8 @@ export default async function AssistantPage({ searchParams }: AssistantPageProps
 
   // Feature flag rollback giữ UI tìm kiếm cũ trong một release, không đổi database.
   if (process.env.BOOKVERSE_ASSISTANT_LEGACY_UI !== "true") {
-    return <AssistantPageClient initialQuery={query} />;
+    const history = await getMyAssistantHistory();
+    return <AssistantPageClient history={history} initialQuery={query} />;
   }
 
   const response = await askBookAssistant(query);

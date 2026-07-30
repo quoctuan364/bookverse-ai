@@ -315,3 +315,84 @@ Validation là cửa sổ duy nhất được phép dùng để chọn model/wei
 Ba lượt chạy lại Checkpoint E sau F1 cùng checksum `5805f444ca12a74f4d4aba2da35685a6bca4f99360ec6993c10ae3a336a76332`. Checksum artifact đổi do config/source provenance có thêm F1, nhưng `metrics`, `stats` và `leakage` bằng đúng artifact E cũ. Production parity giữ 30/30 row của ba user, max score delta = 0.
 
 CTR tiếp tục là `NOT_AVAILABLE`: 18.000 event cũ là synthetic và không có impression thật; request hoặc `BOOK_VIEW` không được dùng thay mẫu số impression.
+
+## 20. Research evaluation khóa validation/final — 30/07/2026
+
+Pipeline mới so sánh production, bốn ablation và năm profile ứng viên trên
+validation, sau đó chạy random sanity với năm seed. Profile chỉ được chọn bằng
+NDCG@10 trên validation; final-test không tham gia lựa chọn.
+
+`no_reading_category` được khóa sau validation:
+
+| Tập/phương pháp | NDCG@10 | Recall@10 | Hit Rate@10 | Coverage@10 |
+|---|---:|---:|---:|---:|
+| Validation selected | 0,002512 | 0,004902 | 0,005602 | 0,222000 |
+| Final selected | 0,002361 | 0,003234 | 0,005970 | 0,209677 |
+| Final production | 0,003954 | 0,006070 | 0,010448 | 0,184061 |
+| Final content | **0,006719** | 0,012662 | 0,020896 | 0,189279 |
+| Final behavior | 0,006450 | **0,013358** | **0,020896** | **0,924573** |
+
+Profile thắng validation không tổng quát hóa sang final. Cổng quyết định trả
+Artifact research lịch sử dùng nhãn `KEEP_PRODUCTION`; theo taxonomy mới, ý
+nghĩa tương ứng là `NO_PROMOTION`, không phải Hybrid tốt nhất. Source không thay
+trọng số production. Đây là kết quả bác bỏ giả thuyết ứng viên, không phải thất
+bại kiểm thử. Nó cho thấy pipeline có thể ngăn một cấu hình overfit validation
+đi vào production.
+
+Random sanity năm seed có NDCG@10 trung bình `0,001098`, độ lệch chuẩn
+`0,001105`; Hit Rate@10 trung bình `0,003641`, độ lệch chuẩn `0,003652`.
+Biến thiên lớn so với giá trị trung bình tiếp tục cho thấy dữ liệu synthetic
+không đủ để tuyên bố hiệu quả AI ngoài phạm vi thực nghiệm thăm dò.
+
+## 21. Hybrid diagnostic và rolling temporal backtest
+
+Audit mới không dùng final cũ để tune. Năm rolling window kết thúc trước
+20/06/2026, primary metric khóa trước là NDCG@10 và bốn chiến lược fusion được
+ghi toàn bộ, kể cả cấu hình thất bại.
+
+Kết quả mean±std NDCG@10:
+
+| Phương pháp | NDCG@10 |
+|---|---:|
+| Behavior | **0,003560±0,001365** |
+| Hybrid production | 0,003521±0,001852 |
+| Random sanity, mean 5 seed/window | 0,003607±0,002136 |
+| RRF Behavior-focused | 0,003551±0,001376 |
+| RRF equal | 0,003186±0,001407 |
+| Weighted rank Behavior | 0,003182±0,001284 |
+| Gated history | 0,003359±0,001242 |
+
+Ứng viên tốt nhất chỉ hơn production `0,000030`, vẫn kém Behavior `0,000009`
+và chỉ thắng baseline mạnh nhất 1/5 cửa sổ. Gate trả `NO_PROMOTION`:
+`REJECT_CANDIDATE` và `RETAIN_CURRENT_PENDING_NEW_UNSEEN_DATA`. Không có
+`final_v2` unseen nên không cấu hình nào đủ điều kiện promote; giữ cấu hình
+hiện tại không khẳng định Hybrid tốt hơn Behavior.
+
+Nguyên nhân chính có bằng chứng: hybrid không chứa item-item co-occurrence;
+Content và Behavior gần như không giao top-10 (Jaccard `0,003620`, Spearman
+`-0,641479`); category/author score thô và dữ liệu synthetic có variance
+temporal cao. Hybrid W5 luôn trả đủ K nên thiếu backfill không phải nguyên nhân.
+Random sanity dùng năm seed khóa trước (`20260714`–`20260718`), lấy mean seed
+trong từng window rồi so sánh trên năm window như các phương pháp khác. Paired
+Random−Behavior có mean `+0,000047`, std `0,002014`, Random cao hơn 2/5 window.
+Seed variance được báo riêng; không chọn seed thắng và không tuyên bố khác biệt
+có ý nghĩa thống kê mạnh. Random không tham gia chọn best deployable baseline.
+
+Chi tiết correctness, dataset diagnostics, năm ví dụ user, cohort và provenance
+nằm tại [`AI_HYBRID_DIAGNOSTIC.md`](AI_HYBRID_DIAGNOSTIC.md).
+
+## 22. Data readiness và final_v2
+
+Audit read-only ngày 30/07/2026 xác nhận verified real data bằng 0 user, 0 item
+exposure và 0 event; impression/click/conversion đều bằng 0. Legacy 18.002
+InteractionEvent là synthetic và không có pilot-consent provenance nên không
+được dùng để huấn luyện. Decision hiện hành là **`BLOCKED_BY_DATA`**.
+
+Instrumentation đã bổ sung collection context, pilot/consent version,
+experiment group, source component và device suy phía server. Export chỉ nhận
+`PILOT_CONSENTED` và ẩn danh bằng HMAC. Final-v2 locker chỉ khóa ID/cutoff/hash,
+không tính metric; hiện chưa đủ điều kiện chạy.
+
+Không thử thêm collaborative model, reranker, time decay hoặc weight mới khi
+data gate chưa đạt. Baseline/candidate gần nhất vẫn nằm trong hybrid artifact;
+không có bảng metric mô hình mới vì không có dữ liệu unseen hợp lệ.

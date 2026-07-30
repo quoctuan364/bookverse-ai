@@ -5,6 +5,7 @@ import { normalizeBookCoverUrl } from "@/lib/book-cover";
 import { TAXONOMY_VERSION } from "@/lib/interaction-taxonomy";
 import { getCurrentUser, PermissionError, requireAuthenticatedUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
+import { publicBookQualityWhere, publicDemoBookWhere } from "@/lib/public-book-policy";
 
 type DecimalLike = {
   toNumber: () => number;
@@ -42,22 +43,13 @@ export interface BookDetail {
     condition: string;
   } | null;
   isFavorite: boolean;
+  isInMembership: boolean;
   reviews: BookDetailReview[];
   sourceMetadata: {
-    sourceProvider: string;
-    sourcePageUrl: string;
-    dataLabel: string;
-    coverRightsStatus: string;
-    priceStatus: string;
-    languageProfile: string;
     languages: string[];
     isbn: string | null;
     publisher: string | null;
-    descriptionStatus: string;
-    sourceRatingAverage: number | null;
-    sourceRatingCount: number | null;
     isVietnameseEdition: boolean;
-    authorNationality: string;
   } | null;
 }
 
@@ -65,6 +57,20 @@ export interface BookReviewResult {
   success: boolean;
   message: string;
   reason?: "AUTH_REQUIRED" | "VALIDATION_ERROR" | "NOT_FOUND" | "DATABASE_ERROR";
+}
+
+export interface RelatedBook {
+  id: string;
+  title: string;
+  author: string;
+  coverImage: string | null;
+  price: number;
+  category: string;
+  catalogSource: "CURATED_REAL" | "SYNTHETIC_DEMO";
+  metadataBadge?: string;
+  priceLabel?: string;
+  availableListingId?: string | null;
+  isFavorite?: boolean;
 }
 
 function decimalToNumber(value: DecimalLike | number | string | null): number | null {
@@ -92,9 +98,10 @@ export async function getBookById(id: string): Promise<BookDetail | null> {
   try {
     const currentUser = await getCurrentUser();
     const userId = currentUser && !currentUser.isLocked ? currentUser.id : null;
-    const book = await prisma.book.findUnique({
+    const visibilityWhere = id.startsWith("RB") ? publicBookQualityWhere() : publicDemoBookWhere();
+    const book = await prisma.book.findFirst({
       where: {
-        id,
+        AND: [{ id }, visibilityWhere],
       },
       include: {
         category: {
@@ -119,6 +126,7 @@ export async function getBookById(id: string): Promise<BookDetail | null> {
         listings: {
           where: {
             status: ListingStatus.APPROVED,
+            stock: { gt: 0 },
           },
           orderBy: {
             price: "asc",
@@ -132,20 +140,10 @@ export async function getBookById(id: string): Promise<BookDetail | null> {
         },
         sourceMetadata: {
           select: {
-            sourceProvider: true,
-            sourcePageUrl: true,
-            dataLabel: true,
-            coverRightsStatus: true,
-            priceStatus: true,
-            languageProfile: true,
             languages: true,
             isbn: true,
             publisher: true,
-            descriptionStatus: true,
-            sourceRatingAverage: true,
-            sourceRatingCount: true,
             isVietnameseEdition: true,
-            authorNationality: true,
           },
         },
       },
@@ -173,7 +171,8 @@ export async function getBookById(id: string): Promise<BookDetail | null> {
       id: book.id,
       title: book.title,
       author: book.authorName,
-      description: book.description,
+        // Không phát lại mô tả nhập từ nguồn trên giao diện công khai.
+        description: book.sourceMetadata ? null : book.description,
       coverImage: normalizeBookCoverUrl(book.coverPath),
       price: decimalToNumber(book.price) ?? 0,
       rating: decimalToNumber(book.rating),
@@ -189,6 +188,8 @@ export async function getBookById(id: string): Promise<BookDetail | null> {
           }
         : null,
       isFavorite: Boolean(favorite),
+      // Mọi đầu sách đang hoạt động đều thuộc kho đọc của gói hội viên.
+      isInMembership: book.status === "ACTIVE" && !book.deletedAt,
       reviews: book.reviews.map((review) => ({
         id: review.id,
         rating: review.rating,
@@ -203,6 +204,89 @@ export async function getBookById(id: string): Promise<BookDetail | null> {
   } catch (error: unknown) {
     logActionError("getBookById", error);
     return null;
+  }
+}
+
+export async function getRelatedBooks(
+  bookId: string,
+  categoryId: string,
+  isCurated: boolean,
+): Promise<RelatedBook[]> {
+  try {
+    const currentUser = await getCurrentUser();
+    const userId = currentUser && !currentUser.isLocked ? currentUser.id : null;
+    const books = await prisma.book.findMany({
+      where: {
+        AND: [
+          { id: { not: bookId } },
+          { categoryId },
+          isCurated ? publicBookQualityWhere() : publicDemoBookWhere(),
+        ],
+      },
+      orderBy: [
+        {
+          rating: "desc",
+        },
+        {
+          id: "asc",
+        },
+      ],
+      take: 5,
+      select: {
+        id: true,
+        title: true,
+        authorName: true,
+        coverPath: true,
+        price: true,
+        category: {
+          select: {
+            name: true,
+          },
+        },
+        sourceMetadata: {
+          select: {
+            sourceProvider: true,
+          },
+        },
+        listings: {
+          where: {
+            status: ListingStatus.APPROVED,
+            stock: { gt: 0 },
+          },
+          orderBy: { price: "asc" },
+          take: 1,
+          select: { id: true },
+        },
+        favoriteBooks: {
+          where: {
+            userId: userId ?? "__BOOKVERSE_GUEST__",
+          },
+          take: 1,
+          select: { id: true },
+        },
+      },
+    });
+
+    return books.map((book) => {
+      const catalogSource = book.sourceMetadata ? "CURATED_REAL" : "SYNTHETIC_DEMO";
+
+      return {
+        id: book.id,
+        title: book.title,
+        author: book.authorName,
+        coverImage: normalizeBookCoverUrl(book.coverPath),
+        price: decimalToNumber(book.price) ?? 0,
+        category: book.category.name,
+        catalogSource,
+        metadataBadge: catalogSource === "CURATED_REAL" ? "Sách tuyển chọn" : undefined,
+        priceLabel: catalogSource === "CURATED_REAL" ? "Giá BookVerse" : undefined,
+        availableListingId: book.listings[0]?.id ?? null,
+        isFavorite: book.favoriteBooks.length > 0,
+      };
+    });
+  } catch (error: unknown) {
+    logActionError("getRelatedBooks", error);
+    return [];
   }
 }
 

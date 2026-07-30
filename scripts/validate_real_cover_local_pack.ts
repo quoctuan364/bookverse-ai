@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 
-import { COVER_POLICY, isUsableCoverDimensions, isValidCoverImageBytes } from "@/lib/cover-policy";
+import { isUsableCoverDimensions, isValidCoverImageBytes } from "@/lib/cover-policy";
 
 type AssetStatus =
   | "VALID_LOCAL_PORTRAIT"

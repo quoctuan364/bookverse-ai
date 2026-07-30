@@ -7,6 +7,21 @@ export const IMPRESSION_MINIMUM_MS = 1_000;
 const ATTRIBUTABLE_PURCHASE_STATUSES = new Set(["PAID", "PAID_DEMO", "SHIPPED", "COMPLETED"]);
 
 export type ClientTelemetryEvent = "IMPRESSION" | "CLICK";
+export type RecommendationCollectionContextValue =
+  | "STANDARD_APP"
+  | "PILOT_CONSENTED";
+export type RecommendationDeviceClassValue =
+  | "DESKTOP"
+  | "MOBILE"
+  | "TABLET"
+  | "UNKNOWN";
+
+export interface RecommendationCollectionMetadata {
+  collectionContext: RecommendationCollectionContextValue;
+  pilotId: string | null;
+  consentVersion: string | null;
+  experimentGroup: string | null;
+}
 
 export interface ParsedTelemetryPayload {
   requestId: string;
@@ -20,6 +35,7 @@ export interface ExposureCandidate {
   bookId: string;
   type: ClientTelemetryEvent;
   occurredAt: Date;
+  deviceClass?: RecommendationDeviceClassValue;
 }
 
 export interface VerifiedConversion {
@@ -43,6 +59,71 @@ function readShortIdentifier(value: unknown): string | null {
     return null;
   }
   return normalized;
+}
+
+function readLabel(
+  value: string | undefined,
+  minimum: number,
+  maximum: number,
+): string | null {
+  const normalized = value?.trim() ?? "";
+  if (
+    normalized.length < minimum ||
+    normalized.length > maximum ||
+    !/^[A-Za-z0-9._-]+$/.test(normalized)
+  ) {
+    return null;
+  }
+  return normalized;
+}
+
+export function resolveCollectionMetadata(
+  environment: Record<string, string | undefined>,
+): RecommendationCollectionMetadata {
+  if (environment.RECOMMENDATION_PILOT_MODE !== "consented") {
+    return {
+      collectionContext: "STANDARD_APP",
+      pilotId: null,
+      consentVersion: null,
+      experimentGroup: null,
+    };
+  }
+  const pilotId = readLabel(environment.RECOMMENDATION_PILOT_ID, 3, 80);
+  const consentVersion = readLabel(
+    environment.RECOMMENDATION_CONSENT_VERSION,
+    1,
+    40,
+  );
+  if (!pilotId || !consentVersion) {
+    // Không gắn nhãn consent nếu cấu hình pilot thiếu hoặc sai định dạng.
+    return {
+      collectionContext: "STANDARD_APP",
+      pilotId: null,
+      consentVersion: null,
+      experimentGroup: null,
+    };
+  }
+  return {
+    collectionContext: "PILOT_CONSENTED",
+    pilotId,
+    consentVersion,
+    experimentGroup: readLabel(
+      environment.RECOMMENDATION_EXPERIMENT_GROUP,
+      1,
+      40,
+    ),
+  };
+}
+
+export function classifyRecommendationDevice(
+  userAgent: string | null | undefined,
+): RecommendationDeviceClassValue {
+  const value = userAgent?.toLowerCase() ?? "";
+  if (!value) return "UNKNOWN";
+  if (/ipad|tablet|kindle|silk/.test(value)) return "TABLET";
+  if (/mobile|iphone|ipod|android/.test(value)) return "MOBILE";
+  if (/windows|macintosh|linux|cros/.test(value)) return "DESKTOP";
+  return "UNKNOWN";
 }
 
 export function parseTelemetryPayload(value: unknown): ParsedTelemetryPayload {

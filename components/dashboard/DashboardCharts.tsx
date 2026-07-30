@@ -33,19 +33,19 @@ interface DashboardChartsProps {
 }
 
 const tooltipStyle = {
-  background: "rgba(15, 23, 42, 0.94)",
-  border: "1px solid rgba(255, 255, 255, 0.12)",
+  background: "#102B2A",
+  border: "1px solid rgba(255, 255, 255, 0.16)",
   borderRadius: "12px",
-  color: "#F8FAFC",
+  color: "#FFFDF8",
 };
 
 const labelStyle = {
-  color: "#CBD5E1",
+  color: "#D9EEEA",
   fontWeight: 700,
 };
 
 const axisTick = {
-  fill: "#94A3B8",
+  fill: "#68736E",
   fontSize: 12,
 };
 
@@ -84,30 +84,33 @@ export function DashboardCharts({ readingData, revenueData }: DashboardChartsPro
 
   return (
     <div className="grid gap-5 xl:grid-cols-2">
-      <section className="rounded-2xl border border-white/10 bg-slate-950/72 p-5 text-zinc-100 shadow-[0_24px_90px_rgba(0,0,0,0.32)] backdrop-blur-2xl">
+      <section
+        aria-labelledby="reading-chart-title"
+        className="rounded-2xl border border-[#176B62]/15 bg-white p-5 shadow-[0_16px_45px_rgba(23,107,98,0.08)]"
+      >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#7DD3C7]">User Dashboard</p>
-            <h2 className="mt-2 text-xl font-black">Thói quen đọc sách</h2>
-            <p className="mt-1 text-sm text-zinc-400">Theo dõi phút đọc và số trang đã chạm trong 14 ngày gần nhất.</p>
+            <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#176B62]">Nhịp đọc 14 ngày</p>
+            <h2 className="mt-2 text-xl font-black text-[#17202A]" id="reading-chart-title">Thói quen đọc sách</h2>
+            <p className="mt-1 text-sm leading-6 text-[#66706B]">Phút đọc và số trang đã chạm theo từng ngày.</p>
           </div>
           <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2">
-              <p className="text-lg font-black text-[#F2C14E]">{readingSummary.minutes}</p>
-              <p className="text-[11px] font-bold uppercase text-zinc-500">Phút</p>
+            <div className="rounded-xl bg-[#FFF4DD] px-3 py-2">
+              <p className="text-lg font-black text-[#8A5A00]">{readingSummary.minutes}</p>
+              <p className="text-[11px] font-bold uppercase text-[#7A6540]">Phút</p>
             </div>
-            <div className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2">
-              <p className="text-lg font-black text-[#7DD3C7]">{readingSummary.pages}</p>
-              <p className="text-[11px] font-bold uppercase text-zinc-500">Trang</p>
+            <div className="rounded-xl bg-[#E6F3F0] px-3 py-2">
+              <p className="text-lg font-black text-[#176B62]">{readingSummary.pages}</p>
+              <p className="text-[11px] font-bold uppercase text-[#456862]">Trang</p>
             </div>
-            <div className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2">
-              <p className="text-lg font-black text-zinc-50">{readingSummary.sessions}</p>
-              <p className="text-[11px] font-bold uppercase text-zinc-500">Phiên</p>
+            <div className="rounded-xl bg-[#F2EEE6] px-3 py-2">
+              <p className="text-lg font-black text-[#17202A]">{readingSummary.sessions}</p>
+              <p className="text-[11px] font-bold uppercase text-[#66706B]">Phiên</p>
             </div>
           </div>
         </div>
 
-        <div className="mt-6 h-80">
+        <div className="mt-6 h-72 sm:h-80" role="img" aria-label="Biểu đồ vùng thói quen đọc trong 14 ngày">
           <ResponsiveContainer height="100%" width="100%">
             <AreaChart data={readingData} margin={{ bottom: 0, left: -10, right: 8, top: 12 }}>
               <defs>
@@ -116,7 +119,7 @@ export function DashboardCharts({ readingData, revenueData }: DashboardChartsPro
                   <stop offset="95%" stopColor="#0F766E" stopOpacity={0.04} />
                 </linearGradient>
               </defs>
-              <CartesianGrid stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid stroke="#E7E0D5" strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="label" tick={axisTick} tickLine={false} />
               <YAxis tick={axisTick} tickLine={false} width={36} />
               <Tooltip contentStyle={tooltipStyle} labelStyle={labelStyle} />
@@ -141,25 +144,28 @@ export function DashboardCharts({ readingData, revenueData }: DashboardChartsPro
         </div>
       </section>
 
-      <section className="rounded-2xl border border-white/10 bg-zinc-950/72 p-5 text-zinc-100 shadow-[0_24px_90px_rgba(0,0,0,0.32)] backdrop-blur-2xl">
+      <section
+        aria-labelledby="revenue-chart-title"
+        className="rounded-2xl border border-[#C65D43]/15 bg-white p-5 shadow-[0_16px_45px_rgba(198,93,67,0.08)]"
+      >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#F2C14E]">Seller Dashboard</p>
-            <h2 className="mt-2 text-xl font-black">Doanh thu chợ sách</h2>
-            <p className="mt-1 text-sm text-zinc-400">Tổng hợp đơn đã thanh toán, đang giao hoặc hoàn tất trong 30 ngày.</p>
+            <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#C65D43]">Kết quả 30 ngày</p>
+            <h2 className="mt-2 text-xl font-black text-[#17202A]" id="revenue-chart-title">Doanh thu chợ sách</h2>
+            <p className="mt-1 text-sm leading-6 text-[#66706B]">Các đơn đã thanh toán, đang giao hoặc hoàn tất.</p>
           </div>
-          <div className="rounded-xl border border-[#F2C14E]/20 bg-[#F2C14E]/10 px-4 py-3 text-right">
-            <p className="text-lg font-black text-[#F2C14E]">{currencyFormatter.format(revenueSummary.revenue)}</p>
-            <p className="text-xs font-bold text-zinc-400">
+          <div className="rounded-xl border border-[#C65D43]/15 bg-[#FFF0EB] px-4 py-3 text-right">
+            <p className="text-lg font-black text-[#B44F37]">{currencyFormatter.format(revenueSummary.revenue)}</p>
+            <p className="text-xs font-bold text-[#765B54]">
               {revenueSummary.orders} đơn / {revenueSummary.items} sản phẩm
             </p>
           </div>
         </div>
 
-        <div className="mt-6 h-80">
+        <div className="mt-6 h-72 sm:h-80" role="img" aria-label="Biểu đồ cột doanh thu chợ sách trong 30 ngày">
           <ResponsiveContainer height="100%" width="100%">
             <BarChart data={revenueData} margin={{ bottom: 0, left: 4, right: 8, top: 12 }}>
-              <CartesianGrid stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid stroke="#E7E0D5" strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="label" tick={axisTick} tickLine={false} />
               <YAxis
                 tick={axisTick}
@@ -175,7 +181,7 @@ export function DashboardCharts({ readingData, revenueData }: DashboardChartsPro
                 ]}
                 labelStyle={labelStyle}
               />
-              <Bar dataKey="revenue" fill="#D6A84F" name="Doanh thu" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="revenue" fill="#C65D43" name="Doanh thu" radius={[8, 8, 0, 0]} />
               <Bar dataKey="orders" fill="#0F766E" name="Số đơn" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>

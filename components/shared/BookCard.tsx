@@ -1,5 +1,6 @@
-import { BookOpen, Database, Info, Sparkles } from "lucide-react";
+import { BadgeCheck, Sparkles } from "lucide-react";
 import { RecommendationTrackedLink } from "@/components/recommendation/RecommendationTrackedLink";
+import { BookCardActions } from "@/components/shared/BookCardActions";
 import { BookCover } from "@/components/shared/BookCover";
 import { Badge } from "@/components/ui/badge";
 import { getRecommendationEvidencePresentation } from "@/lib/book-card-presentation";
@@ -19,11 +20,15 @@ export interface BookCardData {
   metadataBadge?: string;
   priceLabel?: string | null;
   sourceRating?: number | null;
+  availableListingId?: string | null;
+  isFavorite?: boolean;
 }
 
 interface BookCardProps {
   book: BookCardData;
   recommendationRequestId?: string | null;
+  returnPath?: string;
+  showQuickActions?: boolean;
 }
 
 function formatPrice(price: number): string {
@@ -34,77 +39,79 @@ function formatPrice(price: number): string {
   }).format(price);
 }
 
-export function BookCard({ book, recommendationRequestId }: BookCardProps) {
+export function BookCard({
+  book,
+  recommendationRequestId,
+  returnPath = "/",
+  showQuickActions = true,
+}: BookCardProps) {
   const evidencePresentation = getRecommendationEvidencePresentation(book.recommendationEvidence, book.recommendationEvidenceStatus);
   const isCurated = book.catalogSource === "CURATED_REAL";
 
   return (
-    <RecommendationTrackedLink
-      aria-label={`Xem chi tiết sách ${book.title}`}
-      bookId={book.id}
-      className="block"
-      href={`/book/${book.id}`}
-      requestId={recommendationRequestId}
-    >
-      <article className="group overflow-hidden rounded-2xl border border-white/10 bg-slate-950/72 text-zinc-100 shadow-[0_24px_70px_rgba(0,0,0,0.26)] backdrop-blur-2xl transition-all duration-300 hover:-translate-y-1 hover:border-[#0F766E]/45 hover:shadow-[0_28px_90px_rgba(0,0,0,0.36)]">
-        <div className="relative aspect-[2/3] overflow-hidden bg-zinc-900">
+    <article className="group flex h-full flex-col overflow-hidden rounded-2xl border border-[#1D2433]/10 bg-white text-[#1D2433] shadow-[0_12px_30px_rgba(37,49,56,0.1)] transition-all duration-300 hover:border-[#176B62]/35 hover:shadow-[0_20px_42px_rgba(37,49,56,0.16)]">
+      <RecommendationTrackedLink
+        aria-label={`Xem chi tiết sách ${book.title}`}
+        bookId={book.id}
+        className="flex flex-1 flex-col focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#176B62]"
+        href={`/book/${book.id}`}
+        requestId={recommendationRequestId}
+      >
+        <div className="relative aspect-[2/3] overflow-hidden bg-[#e9e4d8]">
           <BookCover
             alt={`Bìa sách ${book.title}`}
             author={book.author}
             bookId={book.id}
             category={book.category}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
             loading="lazy"
             src={book.coverImage}
             title={book.title}
+            useBookVerseArtwork={isCurated}
           />
-          <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-slate-950/86 to-transparent" />
-          <Badge className="absolute left-3 top-3 border-0 bg-[#0F766E] text-[#FFFDF8] shadow-[0_8px_20px_rgba(15,118,110,0.24)]">
+          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#1d2433]/65 to-transparent" />
+          <Badge className="absolute left-3 top-3 max-w-[calc(100%-1.5rem)] truncate border-0 bg-[#176B62] text-[#FFFDF8] shadow-[0_8px_20px_rgba(23,107,98,0.22)]">
             {isCurated ? (
-              <Database className="mr-1 h-3 w-3" aria-hidden="true" />
+              <BadgeCheck className="mr-1 h-3 w-3 shrink-0" aria-hidden="true" />
             ) : (
-              <Sparkles className="mr-1 h-3 w-3" aria-hidden="true" />
+              <Sparkles className="mr-1 h-3 w-3 shrink-0" aria-hidden="true" />
             )}
-            {book.metadataBadge ?? (isCurated ? "Sách trong danh mục" : evidencePresentation.badgeLabel)}
+            {book.metadataBadge ?? (isCurated ? "Sách tuyển chọn" : evidencePresentation.badgeLabel)}
           </Badge>
-          <span className="absolute bottom-3 left-3 rounded-full bg-slate-950/82 px-3 py-1 text-sm font-black text-[#F2C14E] shadow-[0_8px_18px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-            {book.priceLabel ? `${book.priceLabel} · ` : ""}{formatPrice(book.price)}
+          <span className="absolute bottom-3 left-3 rounded-full bg-[#fffdf8]/95 px-3 py-1 text-sm font-black text-[#104C47] shadow-[0_8px_18px_rgba(0,0,0,0.18)]">
+            {formatPrice(book.price)}
           </span>
         </div>
 
-        <div className="space-y-3 p-4">
-          <h3 className="line-clamp-2 min-h-12 text-base font-black leading-6 text-zinc-50">
+        <div className="flex flex-1 flex-col p-4">
+          <h3 className="bv-editorial line-clamp-2 min-h-12 text-lg font-bold leading-6 text-[#1D2433]">
             {book.title}
           </h3>
-          <p className="truncate text-sm font-medium text-zinc-400">{book.author}</p>
-
-          {isCurated ? (
-            <p className="line-clamp-2 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-xs leading-5 text-zinc-300">
-              <span className="inline-flex items-center gap-1 font-bold text-[#F2C14E]">
-                <Info className="h-3.5 w-3.5" aria-hidden="true" />
-                Nguồn metadata
-              </span>{" "}
-              Open Library{book.sourceRating !== null && book.sourceRating !== undefined ? ` · Rating nguồn ${book.sourceRating.toFixed(1)}` : ""}
-            </p>
-          ) : (
-            <p
-              className="line-clamp-2 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-xs leading-5 text-zinc-300"
-              title={evidencePresentation.evidenceText}
-            >
-              <span className="inline-flex items-center gap-1 font-bold text-[#F2C14E]">
-                <Info className="h-3.5 w-3.5" aria-hidden="true" />
-                {evidencePresentation.evidenceLabel}
-              </span>{" "}
-              {evidencePresentation.evidenceText}
-            </p>
-          )}
-
-          <span className="inline-flex items-center gap-2 text-sm font-bold text-[#7DD3C7]">
-            <BookOpen className="h-4 w-4" aria-hidden="true" />
-            Xem chi tiết
-          </span>
+          <p className="mt-2 line-clamp-1 min-h-5 text-sm font-medium text-[#687083]">
+            {book.author}
+          </p>
+          <div className="mt-auto flex min-h-7 items-center justify-between gap-2 pt-3 text-xs font-bold">
+            <span className="min-w-0 truncate rounded-full bg-[#F3F0E8] px-2.5 py-1 text-[#586274]">
+              {book.category?.trim() || "Sách tổng hợp"}
+            </span>
+            {book.availableListingId ? (
+              <span className="shrink-0 text-[#176B62]">Còn hàng</span>
+            ) : null}
+          </div>
         </div>
-      </article>
-    </RecommendationTrackedLink>
+      </RecommendationTrackedLink>
+
+      {showQuickActions ? (
+        <div className="mt-auto border-t border-[#1D2433]/8 px-4 py-4">
+          <BookCardActions
+            availableListingId={book.availableListingId}
+            bookId={book.id}
+            initialFavorite={book.isFavorite}
+            returnPath={returnPath}
+            showCart
+          />
+        </div>
+      ) : null}
+    </article>
   );
 }

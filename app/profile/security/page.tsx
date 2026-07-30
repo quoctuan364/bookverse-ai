@@ -52,7 +52,7 @@ export default async function ProfileSecurityPage({ searchParams }: ProfileSecur
             </p>
           </div>
           <Link
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.07] px-4 text-sm font-bold text-zinc-100 transition hover:bg-white/[0.12]"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.07] px-4 text-sm font-bold text-zinc-100 transition hover:bg-white/[0.12]"
             href="/profile"
           >
             Về hồ sơ

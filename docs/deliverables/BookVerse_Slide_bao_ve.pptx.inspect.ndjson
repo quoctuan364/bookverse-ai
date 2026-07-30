@@ -1,0 +1,243 @@
+{"kind":"deck","id":"pr/g3u3gn","name":"Deck"}
+{"kind":"layout","layoutId":"3671e1b5-86a7-4d6d-bdf8-eb297edebd3d","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"a9baa143-c5e9-4d53-94bf-6e3d6dfb5dd2","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/e43d33","slide":1,"title":"BookVerse AI","textShapes":3}
+{"kind":"textbox","id":"sh/y10by9k3","slide":1,"name":"Title-3-1","text":"BookVerse AI\nHệ gợi ý có bằng chứng","textPreview":"BookVerse AI | Hệ gợi ý có bằng chứng","textChars":35,"textLines":2,"bbox":[41.33,270.86,992,380.5]}
+{"kind":"textbox","id":"sh/l4rutoje","slide":1,"name":"Subtitle-4-2","text":"ĐỒ ÁN TỐT NGHIỆP","textPreview":"ĐỒ ÁN TỐT NGHIỆP","textChars":16,"textLines":1,"bbox":[41.33,41.18,646.49,68.15]}
+{"kind":"textbox","id":"sh/03it0j2t","slide":1,"name":"Subtitle-4-3","text":"2026","textPreview":"2026","textChars":4,"textLines":1,"bbox":[828,41.18,410.67,68.15]}
+{"kind":"shape","id":"sh/be9cnelc","slide":1,"bbox":[41,642,430,8]}
+{"kind":"notes","id":"nt/e43d33","slide":1,"text":"Mở đầu bằng đóng góp trung tâm: xây một hệ thống sách đủ nghiệp vụ để tạo dữ liệu có thể kiểm tra cho AI.\n\n[Sources]\n- D:/Doantotnghiep/docs/ACADEMIC_REPORT_DRAFT.md\n[/Sources]"}
+{"kind":"slide","id":"sl/clnl4k","slide":2,"title":"BOOKVERSE AI","textShapes":12}
+{"kind":"textbox","id":"sh/ylk7uts7","slide":2,"text":"BOOKVERSE AI","textPreview":"BOOKVERSE AI","textChars":12,"textLines":1,"bbox":[52,24,250,28]}
+{"kind":"textbox","id":"sh/lob6p8ri","slide":2,"text":"Bài toán không chỉ là “gợi ý đúng cuốn sách”","textPreview":"Bài toán không chỉ là “gợi ý đúng cuốn sách”","textChars":44,"textLines":1,"bbox":[52,62,1140,68]}
+{"kind":"textbox","id":"sh/kn2pw3ad","slide":2,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1184,665,44,26]}
+{"kind":"shape","id":"sh/7qtory9o","slide":2,"bbox":[52,160,360,430]}
+{"kind":"shape","id":"sh/6pk7yts3","slide":2,"bbox":[70,178,48,7]}
+{"kind":"textbox","id":"sh/tsv6t8ru","slide":2,"text":"TRẢI NGHIỆM","textPreview":"TRẢI NGHIỆM","textChars":11,"textLines":1,"bbox":[68,190,328,28]}
+{"kind":"textbox","id":"sh/8r2p03a9","slide":2,"text":"Hành vi đọc bị đứt mạch","textPreview":"Hành vi đọc bị đứt mạch","textChars":23,"textLines":1,"bbox":[68,223,328,56]}
+{"kind":"textbox","id":"sh/nu9ofe9k","slide":2,"text":"Catalog, mua bán, Reader và hỗ trợ thường tách rời.\n\nTín hiệu AI vì thế thiếu ngữ cảnh và khó truy vết.","textPreview":"Catalog, mua bán, Reader và hỗ trợ thường tách rời. |  | Tín hiệu AI vì thế thiếu ngữ cảnh và khó truy vết.","textChars":103,"textLines":3,"bbox":[68,279,328,295]}
+{"kind":"shape","id":"sh/mt0nm9sz","slide":2,"bbox":[440,160,360,430]}
+{"kind":"shape","id":"sh/0j25876l","slide":2,"bbox":[458,178,48,7]}
+{"kind":"textbox","id":"sh/1kbm1cn6","slide":2,"text":"RỦI RO","textPreview":"RỦI RO","textChars":6,"textLines":1,"bbox":[456,190,328,28]}
+{"kind":"textbox","id":"sh/ehkn6xof","slide":2,"text":"Cá nhân hóa dễ thành khẩu hiệu","textPreview":"Cá nhân hóa dễ thành khẩu hiệu","textChars":30,"textLines":1,"bbox":[456,223,328,56]}
+{"kind":"textbox","id":"sh/fit4z250","slide":2,"text":"Recommendation không có evidence, chatbot không khóa nguồn và dữ liệu demo bị gọi nhầm là dữ liệu thật.","textPreview":"Recommendation không có evidence, chatbot không khóa nguồn và dữ liệu demo bị gọi nhầm là dữ liệu thật.","textChars":103,"textLines":1,"bbox":[456,279,328,295]}
+{"kind":"shape","id":"sh/onm5c76h","slide":2,"bbox":[828,160,360,430]}
+{"kind":"shape","id":"sh/povm5cn2","slide":2,"bbox":[846,178,48,7]}
+{"kind":"textbox","id":"sh/2lknahor","slide":2,"text":"LUẬN ĐIỂM","textPreview":"LUẬN ĐIỂM","textChars":9,"textLines":1,"bbox":[844,190,328,28]}
+{"kind":"textbox","id":"sh/nmd4325w","slide":2,"text":"AI phải kiểm tra được","textPreview":"AI phải kiểm tra được","textChars":21,"textLines":1,"bbox":[844,223,328,56]}
+{"kind":"textbox","id":"sh/4ri50n6d","slide":2,"text":"BookVerse gắn nguồn, phiên bản thuật toán, ownership và trạng thái degraded vào luồng nghiệp vụ.","textPreview":"BookVerse gắn nguồn, phiên bản thuật toán, ownership và trạng thái degraded vào luồng nghiệp vụ.","textChars":96,"textLines":1,"bbox":[844,279,328,295]}
+{"kind":"notes","id":"nt/clnl4k","slide":2,"text":"Nhấn mạnh đồ án chọn bài toán evidence và provenance thay vì chỉ trình diễn một danh sách đề xuất.\n\n[Sources]\n- D:/Doantotnghiep/docs/ACADEMIC_REPORT_DRAFT.md\n[/Sources]"}
+{"kind":"slide","id":"sl/eywcrs","slide":3,"title":"BOOKVERSE AI","textShapes":15}
+{"kind":"textbox","id":"sh/3ytsvepc","slide":3,"text":"BOOKVERSE AI","textPreview":"BOOKVERSE AI","textChars":12,"textLines":1,"bbox":[52,24,250,28]}
+{"kind":"textbox","id":"sh/4z294jqx","slide":3,"text":"Bốn đóng góp có thể kiểm chứng","textPreview":"Bốn đóng góp có thể kiểm chứng","textChars":30,"textLines":1,"bbox":[52,62,1140,68]}
+{"kind":"textbox","id":"sh/50vaxo7i","slide":3,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1184,665,44,26]}
+{"kind":"shape","id":"sh/utkry98v","slide":3,"bbox":[52,164,546,206]}
+{"kind":"shape","id":"sh/vutsrepg","slide":3,"bbox":[70,182,48,7]}
+{"kind":"textbox","id":"sh/gv290jq1","slide":3,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[68,194,514,28]}
+{"kind":"textbox","id":"sh/hwbat476","slide":3,"text":"Nghiệp vụ đủ sâu","textPreview":"Nghiệp vụ đủ sâu","textChars":16,"textLines":1,"bbox":[68,227,514,56]}
+{"kind":"textbox","id":"sh/650rup8j","slide":3,"text":"Catalog, order, membership, Reader, seller và admin.","textPreview":"Catalog, order, membership, Reader, seller và admin.","textChars":52,"textLines":1,"bbox":[68,283,514,71]}
+{"kind":"shape","id":"sh/769snup4","slide":3,"bbox":[626,164,546,206]}
+{"kind":"shape","id":"sh/7u9wz6hs","slide":3,"bbox":[644,182,48,7]}
+{"kind":"textbox","id":"sh/m90f61gn","slide":3,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[642,194,514,28]}
+{"kind":"textbox","id":"sh/9wry1wzy","slide":3,"text":"Recommendation có evidence","textPreview":"Recommendation có evidence","textChars":26,"textLines":1,"bbox":[642,227,514,56]}
+{"kind":"textbox","id":"sh/8vix8ryd","slide":3,"text":"Request, item, nguồn tín hiệu và telemetry được lưu riêng.","textPreview":"Request, item, nguồn tín hiệu và telemetry được lưu riêng.","textChars":58,"textLines":1,"bbox":[642,283,514,71]}
+{"kind":"shape","id":"sh/vytg36h4","slide":3,"bbox":[52,400,546,206]}
+{"kind":"shape","id":"sh/ux0fa1gj","slide":3,"bbox":[70,418,48,7]}
+{"kind":"textbox","id":"sh/h0by5gza","slide":3,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[68,430,514,28]}
+{"kind":"textbox","id":"sh/wz2xcbyp","slide":3,"text":"RAG kiểm soát nguồn","textPreview":"RAG kiểm soát nguồn","textChars":19,"textLines":1,"bbox":[68,463,514,56]}
+{"kind":"textbox","id":"sh/b2pwrmh0","slide":3,"text":"Ownership check, context đóng khung và local fallback.","textPreview":"Ownership check, context đóng khung và local fallback.","textChars":54,"textLines":1,"bbox":[68,519,514,71]}
+{"kind":"shape","id":"sh/a1gfyhgf","slide":3,"bbox":[626,400,546,206]}
+{"kind":"shape","id":"sh/exoz6p0n","slide":3,"bbox":[644,418,48,7]}
+{"kind":"textbox","id":"sh/fyx0fu18","slide":3,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[642,430,514,28]}
+{"kind":"textbox","id":"sh/0j618fit","slide":3,"text":"Đánh giá tái lập","textPreview":"Đánh giá tái lập","textChars":16,"textLines":1,"bbox":[642,463,514,56]}
+{"kind":"textbox","id":"sh/1kfihkje","slide":3,"text":"Temporal split, cohort, ablation và final lock.","textPreview":"Temporal split, cohort, ablation và final lock.","textChars":47,"textLines":1,"bbox":[642,519,514,71]}
+{"kind":"notes","id":"nt/eywcrs","slide":3,"text":"Mỗi đóng góp đều trỏ tới cấu trúc dữ liệu, route hoặc quy trình kiểm thử cụ thể trong mã nguồn.\n\n[Sources]\n- D:/Doantotnghiep/docs/ACADEMIC_REPORT_DRAFT.md\n- D:/Doantotnghiep/docs/RELEASE_CHECKLIST.md\n[/Sources]"}
+{"kind":"slide","id":"sl/3lsil6","slide":4,"title":"BOOKVERSE AI","textShapes":12}
+{"kind":"textbox","id":"sh/hkr2hs3m","slide":4,"text":"BOOKVERSE AI","textPreview":"BOOKVERSE AI","textChars":12,"textLines":1,"bbox":[52,24,250,28]}
+{"kind":"textbox","id":"sh/ux03md4b","slide":4,"text":"Kiến trúc: nghiệp vụ là lớp kiểm soát AI","textPreview":"Kiến trúc: nghiệp vụ là lớp kiểm soát AI","textChars":40,"textLines":1,"bbox":[52,62,1140,68]}
+{"kind":"textbox","id":"sh/vi9kfilw","slide":4,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[1184,665,44,26]}
+{"kind":"shape","id":"sh/4nilsnmd","slide":4,"bbox":[247,299,54,34]}
+{"kind":"shape","id":"sh/5ob2ls3y","slide":4,"bbox":[531,299,54,34]}
+{"kind":"shape","id":"sh/il03qd47","slide":4,"bbox":[815,299,54,34]}
+{"kind":"shape","id":"sh/jm9kjils","slide":4,"bbox":[52,255,195,160]}
+{"kind":"shape","id":"sh/krylg3m9","slide":4,"bbox":[70,273,48,7]}
+{"kind":"textbox","id":"sh/ls729o3u","slide":4,"text":"Trình duyệt","textPreview":"Trình duyệt","textChars":11,"textLines":1,"bbox":[68,295,163,56]}
+{"kind":"textbox","id":"sh/1wjuhsfi","slide":4,"text":"Next.js UI\nServer Actions","textPreview":"Next.js UI | Server Actions","textChars":25,"textLines":2,"bbox":[68,353,163,48]}
+{"kind":"shape","id":"sh/0vqtonex","slide":4,"bbox":[301,255,230,160]}
+{"kind":"shape","id":"sh/zuhcf2xc","slide":4,"bbox":[319,273,48,7]}
+{"kind":"textbox","id":"sh/et8bmxw7","slide":4,"text":"Web nghiệp vụ","textPreview":"Web nghiệp vụ","textChars":13,"textLines":1,"bbox":[317,295,198,56]}
+{"kind":"textbox","id":"sh/9kjulcvu","slide":4,"text":"Auth • Order • Reader\nAssistant • Admin","textPreview":"Auth • Order • Reader | Assistant • Admin","textChars":39,"textLines":2,"bbox":[317,353,198,48]}
+{"kind":"shape","id":"sh/ojads7e9","slide":4,"bbox":[585,255,230,160]}
+{"kind":"shape","id":"sh/ny1cj2xo","slide":4,"bbox":[603,273,48,7]}
+{"kind":"textbox","id":"sh/mxsvqxw3","slide":4,"text":"Dữ liệu","textPreview":"Dữ liệu","textChars":7,"textLines":1,"bbox":[601,295,198,56]}
+{"kind":"textbox","id":"sh/xo3upcvq","slide":4,"text":"PostgreSQL • Prisma\nEvidence • Ownership","textPreview":"PostgreSQL • Prisma | Evidence • Ownership","textChars":40,"textLines":2,"bbox":[601,353,198,48]}
+{"kind":"shape","id":"sh/wnadw7e5","slide":4,"bbox":[869,255,230,160]}
+{"kind":"shape","id":"sh/g3258fqt","slide":4,"bbox":[887,273,48,7]}
+{"kind":"textbox","id":"sh/h4b6hk7y","slide":4,"text":"AI service","textPreview":"AI service","textChars":10,"textLines":1,"bbox":[885,295,198,56]}
+{"kind":"textbox","id":"sh/u1kn6p8n","slide":4,"text":"FastAPI\nRanker • Retriever","textPreview":"FastAPI | Ranker • Retriever","textChars":26,"textLines":2,"bbox":[885,353,198,48]}
+{"kind":"shape","id":"sh/f2tofap8","slide":4,"bbox":[52,486,1047,84]}
+{"kind":"textbox","id":"sh/47m5czqp","slide":4,"text":"PROVENANCE GATE  →  dữ liệu demo / quyền nội dung / ownership / thuật toán / trạng thái degraded","textPreview":"PROVENANCE GATE  →  dữ liệu demo / quyền nội dung / ownership / thuật toán / trạng thái degraded","textChars":96,"textLines":1,"bbox":[78,505,995,45]}
+{"kind":"notes","id":"nt/3lsil6","slide":4,"text":"Trình bày từ trái sang phải. Provider LLM là tùy chọn; fallback nội bộ vẫn hoạt động khi provider không sẵn sàng.\n\n[Sources]\n- D:/Doantotnghiep/docs/ACADEMIC_REPORT_DRAFT.md\n[/Sources]"}
+{"kind":"slide","id":"sl/dkwzuc","slide":5,"title":"BOOKVERSE AI","textShapes":19}
+{"kind":"textbox","id":"sh/uhs3e1cz","slide":5,"text":"BOOKVERSE AI","textPreview":"BOOKVERSE AI","textChars":12,"textLines":1,"bbox":[52,24,250,28]}
+{"kind":"textbox","id":"sh/hkjmpgvq","slide":5,"text":"Kịch bản demo nối liền từ tìm kiếm đến AI","textPreview":"Kịch bản demo nối liền từ tìm kiếm đến AI","textChars":41,"textLines":1,"bbox":[52,62,1140,68]}
+{"kind":"textbox","id":"sh/gjalgbu5","slide":5,"text":"05","textPreview":"05","textChars":2,"textLines":1,"bbox":[1184,665,44,26]}
+{"kind":"shape","id":"sh/3m14rqdg","slide":5,"bbox":[128,316,996,10]}
+{"kind":"shape","id":"sh/2lsnilcv","slide":5,"bbox":[136,276,84,84]}
+{"kind":"textbox","id":"sh/pojmtgvm","slide":5,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[136,284,84,68]}
+{"kind":"textbox","id":"sh/4na5kbu1","slide":5,"text":"Tìm sách","textPreview":"Tìm sách","textChars":8,"textLines":1,"bbox":[72,382,212,48]}
+{"kind":"textbox","id":"sh/rql4vqds","slide":5,"text":"Tìm kiếm tiếng Việt\nkhông dấu","textPreview":"Tìm kiếm tiếng Việt | không dấu","textChars":29,"textLines":2,"bbox":[72,432,212,78]}
+{"kind":"shape","id":"sh/qpcnmlc7","slide":5,"bbox":[374,276,84,84]}
+{"kind":"textbox","id":"sh/ojilk7ul","slide":5,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[374,284,84,68]}
+{"kind":"textbox","id":"sh/pkr2tsb6","slide":5,"text":"Đọc thử","textPreview":"Đọc thử","textChars":7,"textLines":1,"bbox":[310,382,212,48]}
+{"kind":"textbox","id":"sh/2x03ixcv","slide":5,"text":"Sample page\ntheo entitlement","textPreview":"Sample page | theo entitlement","textChars":28,"textLines":2,"bbox":[310,432,212,78]}
+{"kind":"shape","id":"sh/3i9kr2t0","slide":5,"bbox":[612,276,84,84]}
+{"kind":"textbox","id":"sh/cn2lo7ux","slide":5,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[612,284,84,68]}
+{"kind":"textbox","id":"sh/dobmxcbi","slide":5,"text":"Mở khóa","textPreview":"Mở khóa","textChars":7,"textLines":1,"bbox":[548,382,212,48]}
+{"kind":"textbox","id":"sh/ql03mxcr","slide":5,"text":"Membership\nSandbox","textPreview":"Membership | Sandbox","textChars":18,"textLines":2,"bbox":[548,432,212,78]}
+{"kind":"shape","id":"sh/bm94v2tc","slide":5,"bbox":[850,276,84,84]}
+{"kind":"textbox","id":"sh/0r2lsrat","slide":5,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[850,284,84,68]}
+{"kind":"textbox","id":"sh/lsbm1cbe","slide":5,"text":"Tương tác","textPreview":"Tương tác","textChars":9,"textLines":1,"bbox":[786,382,212,48]}
+{"kind":"textbox","id":"sh/98725c3i","slide":5,"text":"Bookmark • highlight\nprogress","textPreview":"Bookmark • highlight | progress","textChars":29,"textLines":2,"bbox":[786,432,212,78]}
+{"kind":"shape","id":"sh/87ylc72x","slide":5,"bbox":[1088,276,84,84]}
+{"kind":"textbox","id":"sh/76pk32ls","slide":5,"text":"05","textPreview":"05","textChars":2,"textLines":1,"bbox":[1088,284,84,68]}
+{"kind":"textbox","id":"sh/m5g3ahk7","slide":5,"text":"Nhận hỗ trợ","textPreview":"Nhận hỗ trợ","textChars":11,"textLines":1,"bbox":[1024,382,212,48]}
+{"kind":"textbox","id":"sh/hcrm9w3u","slide":5,"text":"Gợi ý + Assistant\ncó nguồn","textPreview":"Gợi ý + Assistant | có nguồn","textChars":26,"textLines":2,"bbox":[1024,432,212,78]}
+{"kind":"textbox","id":"sh/wbilgr29","slide":5,"text":"Dữ liệu demo được sinh deterministic: 8 chương × 4 trang / sách, luôn có disclaimer.","textPreview":"Dữ liệu demo được sinh deterministic: 8 chương × 4 trang / sách, luôn có disclaimer.","textChars":84,"textLines":1,"bbox":[192,555,896,54]}
+{"kind":"notes","id":"nt/dkwzuc","slide":5,"text":"Nội dung Reader là nội dung mô phỏng BookVerse, không phải nguyên tác, bản dịch hay trích đoạn của sách.\n\n[Sources]\n- D:/Doantotnghiep/lib/demo-book-content.ts\n- D:/Doantotnghiep/docs/DATA_AND_LICENSE_MANIFEST.md\n[/Sources]"}
+{"kind":"slide","id":"sl/uean9f","slide":6,"title":"BOOKVERSE AI","textShapes":14}
+{"kind":"textbox","id":"sh/4fy1w3ut","slide":6,"text":"BOOKVERSE AI","textPreview":"BOOKVERSE AI","textChars":12,"textLines":1,"bbox":[52,24,250,28]}
+{"kind":"textbox","id":"sh/3epk3yd8","slide":6,"text":"Đánh giá AI theo thời gian, không nhìn trước tương lai","textPreview":"Đánh giá AI theo thời gian, không nhìn trước tương lai","textChars":54,"textLines":1,"bbox":[52,62,1140,68]}
+{"kind":"textbox","id":"sh/2dgjutcn","slide":6,"text":"06","textPreview":"06","textChars":2,"textLines":1,"bbox":[1184,665,44,26]}
+{"kind":"shape","id":"sh/hs721ovi","slide":6,"bbox":[400,276,50,32]}
+{"kind":"shape","id":"sh/gry1sjux","slide":6,"bbox":[52,204,310,180]}
+{"kind":"shape","id":"sh/fqpkzydc","slide":6,"bbox":[70,222,48,7]}
+{"kind":"textbox","id":"sh/upwjqtcr","slide":6,"text":"TRAIN","textPreview":"TRAIN","textChars":5,"textLines":1,"bbox":[68,234,278,28]}
+{"kind":"textbox","id":"sh/ton2xov6","slide":6,"text":"Không rò rỉ","textPreview":"Không rò rỉ","textChars":11,"textLines":1,"bbox":[68,267,278,56]}
+{"kind":"textbox","id":"sh/sne1ojul","slide":6,"text":"Event trước mốc\nDựng preference","textPreview":"Event trước mốc | Dựng preference","textChars":31,"textLines":2,"bbox":[68,323,278,45]}
+{"kind":"shape","id":"sh/69w3ado7","slide":6,"bbox":[833,276,50,32]}
+{"kind":"shape","id":"sh/7u54ji5s","slide":6,"bbox":[485,204,310,180]}
+{"kind":"shape","id":"sh/8velcn6d","slide":6,"bbox":[503,222,48,7]}
+{"kind":"textbox","id":"sh/twnmlsny","slide":6,"text":"VALIDATION","textPreview":"VALIDATION","textChars":10,"textLines":1,"bbox":[501,234,278,28]}
+{"kind":"textbox","id":"sh/y5c36dob","slide":6,"text":"Không chọn trên test","textPreview":"Không chọn trên test","textChars":20,"textLines":1,"bbox":[501,267,278,56]}
+{"kind":"textbox","id":"sh/j654fi5w","slide":6,"text":"Chọn profile\nAblation + tie-break","textPreview":"Chọn profile | Ablation + tie-break","textChars":33,"textLines":2,"bbox":[501,323,278,45]}
+{"kind":"shape","id":"sh/k7el8n6h","slide":6,"bbox":[918,204,310,180]}
+{"kind":"shape","id":"sh/l8nmh8n2","slide":6,"bbox":[936,222,48,7]}
+{"kind":"textbox","id":"sh/a1c32tof","slide":6,"text":"FINAL","textPreview":"FINAL","textChars":5,"textLines":1,"bbox":[934,234,278,28]}
+{"kind":"textbox","id":"sh/b2l4by5k","slide":6,"text":"Đọc một lần","textPreview":"Đọc một lần","textChars":11,"textLines":1,"bbox":[934,267,278,56]}
+{"kind":"textbox","id":"sh/z6h03ulc","slide":6,"text":"Chỉ mở sau khi khóa\nSo với baseline","textPreview":"Chỉ mở sau khi khóa | So với baseline","textChars":35,"textLines":2,"bbox":[934,323,278,45]}
+{"kind":"textbox","id":"sh/e58jap47","slide":6,"text":"Cohort: cold / sparse / warm","textPreview":"Cohort: cold / sparse / warm","textChars":28,"textLines":1,"bbox":[92,465,330,68]}
+{"kind":"textbox","id":"sh/18ji543i","slide":6,"text":"Metric: Precision • Recall • Hit Rate • NDCG • MRR • Coverage","textPreview":"Metric: Precision • Recall • Hit Rate • NDCG • MRR • Coverage","textChars":61,"textLines":1,"bbox":[446,465,742,68]}
+{"kind":"notes","id":"nt/uean9f","slide":6,"text":"Temporal split và cohort giúp tránh che lấp thất bại cold-start. Metric được công bố cùng định nghĩa và candidate policy.\n\n[Sources]\n- D:/Doantotnghiep/docs/AI_EVALUATION.md\n- https://arxiv.org/abs/2206.12858\n- https://doi.org/10.1145/192844.192905\n[/Sources]"}
+{"kind":"slide","id":"sl/0ev3zy","slide":7,"title":"BOOKVERSE AI","textShapes":10}
+{"kind":"textbox","id":"sh/hwrmd472","slide":7,"text":"BOOKVERSE AI","textPreview":"BOOKVERSE AI","textChars":12,"textLines":1,"bbox":[52,24,250,28]}
+{"kind":"textbox","id":"sh/u9gn298b","slide":7,"text":"Kết quả hiện tại: hybrid production chưa thắng baseline","textPreview":"Kết quả hiện tại: hybrid production chưa thắng baseline","textChars":55,"textLines":1,"bbox":[52,62,1140,68]}
+{"kind":"textbox","id":"sh/vap4bepw","slide":7,"text":"07","textPreview":"07","textChars":2,"textLines":1,"bbox":[1184,665,44,26]}
+{"kind":"shape","id":"sh/4zi58jqd","slide":7,"bbox":[52,148,735,470]}
+{"kind":"textbox","id":"sh/50r6ho7y","slide":7,"text":"Hit Rate@10 (điểm cơ bản; 100 bp = 1%)","textPreview":"Hit Rate@10 (điểm cơ bản; 100 bp = 1%)","textChars":38,"textLines":1,"bbox":[82,160,675,34]}
+{"kind":"shape","id":"sh/jy9ofeps","slide":7,"bbox":[825,148,363,220]}
+{"kind":"shape","id":"sh/03e5wfq9","slide":7,"bbox":[843,166,48,7]}
+{"kind":"textbox","id":"sh/l47m5k7u","slide":7,"text":"ĐỌC ĐÚNG DỮ LIỆU","textPreview":"ĐỌC ĐÚNG DỮ LIỆU","textChars":16,"textLines":1,"bbox":[841,178,331,28]}
+{"kind":"textbox","id":"sh/183qh03m","slide":7,"text":"Behavior tốt nhất","textPreview":"Behavior tốt nhất","textChars":17,"textLines":1,"bbox":[841,211,331,56]}
+{"kind":"textbox","id":"sh/07u98vmh","slide":7,"text":"Hit Rate@10 = 2,1008%\nHybrid = 0,8403%","textPreview":"Hit Rate@10 = 2,1008% | Hybrid = 0,8403%","textChars":38,"textLines":2,"bbox":[841,267,331,85]}
+{"kind":"shape","id":"sh/z618fqlw","slide":7,"bbox":[825,394,363,224]}
+{"kind":"shape","id":"sh/e5s7654b","slide":7,"bbox":[843,412,48,7]}
+{"kind":"textbox","id":"sh/9c3qlk3y","slide":7,"text":"KẾT LUẬN","textPreview":"KẾT LUẬN","textChars":8,"textLines":1,"bbox":[841,424,331,28]}
+{"kind":"textbox","id":"sh/obu9cfmd","slide":7,"text":"Không tuyên bố tối ưu","textPreview":"Không tuyên bố tối ưu","textChars":21,"textLines":1,"bbox":[841,457,331,56]}
+{"kind":"textbox","id":"sh/nal8jals","slide":7,"text":"Đóng góp nằm ở quy trình đánh giá và khả năng truy vết — chưa nằm ở mô hình vượt trội.","textPreview":"Đóng góp nằm ở quy trình đánh giá và khả năng truy vết — chưa nằm ở mô hình vượt trội.","textChars":86,"textLines":1,"bbox":[841,513,331,89]}
+{"kind":"chart","id":"ch/2h4n658v","slide":7,"name":"","chartType":"bar","bbox":[82,196,675,370]}
+{"kind":"notes","id":"nt/0ev3zy","slide":7,"text":"Đây là snapshot đã có trong dự án. Không chuyển kết quả synthetic thành tuyên bố hiệu quả production.\n\n[Sources]\n- D:/Doantotnghiep/docs/AI_EVALUATION.md\n- D:/Doantotnghiep/docs/ACADEMIC_REPORT_DRAFT.md\n[/Sources]"}
+{"kind":"slide","id":"sl/loq531","slide":8,"title":"BOOKVERSE AI","textShapes":16}
+{"kind":"textbox","id":"sh/7250naxo","slide":8,"text":"BOOKVERSE AI","textPreview":"BOOKVERSE AI","textChars":12,"textLines":1,"bbox":[52,24,250,28]}
+{"kind":"textbox","id":"sh/83e1gfe9","slide":8,"text":"Nâng cấp nghiên cứu: chọn mô hình mà không sửa production","textPreview":"Nâng cấp nghiên cứu: chọn mô hình mà không sửa production","textChars":57,"textLines":1,"bbox":[52,62,1140,68]}
+{"kind":"textbox","id":"sh/94nip0fu","slide":8,"text":"08","textPreview":"08","textChars":2,"textLines":1,"bbox":[1184,665,44,26]}
+{"kind":"shape","id":"sh/u5wji5wz","slide":8,"bbox":[52,184,258,322]}
+{"kind":"shape","id":"sh/v65kraxk","slide":8,"bbox":[70,202,48,7]}
+{"kind":"textbox","id":"sh/wre1kfe5","slide":8,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[68,214,226,28]}
+{"kind":"textbox","id":"sh/hs72tkfq","slide":8,"text":"5 profile định trước","textPreview":"5 profile định trước","textChars":20,"textLines":1,"bbox":[68,247,226,56]}
+{"kind":"textbox","id":"sh/a9cj6lgv","slide":8,"text":"Không mò trọng số trên final.","textPreview":"Không mò trọng số trên final.","textChars":29,"textLines":1,"bbox":[68,303,226,187]}
+{"kind":"shape","id":"sh/bal0fqxg","slide":8,"bbox":[338,184,258,322]}
+{"kind":"shape","id":"sh/nmd87qlw","slide":8,"bbox":[356,202,48,7]}
+{"kind":"textbox","id":"sh/ml47elkb","slide":8,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[354,214,226,28]}
+{"kind":"textbox","id":"sh/9ofq9g32","slide":8,"text":"4 ablation","textPreview":"4 ablation","textChars":10,"textLines":1,"bbox":[354,247,226,56]}
+{"kind":"textbox","id":"sh/8nmpgv2h","slide":8,"text":"Bỏ từng thành phần để đo đóng góp.","textPreview":"Bỏ từng thành phần để đo đóng góp.","textChars":34,"textLines":1,"bbox":[354,303,226,187]}
+{"kind":"shape","id":"sh/zid836lk","slide":8,"bbox":[624,184,258,322]}
+{"kind":"shape","id":"sh/yh47a1kf","slide":8,"bbox":[642,202,48,7]}
+{"kind":"textbox","id":"sh/lkvq5g3q","slide":8,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[640,214,226,28]}
+{"kind":"textbox","id":"sh/0jmpcb25","slide":8,"text":"Random nhiều seed","textPreview":"Random nhiều seed","textChars":17,"textLines":1,"bbox":[640,247,226,56]}
+{"kind":"textbox","id":"sh/but8z6lo","slide":8,"text":"Báo mean/std thay vì một lần may mắn.","textPreview":"Báo mean/std thay vì một lần may mắn.","textChars":37,"textLines":1,"bbox":[640,303,226,187]}
+{"kind":"shape","id":"sh/qtk761k3","slide":8,"bbox":[910,184,258,322]}
+{"kind":"shape","id":"sh/upkri1ov","slide":8,"bbox":[928,202,48,7]}
+{"kind":"textbox","id":"sh/fqt8rm5g","slide":8,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[926,214,226,28]}
+{"kind":"textbox","id":"sh/gr29kr61","slide":8,"text":"Khóa rồi mới final","textPreview":"Khóa rồi mới final","textChars":18,"textLines":1,"bbox":[926,247,226,56]}
+{"kind":"textbox","id":"sh/1sbqtwnm","slide":8,"text":"Cấu hình thắng validation mới được đọc test.","textPreview":"Cấu hình thắng validation mới được đọc test.","textChars":44,"textLines":1,"bbox":[926,303,226,187]}
+{"kind":"textbox","id":"sh/2dkrm147","slide":8,"text":"Hằng số production không tự thay đổi sau thí nghiệm.","textPreview":"Hằng số production không tự thay đổi sau thí nghiệm.","textChars":52,"textLines":1,"bbox":[215,548,850,62]}
+{"kind":"notes","id":"nt/loq531","slide":8,"text":"Pipeline mới trả báo cáo cấu hình được đánh giá nhưng không ghi ngược vào trọng số chạy thật.\n\n[Sources]\n- D:/Doantotnghiep/ai_service/evaluation/research.py\n- D:/Doantotnghiep/ai_service/evaluation/runner.py\n[/Sources]"}
+{"kind":"slide","id":"sl/2muqe9","slide":9,"title":"BOOKVERSE AI","textShapes":13}
+{"kind":"textbox","id":"sh/5kbmd4zq","slide":9,"text":"BOOKVERSE AI","textPreview":"BOOKVERSE AI","textChars":12,"textLines":1,"bbox":[52,24,250,28]}
+{"kind":"textbox","id":"sh/ih0329gz","slide":9,"text":"Dữ liệu được gắn nhãn theo mức độ có thể tin cậy","textPreview":"Dữ liệu được gắn nhãn theo mức độ có thể tin cậy","textChars":48,"textLines":1,"bbox":[52,62,1140,68]}
+{"kind":"textbox","id":"sh/ji94behk","slide":9,"text":"09","textPreview":"09","textChars":2,"textLines":1,"bbox":[1184,665,44,26]}
+{"kind":"shape","id":"sh/sn2l8jy1","slide":9,"bbox":[52,170,350,330]}
+{"kind":"shape","id":"sh/tobmhozm","slide":9,"bbox":[70,188,48,7]}
+{"kind":"textbox","id":"sh/6lk369gb","slide":9,"text":"SYNTHETIC","textPreview":"SYNTHETIC","textChars":9,"textLines":1,"bbox":[68,200,318,28]}
+{"kind":"textbox","id":"sh/rmt4fehg","slide":9,"text":"Demo catalog & nội dung đọc","textPreview":"Demo catalog & nội dung đọc","textChars":27,"textLines":1,"bbox":[68,233,318,56]}
+{"kind":"textbox","id":"sh/gbmlcjyd","slide":9,"text":"Dùng để tái lập luồng demo.\n\nKhông gọi là hành vi người dùng thật hay nguyên tác sách.","textPreview":"Dùng để tái lập luồng demo. |  | Không gọi là hành vi người dùng thật hay nguyên tác sách.","textChars":86,"textLines":3,"bbox":[68,289,318,195]}
+{"kind":"shape","id":"sh/1cvmlozy","slide":9,"bbox":[432,170,350,330]}
+{"kind":"shape","id":"sh/hkb2lwbu","slide":9,"bbox":[450,188,48,7]}
+{"kind":"textbox","id":"sh/gj2lcru9","slide":9,"text":"EXTERNAL METADATA","textPreview":"EXTERNAL METADATA","textChars":17,"textLines":1,"bbox":[448,200,318,28]}
+{"kind":"textbox","id":"sh/fitkjmto","slide":9,"text":"Open Library đã chuẩn hóa","textPreview":"Open Library đã chuẩn hóa","textChars":25,"textLines":1,"bbox":[448,233,318,56]}
+{"kind":"textbox","id":"sh/uhk3a1c3","slide":9,"text":"Metadata có provenance.\n\nQuyền cover vẫn là NOT_VERIFIED nếu chưa có hồ sơ.","textPreview":"Metadata có provenance. |  | Quyền cover vẫn là NOT_VERIFIED nếu chưa có hồ sơ.","textChars":75,"textLines":3,"bbox":[448,289,318,195]}
+{"kind":"shape","id":"sh/pov2pgbq","slide":9,"bbox":[812,170,376,330]}
+{"kind":"shape","id":"sh/4n2lgbu5","slide":9,"bbox":[830,188,48,7]}
+{"kind":"textbox","id":"sh/3mtkn6tk","slide":9,"text":"REAL USER","textPreview":"REAL USER","textChars":9,"textLines":1,"bbox":[828,200,344,28]}
+{"kind":"textbox","id":"sh/2lk3e1cf","slide":9,"text":"Chỉ claim khi đủ ownership","textPreview":"Chỉ claim khi đủ ownership","textChars":26,"textLines":1,"bbox":[828,233,344,56]}
+{"kind":"textbox","id":"sh/lsr2dcbm","slide":9,"text":"Interaction ID, event, timestamp, taxonomy và algorithm version phải đầy đủ.","textPreview":"Interaction ID, event, timestamp, taxonomy và algorithm version phải đầy đủ.","textChars":76,"textLines":1,"bbox":[828,289,344,195]}
+{"kind":"textbox","id":"sh/kri147u1","slide":9,"text":"UAT / SUS: NOT_AVAILABLE cho đến khi có phản hồi người dùng thật","textPreview":"UAT / SUS: NOT_AVAILABLE cho đến khi có phản hồi người dùng thật","textChars":64,"textLines":1,"bbox":[176,545,928,68]}
+{"kind":"notes","id":"nt/2muqe9","slide":9,"text":"SUS chỉ phản ánh khả dụng cảm nhận; không đo độ đúng của chatbot hay hiệu quả recommendation.\n\n[Sources]\n- D:/Doantotnghiep/docs/DATA_AND_LICENSE_MANIFEST.md\n- D:/Doantotnghiep/docs/UAT_PLAN.md\n- https://www.researchgate.net/publication/228593520_SUS_A_quick_and_dirty_usability_scale\n[/Sources]"}
+{"kind":"slide","id":"sl/edcr89","slide":10,"title":"BOOKVERSE AI","textShapes":13}
+{"kind":"textbox","id":"sh/7yhsve5c","slide":10,"text":"BOOKVERSE AI","textPreview":"BOOKVERSE AI","textChars":12,"textLines":1,"bbox":[52,24,250,28]}
+{"kind":"textbox","id":"sh/8zqt4j6x","slide":10,"text":"Bằng chứng chất lượng phần mềm","textPreview":"Bằng chứng chất lượng phần mềm","textChars":30,"textLines":1,"bbox":[52,62,1140,68]}
+{"kind":"textbox","id":"sh/t0zuxoni","slide":10,"text":"10","textPreview":"10","textChars":2,"textLines":1,"bbox":[1184,665,44,26]}
+{"kind":"shape","id":"sh/u18b6to3","slide":10,"bbox":[72,184,260,188]}
+{"kind":"textbox","id":"sh/v2hczy5o","slide":10,"text":"208/208","textPreview":"208/208","textChars":7,"textLines":1,"bbox":[88,209,228,76]}
+{"kind":"textbox","id":"sh/g3qt836t","slide":10,"text":"Unit test TypeScript","textPreview":"Unit test TypeScript","textChars":20,"textLines":1,"bbox":[92,292,220,56]}
+{"kind":"shape","id":"sh/h4zu18ne","slide":10,"bbox":[366,184,260,188]}
+{"kind":"textbox","id":"sh/i5sbatoz","slide":10,"text":"32","textPreview":"32","textChars":2,"textLines":1,"bbox":[382,209,228,76]}
+{"kind":"textbox","id":"sh/361c3y5k","slide":10,"text":"Python test đã pass","textPreview":"Python test đã pass","textChars":19,"textLines":1,"bbox":[386,292,220,56]}
+{"kind":"shape","id":"sh/vypcvq98","slide":10,"bbox":[660,184,260,188]}
+{"kind":"textbox","id":"sh/uxgbmlsn","slide":10,"text":"14/14","textPreview":"14/14","textChars":5,"textLines":1,"bbox":[676,209,228,76]}
+{"kind":"textbox","id":"sh/h07ux0re","slide":10,"text":"E2E desktop + mobile","textPreview":"E2E desktop + mobile","textChars":20,"textLines":1,"bbox":[680,292,220,56]}
+{"kind":"shape","id":"sh/gzytovat","slide":10,"bbox":[954,184,260,188]}
+{"kind":"textbox","id":"sh/7upcr69w","slide":10,"text":"PASS","textPreview":"PASS","textChars":4,"textLines":1,"bbox":[970,209,228,76]}
+{"kind":"textbox","id":"sh/6tgby1sr","slide":10,"text":"Lint • typecheck • build","textPreview":"Lint • typecheck • build","textChars":24,"textLines":1,"bbox":[974,292,220,56]}
+{"kind":"textbox","id":"sh/tw7utgr2","slide":10,"text":"Clean-clone: migrate → seed → 640 trang demo → membership → readiness 10/10","textPreview":"Clean-clone: migrate → seed → 640 trang demo → membership → readiness 10/10","textChars":75,"textLines":1,"bbox":[92,420,1096,82]}
+{"kind":"textbox","id":"sh/8vyt0bah","slide":10,"text":"PostgreSQL 55432 • AI service 8800 • /health = ok • container và volume tách khỏi stack cũ","textPreview":"PostgreSQL 55432 • AI service 8800 • /health = ok • container và volume tách khỏi stack cũ","textChars":90,"textLines":1,"bbox":[164,535,952,62]}
+{"kind":"notes","id":"nt/edcr89","slide":10,"text":"Các con số là kết quả chạy lại trên database demo cô lập. Python còn 1 integration test chỉ chạy khi bật cờ PostgreSQL test.\n\n[Sources]\n- D:/Doantotnghiep/package.json\n- D:/Doantotnghiep/scripts/bootstrap_demo.ps1\n- D:/Doantotnghiep/docs/RELEASE_CHECKLIST.md\n[/Sources]"}
+{"kind":"slide","id":"sl/y3qi4k","slide":11,"title":"BOOKVERSE AI","textShapes":13}
+{"kind":"textbox","id":"sh/byh0bip8","slide":11,"text":"BOOKVERSE AI","textPreview":"BOOKVERSE AI","textChars":12,"textLines":1,"bbox":[52,24,250,28]}
+{"kind":"textbox","id":"sh/wzqh4n6t","slide":11,"text":"Ba giới hạn còn lại quyết định mức điểm cao","textPreview":"Ba giới hạn còn lại quyết định mức điểm cao","textChars":43,"textLines":1,"bbox":[52,62,1140,68]}
+{"kind":"textbox","id":"sh/x0zids7e","slide":11,"text":"11","textPreview":"11","textChars":2,"textLines":1,"bbox":[1184,665,44,26]}
+{"kind":"shape","id":"sh/y18j6xoz","slide":11,"bbox":[52,160,352,370]}
+{"kind":"shape","id":"sh/j2h0f2pk","slide":11,"bbox":[70,178,48,7]}
+{"kind":"textbox","id":"sh/k3q1876p","slide":11,"text":"01 • DỮ LIỆU","textPreview":"01 • DỮ LIỆU","textChars":12,"textLines":1,"bbox":[68,190,320,28]}
+{"kind":"textbox","id":"sh/l4zihc7a","slide":11,"text":"Chưa có interaction production","textPreview":"Chưa có interaction production","textChars":30,"textLines":1,"bbox":[68,223,320,56]}
+{"kind":"textbox","id":"sh/65sjahov","slide":11,"text":"Cần log impression / click / reading có đồng thuận và đủ mật độ để đánh giá online.","textPreview":"Cần log impression / click / reading có đồng thuận và đủ mật độ để đánh giá online.","textChars":83,"textLines":1,"bbox":[68,279,320,235]}
+{"kind":"shape","id":"sh/7610j2pg","slide":11,"bbox":[432,160,352,370]}
+{"kind":"shape","id":"sh/vapszyt0","slide":11,"bbox":[450,178,48,7]}
+{"kind":"textbox","id":"sh/u9gr6tcf","slide":11,"text":"02 • NGƯỜI DÙNG","textPreview":"02 • NGƯỜI DÙNG","textChars":15,"textLines":1,"bbox":[448,190,320,28]}
+{"kind":"textbox","id":"sh/hw7a18b6","slide":11,"text":"Chưa có UAT thật","textPreview":"Chưa có UAT thật","textChars":16,"textLines":1,"bbox":[448,223,320,56]}
+{"kind":"textbox","id":"sh/wby983ul","slide":11,"text":"Cần 5–8 người, sáu task, task success, thời gian, lỗi và 10 câu SUS.","textPreview":"Cần 5–8 người, sáu task, task success, thời gian, lỗi và 10 câu SUS.","textChars":68,"textLines":1,"bbox":[448,279,320,235]}
+{"kind":"shape","id":"sh/76psvyt4","slide":11,"bbox":[812,160,376,370]}
+{"kind":"shape","id":"sh/m5wr2tcj","slide":11,"bbox":[830,178,48,7]}
+{"kind":"textbox","id":"sh/987axobu","slide":11,"text":"03 • QUYỀN NỘI DUNG","textPreview":"03 • QUYỀN NỘI DUNG","textChars":19,"textLines":1,"bbox":[828,190,344,28]}
+{"kind":"textbox","id":"sh/87y94ju9","slide":11,"text":"Cover rights chưa xác minh","textPreview":"Cover rights chưa xác minh","textChars":26,"textLines":1,"bbox":[828,223,344,56]}
+{"kind":"textbox","id":"sh/r29s7it8","slide":11,"text":"Cần manifest nguồn/quyền hoặc thay toàn bộ bằng artwork tự tạo trước khi công bố.","textPreview":"Cần manifest nguồn/quyền hoặc thay toàn bộ bằng artwork tự tạo trước khi công bố.","textChars":81,"textLines":1,"bbox":[828,279,344,235]}
+{"kind":"textbox","id":"sh/610bedcn","slide":11,"text":"Ưu tiên trước bảo vệ: chạy clean-clone trên máy khác → thu UAT → chốt hồ sơ quyền → cập nhật phụ lục bằng kết quả thật.","textPreview":"Ưu tiên trước bảo vệ: chạy clean-clone trên máy khác → thu UAT → chốt hồ sơ quyền → cập nhật phụ lục bằng kết quả thật.","textChars":119,"textLines":1,"bbox":[114,568,1052,58]}
+{"kind":"notes","id":"nt/y3qi4k","slide":11,"text":"Đây là giới hạn công bố, không phải lỗi bị che giấu. Chỉ cập nhật slide khi có bằng chứng thật.\n\n[Sources]\n- D:/Doantotnghiep/docs/UAT_PLAN.md\n- D:/Doantotnghiep/docs/DATA_AND_LICENSE_MANIFEST.md\n- D:/Doantotnghiep/docs/RELEASE_CHECKLIST.md\n[/Sources]"}
+{"kind":"slide","id":"sl/ic8jw4","slide":12,"title":"Phần mềm mạnh.","textShapes":4}
+{"kind":"textbox","id":"sh/lwnuxcvi","slide":12,"name":"Title-3-1","text":"Phần mềm mạnh.\nAI được đánh giá trung thực.","textPreview":"Phần mềm mạnh. | AI được đánh giá trung thực.","textChars":43,"textLines":2,"bbox":[41.33,182.55,992,261.57]}
+{"kind":"textbox","id":"sh/ytwv2hwr","slide":12,"name":"Subtitle-4-2","text":"Nộp được • demo được\nKhông dùng số liệu giả\nHướng phát triển rõ ràng","textPreview":"Nộp được • demo được | Không dùng số liệu giả | Hướng phát triển rõ ràng","textChars":68,"textLines":3,"bbox":[41.33,522.13,374.67,113.41]}
+{"kind":"textbox","id":"sh/zu5cvmxc","slide":12,"name":"Subtitle-4-3","text":"KẾT LUẬN","textPreview":"KẾT LUẬN","textChars":8,"textLines":1,"bbox":[41.33,41.18,169.33,68.15]}
+{"kind":"shape","id":"sh/8zydsret","slide":12,"bbox":[880,210,310,310]}
+{"kind":"textbox","id":"sh/907u1wve","slide":12,"text":"BOOK\nVERSE\nAI","textPreview":"BOOK | VERSE | AI","textChars":13,"textLines":3,"bbox":[900,244,270,230]}
+{"kind":"notes","id":"nt/ic8jw4","slide":12,"text":"Kết luận bằng sự cân bằng: hệ thống phần mềm có chiều sâu; phần AI được báo cáo đúng mức bằng chứng hiện có.\n\n[Sources]\n- D:/Doantotnghiep/docs/ACADEMIC_REPORT_DRAFT.md\n[/Sources]"}

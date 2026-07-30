@@ -3,6 +3,8 @@ import crypto from "node:crypto";
 import {
   OrderStatus,
   Prisma,
+  RecommendationCollectionContext,
+  RecommendationDeviceClass,
   RecommendationSurface,
   RecommendationTelemetryType,
 } from "@prisma/client";
@@ -18,6 +20,7 @@ import {
 } from "@/lib/recommendation-position-policy";
 import {
   attributionWindowDays,
+  resolveCollectionMetadata,
   selectConversionAttributions,
   type ClientTelemetryEvent,
   type ExposureCandidate,
@@ -37,6 +40,7 @@ export interface RecommendationSnapshotItem {
   score: number;
   evidence?: string | null;
   source?: RecommendationCandidateSource;
+  sourceComponent?: string | null;
   productionOrder?: number;
 }
 
@@ -54,7 +58,17 @@ interface NormalizedSnapshotPersistenceInput {
   surface: RecommendationSurface;
   candidateProfile: string;
   filterProfile: string;
-  items: Array<{ bookId: string; position: number; score: number; evidence: string | null }>;
+  collectionContext: RecommendationCollectionContext;
+  pilotId: string | null;
+  consentVersion: string | null;
+  experimentGroup: string | null;
+  items: Array<{
+    bookId: string;
+    position: number;
+    score: number;
+    evidence: string | null;
+    sourceComponent: string | null;
+  }>;
 }
 
 export type RecommendationSnapshotPersistence = (
@@ -117,6 +131,10 @@ async function persistRecommendationSnapshot(input: NormalizedSnapshotPersistenc
       surface: input.surface,
       candidateProfile: input.candidateProfile,
       filterProfile: input.filterProfile,
+      collectionContext: input.collectionContext,
+      pilotId: input.pilotId,
+      consentVersion: input.consentVersion,
+      experimentGroup: input.experimentGroup,
       items: {
         create: input.items,
       },
@@ -142,7 +160,7 @@ export async function createRecommendationRequestSnapshotResult(input: {
       rank: item.position,
       source: item.source ?? "CURRENT",
       productionOrder: item.productionOrder ?? index,
-      payload: null,
+      payload: { sourceComponent: item.sourceComponent ?? item.source ?? null },
     })),
     Math.max(1, input.items.length),
   );
@@ -156,17 +174,26 @@ export async function createRecommendationRequestSnapshotResult(input: {
     };
   }
 
+  const collectionMetadata = resolveCollectionMetadata(process.env);
   const persistenceInput: NormalizedSnapshotPersistenceInput = {
     userId: input.userId,
     algorithmVersion: input.algorithmVersion,
     surface: input.surface,
     candidateProfile: input.candidateProfile,
     filterProfile: input.filterProfile,
+    collectionContext:
+      collectionMetadata.collectionContext === "PILOT_CONSENTED"
+        ? RecommendationCollectionContext.PILOT_CONSENTED
+        : RecommendationCollectionContext.STANDARD_APP,
+    pilotId: collectionMetadata.pilotId,
+    consentVersion: collectionMetadata.consentVersion,
+    experimentGroup: collectionMetadata.experimentGroup,
     items: normalized.items.map((item) => ({
       bookId: item.bookId,
       position: item.position,
       score: item.score,
       evidence: item.evidence?.slice(0, 1_000) ?? null,
+      sourceComponent: item.payload.sourceComponent?.slice(0, 80) ?? null,
     })),
   };
 
@@ -216,6 +243,7 @@ export async function recordRecommendationTelemetry(input: {
   requestId: string;
   bookId: string;
   eventType: ClientTelemetryEvent;
+  deviceClass?: RecommendationDeviceClass;
 }): Promise<{ eventId: string; duplicate: boolean; occurredAt: Date }> {
   const user = await prisma.user.findUnique({
     where: { id: input.currentUserId },
@@ -268,6 +296,7 @@ export async function recordRecommendationTelemetry(input: {
             : RecommendationTelemetryType.CLICK,
         canonicalEvent: canonicalEventFor(input.eventType),
         deduplicationKey,
+        deviceClass: input.deviceClass ?? RecommendationDeviceClass.UNKNOWN,
       },
       select: { id: true, occurredAt: true },
     });
@@ -302,6 +331,7 @@ export async function syncRecommendationConversionsForUser(
       requestItemId: true,
       type: true,
       occurredAt: true,
+      deviceClass: true,
       requestItem: { select: { bookId: true } },
     },
   });
@@ -313,6 +343,7 @@ export async function syncRecommendationConversionsForUser(
     bookId: event.requestItem.bookId,
     type: event.type === RecommendationTelemetryType.CLICK ? "CLICK" : "IMPRESSION",
     occurredAt: event.occurredAt,
+    deviceClass: event.deviceClass,
   }));
   const bookIds = [...new Set(exposures.map((event) => event.bookId))];
   const [orderItems, sessions, bookmarks, favorites, reviews] = await Promise.all([
@@ -399,6 +430,14 @@ export async function syncRecommendationConversionsForUser(
       sourceType: conversion.sourceType,
       sourceId: conversion.sourceId,
       attributionAnchor: anchor,
+      deviceClass:
+        exposure.deviceClass === "DESKTOP"
+          ? RecommendationDeviceClass.DESKTOP
+          : exposure.deviceClass === "MOBILE"
+            ? RecommendationDeviceClass.MOBILE
+            : exposure.deviceClass === "TABLET"
+              ? RecommendationDeviceClass.TABLET
+              : RecommendationDeviceClass.UNKNOWN,
       occurredAt: conversion.occurredAt,
     })),
     skipDuplicates: true,

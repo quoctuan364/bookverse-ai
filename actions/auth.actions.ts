@@ -2,6 +2,7 @@
 
 import bcrypt from "bcrypt";
 import { UserRole } from "@prisma/client";
+import { PASSWORD_MIN_LENGTH } from "@/lib/password-reset-policy";
 import prisma from "@/lib/prisma";
 
 export interface RegisterUserInput {
@@ -41,8 +42,8 @@ export async function registerUser(data: RegisterUserInput): Promise<AuthActionR
       return { success: false, message: "Email không hợp lệ." };
     }
 
-    if (password.length < 6) {
-      return { success: false, message: "Mật khẩu phải có ít nhất 6 ký tự." };
+    if (password.length < PASSWORD_MIN_LENGTH) {
+      return { success: false, message: `Mật khẩu phải có ít nhất ${PASSWORD_MIN_LENGTH} ký tự.` };
     }
 
     const existingUser = await prisma.user.findUnique({

@@ -6,9 +6,11 @@ import { RecommendationSurface } from "@prisma/client";
 import {
   TelemetryRateLimiter,
   calculateInstrumentedCtr,
+  classifyRecommendationDevice,
   isAttributablePurchaseStatus,
   parseTelemetryPayload,
   qualifiesAsImpression,
+  resolveCollectionMetadata,
   selectConversionAttributions,
 } from "@/lib/recommendation-telemetry-policy";
 import { createRecommendationRequestSnapshotResult } from "@/lib/recommendation-telemetry";
@@ -111,6 +113,52 @@ test("rate limiter chặn sau giới hạn và reset đúng window", () => {
   assert.equal(limiter.allow("U1", 10), true);
   assert.equal(limiter.allow("U1", 20), false);
   assert.equal(limiter.allow("U1", 1_000), true);
+});
+
+test("device được suy từ user-agent phía server", () => {
+  assert.equal(
+    classifyRecommendationDevice("Mozilla/5.0 (iPhone; Mobile)"),
+    "MOBILE",
+  );
+  assert.equal(
+    classifyRecommendationDevice("Mozilla/5.0 (iPad; Tablet)"),
+    "TABLET",
+  );
+  assert.equal(
+    classifyRecommendationDevice("Mozilla/5.0 (Windows NT 10.0)"),
+    "DESKTOP",
+  );
+  assert.equal(classifyRecommendationDevice(null), "UNKNOWN");
+});
+
+test("pilot chỉ được gắn nhãn consent khi cấu hình đầy đủ", () => {
+  assert.deepEqual(resolveCollectionMetadata({}), {
+    collectionContext: "STANDARD_APP",
+    pilotId: null,
+    consentVersion: null,
+    experimentGroup: null,
+  });
+  assert.equal(
+    resolveCollectionMetadata({
+      RECOMMENDATION_PILOT_MODE: "consented",
+      RECOMMENDATION_PILOT_ID: "pilot-2026",
+    }).collectionContext,
+    "STANDARD_APP",
+  );
+  assert.deepEqual(
+    resolveCollectionMetadata({
+      RECOMMENDATION_PILOT_MODE: "consented",
+      RECOMMENDATION_PILOT_ID: "pilot-2026",
+      RECOMMENDATION_CONSENT_VERSION: "v1",
+      RECOMMENDATION_EXPERIMENT_GROUP: "behavior-shadow",
+    }),
+    {
+      collectionContext: "PILOT_CONSENTED",
+      pilotId: "pilot-2026",
+      consentVersion: "v1",
+      experimentGroup: "behavior-shadow",
+    },
+  );
 });
 
 test("persistence failure trả degraded contract và không lộ raw error", async () => {

@@ -84,7 +84,7 @@ export default async function ForgotPasswordPage({ searchParams }: ForgotPasswor
 
         <p className="mt-6 text-center text-sm text-[#66706B]">
           Đã nhớ mật khẩu?{" "}
-          <Link className="font-black text-[#0F766E] hover:underline" href="/login">
+          <Link className="inline-flex min-h-11 items-center rounded-lg px-2 font-black text-[#0F766E] hover:bg-[#EAF2EF] hover:underline" href="/login">
             Quay lại đăng nhập
           </Link>
         </p>

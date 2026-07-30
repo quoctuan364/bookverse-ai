@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
@@ -19,6 +20,7 @@ import {
   type AssistantSuccessResponse,
 } from "@/lib/assistant-contract";
 import { requestAssistant, submitAssistantFeedback } from "@/lib/assistant-client";
+import { ASSISTANT_STORE_QUICK_QUESTIONS } from "@/lib/assistant-knowledge";
 import { cn } from "@/lib/utils";
 
 interface ChatMessage {
@@ -34,11 +36,13 @@ const initialMessages: ChatMessage[] = [
   {
     id: "welcome",
     role: "assistant",
-    content: "Xin chào! Bạn muốn tìm sách theo chủ đề, mục tiêu hay ngân sách nào?",
+    content:
+      "Xin chào! Mình có thể tìm sách và giải đáp về hội viên, đọc Ebook, đơn hàng, chợ sách hoặc tài khoản BookVerse.",
   },
 ];
 
 export function FloatingChatbot() {
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
@@ -127,8 +131,24 @@ export function FloatingChatbot() {
     .reverse()
     .find((message) => message.response)?.response;
 
+  // Không che nội dung ở màn hình đã có AI riêng hoặc các luồng biểu mẫu quan trọng.
+  const shouldHideChatbot =
+    pathname === "/assistant" ||
+    pathname.startsWith("/read/") ||
+    pathname.startsWith("/admin") ||
+    pathname === "/login" ||
+    pathname === "/register" ||
+    pathname === "/forgot-password" ||
+    pathname === "/reset-password" ||
+    pathname.startsWith("/membership/checkout") ||
+    pathname.startsWith("/membership/payment");
+
+  if (shouldHideChatbot) {
+    return null;
+  }
+
   return (
-    <div className="fixed bottom-5 right-5 z-[70]">
+    <div className="fixed bottom-20 right-3 z-[70] lg:bottom-5 lg:right-5">
       {isOpen ? (
         <section
           aria-label="BookVerse AI Assistant"
@@ -147,7 +167,7 @@ export function FloatingChatbot() {
                   {latestResponse?.degraded
                     ? latestResponse.mocked
                       ? "DEV MOCK đang bật"
-                      : "Dự phòng từ catalog đã xác minh"
+                      : "Dự phòng từ dữ liệu BookVerse"
                     : latestResponse
                       ? `${latestResponse.provider} · ${latestResponse.source}`
                       : "RAG và fallback minh bạch"}
@@ -156,7 +176,7 @@ export function FloatingChatbot() {
             </div>
             <Button
               aria-label="Đóng chatbot"
-              className="h-9 w-9 rounded-full border-white/10 bg-white/8 text-zinc-100 hover:bg-white/14"
+              className="h-11 w-11 rounded-full border-white/10 bg-white/8 text-zinc-100 hover:bg-white/14"
               onClick={() => setIsOpen(false)}
               size="icon"
               type="button"
@@ -174,11 +194,28 @@ export function FloatingChatbot() {
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               {latestResponse.mocked
                 ? "Chỉ dùng để phát triển; production luôn vô hiệu hóa mock."
-                : "Provider hoặc vector chưa sẵn sàng; kết quả hiện lấy từ catalog thật, không giả phản hồi AI."}
+                : "Provider hoặc vector chưa sẵn sàng; kết quả hiện lấy từ dữ liệu BookVerse đã xác minh, không giả phản hồi AI."}
             </div>
           ) : null}
 
           <div aria-live="polite" className="bv-scrollbar flex-1 space-y-3 overflow-y-auto px-4 py-4">
+            {messages.length === 1 ? (
+              <div className="grid grid-cols-2 gap-2">
+                {ASSISTANT_STORE_QUICK_QUESTIONS.map((question) => (
+                  <button
+                    className="min-h-11 cursor-pointer rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-left text-xs font-bold text-zinc-200 transition hover:border-[#F2C14E]/35 hover:bg-white/10 hover:text-[#F2C14E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F2C14E]"
+                    disabled={isSending}
+                    key={question.id}
+                    onClick={() => {
+                      setInputValue(question.query);
+                    }}
+                    type="button"
+                  >
+                    {question.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
             {messages.map((message) => (
               <div
                 className={cn("flex flex-col", message.role === "user" ? "items-end" : "items-start")}
@@ -201,7 +238,7 @@ export function FloatingChatbot() {
                   <div className="mt-2 grid w-[86%] gap-1.5">
                     {message.response.validatedBooks.slice(0, 3).map((book) => (
                       <Link
-                        className="rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-xs text-zinc-200 transition hover:border-[#F2C14E]/40 hover:text-[#F2C14E]"
+                        className="inline-flex min-h-11 flex-col justify-center rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-xs text-zinc-200 transition hover:border-[#F2C14E]/40 hover:text-[#F2C14E]"
                         href={book.href}
                         key={book.id}
                         onClick={() => setIsOpen(false)}
@@ -218,7 +255,7 @@ export function FloatingChatbot() {
                     <button
                       aria-label="Câu trả lời hữu ích"
                       className={cn(
-                        "rounded-full border border-white/10 p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-[#F2C14E]",
+                        "inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 text-zinc-400 transition hover:bg-white/10 hover:text-[#F2C14E]",
                         message.feedback === "HELPFUL" && "bg-[#F2C14E]/20 text-[#F2C14E]",
                       )}
                       onClick={() => handleFeedback(message, "HELPFUL")}
@@ -229,7 +266,7 @@ export function FloatingChatbot() {
                     <button
                       aria-label="Câu trả lời chưa hữu ích"
                       className={cn(
-                        "rounded-full border border-white/10 p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-red-300",
+                        "inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 text-zinc-400 transition hover:bg-white/10 hover:text-red-300",
                         message.feedback === "NOT_HELPFUL" && "bg-red-500/15 text-red-300",
                       )}
                       onClick={() => handleFeedback(message, "NOT_HELPFUL")}
@@ -262,16 +299,16 @@ export function FloatingChatbot() {
             <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.08] px-3 py-2 focus-within:ring-2 focus-within:ring-[#D6A84F]/35">
               <input
                 aria-label="Nhập câu hỏi cho chatbot"
-                className="h-10 min-w-0 flex-1 bg-transparent text-sm text-zinc-100 outline-none placeholder:text-zinc-500"
+                className="h-11 min-w-0 flex-1 bg-transparent text-sm text-zinc-100 outline-none placeholder:text-zinc-500"
                 disabled={isSending}
                 maxLength={MAX_ASSISTANT_MESSAGE_LENGTH}
                 onChange={(event) => setInputValue(event.target.value)}
-                placeholder="Ví dụ: Gợi ý sách AI dễ đọc..."
+                placeholder="Hỏi sách, hội viên, đơn hàng..."
                 value={inputValue}
               />
               <Button
                 aria-label="Gửi tin nhắn"
-                className="h-10 w-10 rounded-full bg-[#D6A84F] text-slate-950 hover:bg-[#F2C14E]"
+                className="h-11 w-11 rounded-full bg-[#D6A84F] text-slate-950 hover:bg-[#F2C14E]"
                 disabled={isSending || !inputValue.trim()}
                 size="icon"
                 type="submit"
@@ -289,7 +326,7 @@ export function FloatingChatbot() {
 
       <button
         aria-label={isOpen ? "Đóng chatbot" : "Mở chatbot"}
-        className="group flex h-16 w-16 items-center justify-center rounded-full border border-[#F2C14E]/35 bg-slate-950/80 text-[#F2C14E] shadow-[0_18px_55px_rgba(0,0,0,0.42)] backdrop-blur-xl transition hover:-translate-y-1 hover:bg-[#0F766E]/88 hover:text-white"
+        className="group flex h-14 w-14 items-center justify-center rounded-full border border-[#F2C14E]/35 bg-slate-950/80 text-[#F2C14E] shadow-[0_18px_55px_rgba(0,0,0,0.42)] backdrop-blur-xl transition hover:-translate-y-1 hover:bg-[#0F766E]/88 hover:text-white sm:h-16 sm:w-16"
         onClick={() => setIsOpen((current) => !current)}
         type="button"
       >

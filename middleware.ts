@@ -4,9 +4,16 @@ import { getToken } from "next-auth/jwt";
 const protectedPrefixes = [
   "/cart",
   "/community/new",
+  "/library",
   "/marketplace/new",
+  "/membership/checkout",
+  "/membership/payment",
+  "/membership/success",
+  "/orders",
   "/read",
+  "/reading",
   "/profile",
+  "/seller",
   "/admin",
   "/dashboard",
   "/notifications",
@@ -22,6 +29,11 @@ function isAdminPath(pathname: string): boolean {
 
 export default async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // File Ebook chỉ được đọc qua Server Action sau khi kiểm tra entitlement.
+  if (pathname.startsWith("/ebooks/")) {
+    return new NextResponse("Không được phép truy cập trực tiếp file Ebook.", { status: 403 });
+  }
 
   if (!isProtectedPath(pathname)) {
     return NextResponse.next();
@@ -47,5 +59,5 @@ export default async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\..*).*)"],
+  matcher: ["/ebooks/:path*", "/((?!api|_next/static|_next/image|favicon.ico|.*\\..*).*)"],
 };

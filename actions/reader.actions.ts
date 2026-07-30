@@ -3,10 +3,12 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { InteractionType, TargetType } from "@prisma/client";
+import { EditionType, HighlightColor, InteractionType, TargetType } from "@prisma/client";
 import { TAXONOMY_VERSION } from "@/lib/interaction-taxonomy";
 import { getCurrentUser, requireAuthenticatedUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
+import { decideReadingAccess } from "@/lib/reading-access-policy";
+import { getBookReadingAccess } from "@/lib/membership-access";
 
 export type ReaderActionType = "READ" | "BOOKMARK";
 
@@ -20,6 +22,7 @@ export interface ReaderHighlight {
   pageNumber: number;
   text: string;
   note: string | null;
+  color: HighlightColor;
   createdAt: Date;
 }
 
@@ -27,6 +30,7 @@ export interface ReaderInitialState {
   bookId: string;
   title: string;
   currentPage: number;
+  currentChapter: number;
   progressPercent: number;
   bookmarks: number[];
   highlights: ReaderHighlight[];
@@ -35,12 +39,30 @@ export interface ReaderInitialState {
 export interface ReaderPageContent {
   pageNumber: number;
   content: string;
+  chapterNumber: number;
+  chapterTitle: string;
+  chunkIndex: number;
+}
+
+export interface ReaderChapter {
+  chapterNumber: number;
+  chapterTitle: string;
+  startPage: number;
+  isLocked: boolean;
 }
 
 export interface ReaderBookContent {
   pages: ReaderPageContent[];
+  chapters: ReaderChapter[];
   sourceLabel: string;
   ebookUrl: string | null;
+  access: "FULL" | "PREVIEW";
+  visiblePageCount: number;
+  totalPageCount: number;
+  samplePageCount: number;
+  purchaseUrl: string;
+  canPurchaseEbook: boolean;
+  hasDigitalAsset: boolean;
 }
 
 async function getCurrentUserId(): Promise<string> {
@@ -66,16 +88,6 @@ function toInteractionType(actionType: ReaderActionType | "HIGHLIGHT"): Interact
   }
 
   return InteractionType.READ;
-}
-
-function getNumericBookCode(bookId: string): string | null {
-  const digits = bookId.match(/\d+/)?.[0];
-
-  if (!digits) {
-    return null;
-  }
-
-  return digits.padStart(4, "0").slice(-4);
 }
 
 function decodeHtmlEntities(value: string): string {
@@ -134,6 +146,9 @@ function splitTextIntoPages(text: string, pageSize = 1_250): ReaderPageContent[]
   return pages.map((content, index) => ({
     pageNumber: index + 1,
     content,
+    chapterNumber: 1,
+    chapterTitle: "Nội dung đọc",
+    chunkIndex: index,
   }));
 }
 
@@ -172,8 +187,23 @@ async function getFallbackContent(bookId: string): Promise<ReaderBookContent> {
 
   return {
     pages: splitTextIntoPages(seedText.repeat(4), 1_100),
+    chapters: [
+      {
+        chapterNumber: 1,
+        chapterTitle: "Nội dung giới thiệu",
+        startPage: 1,
+        isLocked: false,
+      },
+    ],
     sourceLabel: "Nội dung fallback từ metadata sách",
     ebookUrl: null,
+    access: "PREVIEW",
+    visiblePageCount: 1,
+    totalPageCount: 1,
+    samplePageCount: 1,
+    purchaseUrl: `/membership?bookId=${encodeURIComponent(bookId)}`,
+    canPurchaseEbook: true,
+    hasDigitalAsset: false,
   };
 }
 
@@ -185,14 +215,118 @@ export async function getReaderBookContent(bookId: string): Promise<ReaderBookCo
       return getFallbackContent("unknown-book");
     }
 
-    const code = getNumericBookCode(cleanBookId);
+    const currentUser = await getCurrentUser();
+    const userId = currentUser && !currentUser.isLocked ? currentUser.id : null;
+    const [ebookEdition, readingAccess, chunks] = await Promise.all([
+      prisma.bookEdition.findFirst({
+        where: {
+          bookId: cleanBookId,
+          editionType: EditionType.EBOOK,
+          isActive: true,
+        },
+        orderBy: { createdAt: "asc" },
+        select: {
+          digitalAsset: {
+            select: {
+              fileUrl: true,
+              samplePages: true,
+            },
+          },
+          listings: {
+            where: {
+              status: "APPROVED",
+              stock: { gt: 0 },
+            },
+            take: 1,
+            select: { id: true },
+          },
+        },
+      }),
+      getBookReadingAccess(userId, cleanBookId),
+      prisma.bookChunk.findMany({
+        where: { bookId: cleanBookId },
+        orderBy: [
+          { chapterNumber: "asc" },
+          { chunkIndex: "asc" },
+        ],
+        select: {
+          chapterNumber: true,
+          chapterTitle: true,
+          pageNumber: true,
+          chunkIndex: true,
+          content: true,
+        },
+      }),
+    ]);
+
+    if (chunks.length > 0) {
+      const hasFullAccess = readingAccess.hasAccess;
+      const accessDecision = decideReadingAccess({
+        totalPages: chunks.length,
+        samplePages: ebookEdition?.digitalAsset?.samplePages,
+        hasEntitlement: hasFullAccess,
+      });
+      // Không mở cả chương đầu vì chương dài có thể vượt quá 10% toàn bộ sách.
+      const visibleChunks = chunks.slice(0, accessDecision.visiblePages);
+      const firstPageByChapter = new Map<number, number>();
+
+      chunks.forEach((chunk, index) => {
+        if (!firstPageByChapter.has(chunk.chapterNumber)) {
+          firstPageByChapter.set(chunk.chapterNumber, index + 1);
+        }
+      });
+
+      const chapters = Array.from(
+        new Map(
+          chunks.map((chunk) => [
+            chunk.chapterNumber,
+            {
+              chapterNumber: chunk.chapterNumber,
+              chapterTitle: chunk.chapterTitle,
+              startPage: firstPageByChapter.get(chunk.chapterNumber) ?? 1,
+              isLocked:
+                !hasFullAccess &&
+                (firstPageByChapter.get(chunk.chapterNumber) ?? 1) > accessDecision.visiblePages,
+            },
+          ]),
+        ).values(),
+      );
+
+      return {
+        pages: visibleChunks.map((chunk, index) => ({
+          pageNumber: index + 1,
+          content: chunk.content,
+          chapterNumber: chunk.chapterNumber,
+          chapterTitle: chunk.chapterTitle,
+          chunkIndex: chunk.chunkIndex,
+        })),
+        chapters,
+        sourceLabel: hasFullAccess
+          ? readingAccess.source === "MEMBERSHIP"
+            ? "Ebook BookVerse · Quyền hội viên"
+            : "Ebook BookVerse · Đã mua"
+          : `Bản đọc thử · ${visibleChunks.length}/${chunks.length} phần (tối đa 10%)`,
+        ebookUrl: null,
+        access: hasFullAccess ? "FULL" : "PREVIEW",
+        visiblePageCount: visibleChunks.length,
+        totalPageCount: chunks.length,
+        samplePageCount: visibleChunks.length,
+        purchaseUrl: `/membership?bookId=${encodeURIComponent(cleanBookId)}`,
+        canPurchaseEbook: true,
+        hasDigitalAsset: Boolean(ebookEdition?.digitalAsset),
+      };
+    }
+
+    const assetFileName = ebookEdition?.digitalAsset?.fileUrl
+      ? path.basename(ebookEdition.digitalAsset.fileUrl)
+      : null;
     const candidates = [
-      code ? `book-${code}.html` : null,
+      assetFileName,
       `${cleanBookId}.html`,
       `${cleanBookId.toLowerCase()}.html`,
     ].filter((item): item is string => Boolean(item));
 
-    for (const fileName of candidates) {
+    for (const fileName of Array.from(new Set(candidates))) {
       const filePath = path.join(process.cwd(), "public", "ebooks", "html", fileName);
 
       if (!existsSync(filePath)) {
@@ -203,15 +337,67 @@ export async function getReaderBookContent(bookId: string): Promise<ReaderBookCo
       const pages = splitTextIntoPages(htmlToPlainText(html));
 
       if (pages.length > 0) {
+        const accessDecision = decideReadingAccess({
+          totalPages: pages.length,
+          samplePages: ebookEdition?.digitalAsset?.samplePages,
+          hasEntitlement: readingAccess.hasAccess,
+        });
+        const visiblePages = pages.slice(0, accessDecision.visiblePages);
+
         return {
-          pages,
-          sourceLabel: `Ebook HTML: ${fileName}`,
-          ebookUrl: `/ebooks/html/${fileName}`,
+          pages: visiblePages,
+          chapters: [
+            {
+              chapterNumber: 1,
+              chapterTitle: "Nội dung Ebook",
+              startPage: 1,
+              isLocked: false,
+            },
+          ],
+          sourceLabel:
+            accessDecision.access === "FULL"
+              ? readingAccess.source === "MEMBERSHIP"
+                ? `Ebook hội viên: ${fileName}`
+                : `Ebook đã mua: ${fileName}`
+              : `Bản đọc thử · ${visiblePages.length}/${pages.length} trang`,
+          // Không trả URL file cho bản đọc thử để tránh tải trực tiếp toàn bộ Ebook.
+          ebookUrl:
+            accessDecision.access === "FULL"
+              ? `/api/ebooks/${encodeURIComponent(cleanBookId)}/file`
+              : null,
+          access: accessDecision.access,
+          visiblePageCount: visiblePages.length,
+          totalPageCount: pages.length,
+          samplePageCount: visiblePages.length,
+        purchaseUrl: `/membership?bookId=${encodeURIComponent(cleanBookId)}`,
+          canPurchaseEbook: true,
+          hasDigitalAsset: Boolean(ebookEdition?.digitalAsset),
         };
       }
     }
 
-    return getFallbackContent(cleanBookId);
+    const fallback = await getFallbackContent(cleanBookId);
+    const accessDecision = decideReadingAccess({
+      totalPages: fallback.pages.length,
+      samplePages: ebookEdition?.digitalAsset?.samplePages,
+      hasEntitlement: readingAccess.hasAccess,
+    });
+    const visiblePages = fallback.pages.slice(0, accessDecision.visiblePages);
+
+    return {
+      ...fallback,
+      pages: visiblePages,
+      sourceLabel:
+        accessDecision.access === "FULL"
+          ? fallback.sourceLabel
+          : `Bản đọc thử · ${visiblePages.length}/${fallback.pages.length} trang`,
+      access: accessDecision.access,
+      visiblePageCount: visiblePages.length,
+      totalPageCount: fallback.pages.length,
+      samplePageCount: visiblePages.length,
+      canPurchaseEbook: true,
+      hasDigitalAsset: Boolean(ebookEdition?.digitalAsset),
+    };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Không thể tải nội dung ebook.";
     console.error(`[getReaderBookContent] ${message}`);
@@ -248,6 +434,7 @@ export async function getReaderInitialState(bookId: string): Promise<ReaderIniti
         bookId: book.id,
         title: book.title,
         currentPage: 1,
+        currentChapter: 1,
         progressPercent: 0,
         bookmarks: [],
         highlights: [],
@@ -264,6 +451,7 @@ export async function getReaderInitialState(bookId: string): Promise<ReaderIniti
         },
         select: {
           currentPage: true,
+          currentChapter: true,
           progressPercent: true,
         },
       }),
@@ -293,6 +481,7 @@ export async function getReaderInitialState(bookId: string): Promise<ReaderIniti
           pageNumber: true,
           text: true,
           note: true,
+          color: true,
           createdAt: true,
         },
       }),
@@ -302,6 +491,7 @@ export async function getReaderInitialState(bookId: string): Promise<ReaderIniti
       bookId: book.id,
       title: book.title,
       currentPage: Math.max(1, progress?.currentPage ?? 1),
+      currentChapter: Math.max(1, progress?.currentChapter ?? 1),
       progressPercent: progress?.progressPercent ?? 0,
       bookmarks: bookmarks.map((bookmark) => bookmark.pageNumber),
       highlights,
@@ -318,6 +508,7 @@ export async function saveReadingProgress(
   currentPage: number,
   totalPages: number,
   timeSpent: number,
+  currentChapter = 1,
 ): Promise<ReaderActionResult> {
   try {
     const userId = await getCurrentUserId();
@@ -325,6 +516,7 @@ export async function saveReadingProgress(
     const safeTotalPages = Math.max(1, Math.floor(totalPages));
     const safeCurrentPage = clampNumber(Math.floor(currentPage), 1, safeTotalPages);
     const safeTimeSpent = Math.max(0, Math.floor(timeSpent));
+    const safeCurrentChapter = Math.max(1, Math.floor(currentChapter));
     const progressPercent = Number(((safeCurrentPage / safeTotalPages) * 100).toFixed(2));
     const minutesRead = Math.ceil(safeTimeSpent / 60);
 
@@ -342,6 +534,7 @@ export async function saveReadingProgress(
         },
         update: {
           currentPage: safeCurrentPage,
+          currentChapter: safeCurrentChapter,
           progressPercent,
           totalMinutes: {
             increment: minutesRead,
@@ -352,6 +545,7 @@ export async function saveReadingProgress(
           userId,
           bookId: cleanBookId,
           currentPage: safeCurrentPage,
+          currentChapter: safeCurrentChapter,
           progressPercent,
           totalMinutes: minutesRead,
           lastReadAt: new Date(),
@@ -449,6 +643,7 @@ export async function saveHighlight(
   pageNumber: number,
   text: string,
   note?: string,
+  color: HighlightColor = HighlightColor.YELLOW,
 ): Promise<ReaderActionResult> {
   try {
     const userId = await getCurrentUserId();
@@ -472,6 +667,7 @@ export async function saveHighlight(
           pageNumber: safePageNumber,
           text: cleanText,
           note: cleanNote,
+          color,
         },
       }),
       prisma.interactionEvent.create({

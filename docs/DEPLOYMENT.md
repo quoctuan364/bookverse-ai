@@ -9,6 +9,7 @@ Ngày xác minh gần nhất: 15/07/2026. Deployment R1 lên `bookverse_ai` đã
 - PostgreSQL demo đang chạy `16.14` trên image `pgvector/pgvector:0.8.5-pg16`, dùng lại đúng volume `doantotnghiep_pgdata` và có extension `vector` 0.8.5.
 - Compose nguồn đã pin `pgvector/pgvector:0.8.5-pg16`; image đã pull có digest `sha256:1d533553fefe4f12e5d80c7b80622ba0c382abb5758856f52983d8789179f0fb`.
 - Rehearsal riêng dùng `docker-compose.rehearsal.yml`, project `bookverse-a2`, port loopback `55432`; demo không bị restart/recreate.
+- Fresh verifier hiện lấy số migration kỳ vọng trực tiếp từ thư mục `prisma/migrations` và kiểm tra thêm `book_source_metadata`, khóa ngoại Book, `gold_catalog_records` cùng Prisma smoke cho hai model catalog mới.
 - Rehearsal current HEAD và database demo chạy đủ 12 migration; lần deploy hai không còn pending.
 - Full clone từ demo đã audit, reconcile deterministic, deploy, backfill, smoke và deploy idempotency PASS.
 - Rollback từ backup pre-deployment có exit code 0 trong 1.931 ms; count và semantic schema checksum khớp nguồn.

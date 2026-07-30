@@ -2,6 +2,7 @@
 
 import { ListingStatus } from "@prisma/client";
 import { normalizeBookCoverUrl } from "@/lib/book-cover";
+import { getCurrentUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
 import { loadSellerQualityScores } from "@/lib/seller-quality-data";
 
@@ -29,10 +30,11 @@ export interface CuratedBook {
   coverImage: string | null;
   price: number;
   catalogSource: "CURATED_REAL";
-  metadataBadge: "Metadata tuyển chọn";
-  priceLabel: "Giá demo";
+  metadataBadge: "Sách tuyển chọn";
+  priceLabel: "Giá BookVerse";
   sourceRating: number | null;
   category: string | null;
+  isFavorite: boolean;
 }
 
 export interface MarketplaceListing {
@@ -111,6 +113,8 @@ export async function getFeaturedBooks(): Promise<FeaturedBook[]> {
 
 export async function getCuratedBooks(): Promise<CuratedBook[]> {
   try {
+    const currentUser = await getCurrentUser();
+    const userId = currentUser && !currentUser.isLocked ? currentUser.id : null;
     const books = await prisma.book.findMany({
       where: {
         sourceMetadata: {
@@ -139,6 +143,13 @@ export async function getCuratedBooks(): Promise<CuratedBook[]> {
         category: {
           select: { name: true },
         },
+        favoriteBooks: {
+          where: {
+            userId: userId ?? "__BOOKVERSE_GUEST__",
+          },
+          take: 1,
+          select: { id: true },
+        },
       },
     });
 
@@ -149,10 +160,11 @@ export async function getCuratedBooks(): Promise<CuratedBook[]> {
       coverImage: normalizeBookCoverUrl(book.coverPath),
       price: decimalToNumber(book.price),
       catalogSource: "CURATED_REAL",
-      metadataBadge: "Metadata tuyển chọn",
-      priceLabel: "Giá demo",
+      metadataBadge: "Sách tuyển chọn",
+      priceLabel: "Giá BookVerse",
       sourceRating: book.sourceMetadata?.sourceRatingAverage ?? null,
       category: book.category?.name ?? null,
+      isFavorite: book.favoriteBooks.length > 0,
     }));
   } catch (error: unknown) {
     // Database chưa apply migration G2 sẽ không có bảng metadata; Home vẫn hoạt động với khu vực cũ.
@@ -166,8 +178,18 @@ export async function getMarketplaceListings(): Promise<MarketplaceListing[]> {
     const listings = await prisma.listing.findMany({
       where: {
         status: ListingStatus.APPROVED,
+        stock: {
+          gt: 0,
+        },
         book: {
-          isNot: null,
+          is: {
+            id: {
+              startsWith: "RB",
+            },
+            sourceMetadata: {
+              isNot: null,
+            },
+          },
         },
       },
       orderBy: {

@@ -36,7 +36,7 @@ export default async function SellerDashboardPage({ searchParams }: SellerPagePr
   const [params, data] = await Promise.all([searchParams, getSellerOverviewData()]);
 
   return (
-    <main className="bv-page">
+    <main className="bv-page bv-seller">
       <SellerHero
         action={
           data.gate.status === "SELLER" ? (

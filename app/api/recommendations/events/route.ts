@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { RecommendationDeviceClass } from "@prisma/client";
 
 import { getCurrentUser } from "@/lib/permissions";
 import {
@@ -8,6 +9,7 @@ import {
 import {
   RECOMMENDATION_EVENT_BODY_LIMIT_BYTES,
   TelemetryRateLimiter,
+  classifyRecommendationDevice,
   parseTelemetryPayload,
 } from "@/lib/recommendation-telemetry-policy";
 
@@ -42,8 +44,12 @@ export async function POST(request: Request) {
       return errorResponse("JSON telemetry không hợp lệ.", 400);
     }
     const payload = parseTelemetryPayload(body);
+    const deviceClass = classifyRecommendationDevice(
+      request.headers.get("user-agent"),
+    ) as RecommendationDeviceClass;
     const result = await recordRecommendationTelemetry({
       currentUserId: currentUser.id,
+      deviceClass,
       ...payload,
     });
     return NextResponse.json(

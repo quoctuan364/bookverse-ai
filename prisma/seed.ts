@@ -17,6 +17,7 @@ import {
   UserRole
 } from "@prisma/client";
 import csv from "csv-parser";
+import { DEMO_ACCOUNT_EMAILS } from "../lib/demo-accounts";
 
 type RawCsvRow = Record<string, string>;
 type BookSeedInfo = {
@@ -36,6 +37,13 @@ const color = {
 const demoDataDir = process.env.DEMO_DATA_DIR
   ? path.resolve(process.env.DEMO_DATA_DIR)
   : path.resolve(process.cwd(), "data", "demo");
+
+function demoUserEmail(userId: string): string {
+  return (
+    DEMO_ACCOUNT_EMAILS[userId as keyof typeof DEMO_ACCOUNT_EMAILS] ??
+    `${userId.toLowerCase()}@bookverse.local`
+  );
+}
 
 function ok(message: string): void {
   console.log(`${color.green}[OK] ${message}${color.reset}`);
@@ -386,6 +394,8 @@ async function importCategoriesAndBooks(
           ? toInt(optional(row, "publish_year"))
           : null,
         isEbook: toBoolean(optional(row, "is_ebook")),
+        // Đây là catalog synthetic dành riêng cho demo học thuật.
+        isPubliclyVisible: true,
         coverPath,
         categoryId,
         tags: {
@@ -407,6 +417,8 @@ async function importCategoriesAndBooks(
           ? toInt(optional(row, "publish_year"))
           : null,
         isEbook: toBoolean(optional(row, "is_ebook")),
+        // Không thay CSV nguồn; chỉ bật bản ghi đã seed trong database demo.
+        isPubliclyVisible: true,
         coverPath,
         categoryId,
         tags: {
@@ -433,7 +445,7 @@ async function importUsers(userRows: RawCsvRow[], sellerIds: Set<string>): Promi
       where: { id: userId },
       update: {
         name: required(row, "name"),
-        email: `${userId.toLowerCase()}@bookverse.local`,
+        email: demoUserEmail(userId),
         password: demoPasswordHash,
         role,
         profile: {
@@ -460,7 +472,7 @@ async function importUsers(userRows: RawCsvRow[], sellerIds: Set<string>): Promi
       create: {
         id: userId,
         name: required(row, "name"),
-        email: `${userId.toLowerCase()}@bookverse.local`,
+        email: demoUserEmail(userId),
         password: demoPasswordHash,
         role,
         profile: {

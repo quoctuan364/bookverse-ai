@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BookOpenCheck, ChartNoAxesCombined, ShieldCheck, Timer } from "lucide-react";
+import { ArrowRight, BookOpenCheck, ChartNoAxesCombined, ShieldCheck, Sparkles, Timer } from "lucide-react";
 import { OrderStatus, UserRole } from "@prisma/client";
 import {
   DashboardCharts,
@@ -242,52 +242,68 @@ export default async function DashboardPage() {
   const uniqueOrders = new Set(revenueItems.map((item) => item.order.id)).size;
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(15,118,110,0.2),transparent_34%),linear-gradient(180deg,#020617_0%,#111827_52%,#18181b_100%)] px-4 py-8 text-zinc-100 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
-        <header className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-slate-950/72 p-5 shadow-[0_24px_90px_rgba(0,0,0,0.34)] backdrop-blur-2xl lg:flex-row lg:items-end lg:justify-between">
+    <main className="bv-page">
+      <section className="bv-hero">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-10 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-8 lg:py-14">
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.2em] text-[#F2C14E]">BookVerse AI</p>
-            <h1 className="mt-2 text-3xl font-black tracking-tight text-white sm:text-4xl">Smart Dashboard</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
-              Một màn hình thống kê chung cho thói quen đọc của user và hiệu quả bán sách của seller/admin.
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-bold">
+              <Sparkles className="h-4 w-4 text-[#F2C14E]" aria-hidden="true" />
+              Tổng quan cá nhân
+            </div>
+            <h1 className="bv-editorial mt-4 text-4xl font-bold tracking-tight text-white sm:text-5xl">
+              Chào {user.name}
+            </h1>
+            <p className="mt-3 max-w-2xl leading-7 text-[#D9EEEA]">
+              Theo dõi hành trình đọc, hiệu quả bán sách và những chỉ số quan trọng trong một màn hình.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.07] px-4 text-sm font-bold text-zinc-100 transition hover:bg-white/[0.12]"
-              href="/profile"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 text-sm font-bold text-white transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F2C14E]"
+              href="/read"
             >
-              Hồ sơ đọc
+              Tiếp tục đọc
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
             <Link
-              className="inline-flex h-10 items-center justify-center rounded-xl bg-[#D6A84F] px-4 text-sm font-bold text-slate-950 transition hover:bg-[#F2C14E]"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#F2C14E] px-4 text-sm font-black text-[#17202A] transition hover:bg-[#FFD46B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               href="/marketplace"
             >
               Mở chợ sách
             </Link>
           </div>
-        </header>
+        </div>
+      </section>
 
-        <section className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5 shadow-[0_18px_55px_rgba(0,0,0,0.24)] backdrop-blur-2xl">
-            <Timer className="h-5 w-5 text-[#7DD3C7]" aria-hidden="true" />
-            <p className="mt-4 text-2xl font-black">{numberFormatter.format(totalReadingMinutes)}</p>
-            <p className="mt-1 text-sm text-zinc-400">Tổng phút đã đọc</p>
+      <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <section aria-label="Chỉ số tổng quan" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-[#176B62]/15 bg-white p-5 shadow-sm">
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-[#E6F3F0] text-[#176B62]">
+              <Timer className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <p className="mt-4 text-2xl font-black tabular-nums text-[#17202A]">{numberFormatter.format(totalReadingMinutes)}</p>
+            <p className="mt-1 text-sm font-medium text-[#66706B]">Tổng phút đã đọc</p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5 shadow-[0_18px_55px_rgba(0,0,0,0.24)] backdrop-blur-2xl">
-            <BookOpenCheck className="h-5 w-5 text-[#F2C14E]" aria-hidden="true" />
-            <p className="mt-4 text-2xl font-black">{completedBooks}</p>
-            <p className="mt-1 text-sm text-zinc-400">Sách đã hoàn thành</p>
+          <div className="rounded-2xl border border-[#B17700]/15 bg-white p-5 shadow-sm">
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-[#FFF4DD] text-[#9B6700]">
+              <BookOpenCheck className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <p className="mt-4 text-2xl font-black tabular-nums text-[#17202A]">{completedBooks}</p>
+            <p className="mt-1 text-sm font-medium text-[#66706B]">Sách đã hoàn thành</p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5 shadow-[0_18px_55px_rgba(0,0,0,0.24)] backdrop-blur-2xl">
-            <ChartNoAxesCombined className="h-5 w-5 text-[#7DD3C7]" aria-hidden="true" />
-            <p className="mt-4 text-2xl font-black">{averageProgress}%</p>
-            <p className="mt-1 text-sm text-zinc-400">Tiến độ trung bình</p>
+          <div className="rounded-2xl border border-[#176B62]/15 bg-white p-5 shadow-sm">
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-[#E6F3F0] text-[#176B62]">
+              <ChartNoAxesCombined className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <p className="mt-4 text-2xl font-black tabular-nums text-[#17202A]">{averageProgress}%</p>
+            <p className="mt-1 text-sm font-medium text-[#66706B]">Tiến độ trung bình</p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5 shadow-[0_18px_55px_rgba(0,0,0,0.24)] backdrop-blur-2xl">
-            <ShieldCheck className="h-5 w-5 text-[#F2C14E]" aria-hidden="true" />
-            <p className="mt-4 text-2xl font-black">{currencyFormatter.format(totalRevenue)}</p>
-            <p className="mt-1 text-sm text-zinc-400">
+          <div className="rounded-2xl border border-[#C65D43]/15 bg-white p-5 shadow-sm">
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-[#FFF0EB] text-[#C65D43]">
+              <ShieldCheck className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <p className="mt-4 text-2xl font-black tabular-nums text-[#17202A]">{currencyFormatter.format(totalRevenue)}</p>
+            <p className="mt-1 text-sm font-medium text-[#66706B]">
               {uniqueOrders} đơn / {totalSellerItems} sản phẩm
             </p>
           </div>
@@ -298,13 +314,13 @@ export default async function DashboardPage() {
         </div>
 
         <section className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="rounded-2xl border border-white/10 bg-slate-950/72 p-5 shadow-[0_24px_90px_rgba(0,0,0,0.32)] backdrop-blur-2xl">
+          <div className="rounded-2xl border border-[#176B62]/15 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-xl font-black">Sách đang đọc</h2>
-                <p className="mt-1 text-sm text-zinc-400">Lấy trực tiếp từ bảng `reading_progress` của user hiện tại.</p>
+                <h2 className="text-xl font-black text-[#17202A]">Sách đang đọc</h2>
+                <p className="mt-1 text-sm text-[#66706B]">Các cuốn vừa đọc và tiến độ mới nhất của bạn.</p>
               </div>
-              <Link className="text-sm font-bold text-[#F2C14E] hover:underline" href="/catalog">
+              <Link className="inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-bold text-[#176B62] transition hover:bg-[#E6F3F0] hover:underline" href="/catalog">
                 Danh mục sách
               </Link>
             </div>
@@ -313,73 +329,73 @@ export default async function DashboardPage() {
               {readingProgress.length > 0 ? (
                 readingProgress.map((item) => (
                   <article
-                    className="rounded-xl border border-white/10 bg-white/[0.05] p-4 transition hover:bg-white/[0.08]"
+                    className="rounded-xl border border-[#D8D0C2] bg-[#FFFDF8] p-4 transition hover:border-[#176B62]/30 hover:bg-[#F7FBF9]"
                     key={`${item.book.title}-${item.currentPage}`}
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
-                        <h3 className="truncate text-base font-black text-zinc-50">{item.book.title}</h3>
-                        <p className="mt-1 text-sm text-zinc-400">{item.book.authorName}</p>
+                        <h3 className="truncate text-base font-black text-[#17202A]">{item.book.title}</h3>
+                        <p className="mt-1 text-sm text-[#66706B]">{item.book.authorName}</p>
                       </div>
-                      <span className="rounded-full bg-[#0F766E]/18 px-3 py-1 text-xs font-bold text-[#7DD3C7] ring-1 ring-[#0F766E]/35">
+                      <span className="rounded-full bg-[#E6F3F0] px-3 py-1 text-xs font-bold text-[#176B62] ring-1 ring-[#176B62]/20">
                         {Math.round(item.progressPercent)}%
                       </span>
                     </div>
-                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#E7E0D5]">
                       <div
                         className="h-full rounded-full bg-[#D6A84F]"
                         style={{ width: `${Math.min(Math.max(item.progressPercent, 0), 100)}%` }}
                       />
                     </div>
-                    <p className="mt-2 text-xs text-zinc-500">
+                    <p className="mt-2 text-xs text-[#66706B]">
                       Trang {item.currentPage} - {item.totalMinutes} phút - đọc gần nhất{" "}
                       {dateFormatter.format(item.lastReadAt ?? item.updatedAt)}
                     </p>
                   </article>
                 ))
               ) : (
-                <p className="rounded-xl border border-dashed border-white/12 bg-white/[0.04] p-4 text-sm text-zinc-400">
+                <p className="rounded-xl border border-dashed border-[#D8D0C2] bg-[#F7F4ED] p-4 text-sm text-[#66706B]">
                   Chưa có tiến độ đọc. Hãy mở một cuốn sách và lưu tiến độ để dashboard có dữ liệu.
                 </p>
               )}
             </div>
           </div>
 
-          <aside className="h-fit rounded-2xl border border-white/10 bg-zinc-950/72 p-5 shadow-[0_24px_90px_rgba(0,0,0,0.32)] backdrop-blur-2xl">
-            <h2 className="text-xl font-black">Điểm chất lượng theo quy tắc</h2>
-            <p className="mt-1 text-sm text-zinc-400">
-              Công thức deterministic v1 từ đơn hoàn tất/hủy và chất lượng listing; không phải điểm AI.
+          <aside className="h-fit rounded-2xl border border-[#C65D43]/15 bg-white p-5 shadow-sm">
+            <h2 className="text-xl font-black text-[#17202A]">Uy tín người bán</h2>
+            <p className="mt-1 text-sm leading-6 text-[#66706B]">
+              Điểm được tính từ đơn hoàn tất, đơn hủy và chất lượng tin đăng.
             </p>
 
             {sellerQualityScore ? (
               <div className="mt-5">
                 <div className="flex items-end justify-between gap-3">
                   <div>
-                    <p className="text-4xl font-black text-[#F2C14E]">{sellerQualityScore.score.toFixed(1)}</p>
-                    <p className="text-sm text-zinc-400">/ 100 điểm</p>
+                    <p className="text-4xl font-black text-[#C65D43]">{sellerQualityScore.score.toFixed(1)}</p>
+                    <p className="text-sm text-[#66706B]">/ 100 điểm</p>
                   </div>
-                  <span className="rounded-full border border-[#0F766E]/35 bg-[#0F766E]/18 px-3 py-1 text-xs font-bold text-[#7DD3C7]">
+                  <span className="rounded-full border border-[#176B62]/20 bg-[#E6F3F0] px-3 py-1 text-xs font-bold text-[#176B62]">
                     {sellerQualityScore.badge}
                   </span>
                 </div>
 
                 <div className="mt-5 grid grid-cols-2 gap-3">
-                  <div className="rounded-xl border border-white/10 bg-white/[0.05] p-3">
-                    <p className="text-lg font-black">{sellerQualityScore.facts.completedOrders}</p>
-                    <p className="text-xs text-zinc-500">Đơn hoàn tất</p>
+                  <div className="rounded-xl border border-[#D8D0C2] bg-[#FFFDF8] p-3">
+                    <p className="text-lg font-black text-[#17202A]">{sellerQualityScore.facts.completedOrders}</p>
+                    <p className="text-xs text-[#66706B]">Đơn hoàn tất</p>
                   </div>
-                  <div className="rounded-xl border border-white/10 bg-white/[0.05] p-3">
-                    <p className="text-lg font-black">{sellerQualityScore.facts.cancelledOrders}</p>
-                    <p className="text-xs text-zinc-500">Đơn đã hủy</p>
+                  <div className="rounded-xl border border-[#D8D0C2] bg-[#FFFDF8] p-3">
+                    <p className="text-lg font-black text-[#17202A]">{sellerQualityScore.facts.cancelledOrders}</p>
+                    <p className="text-xs text-[#66706B]">Đơn đã hủy</p>
                   </div>
                 </div>
 
-                <p className="mt-4 rounded-xl border border-white/10 bg-white/[0.05] p-3 text-sm leading-6 text-zinc-300">
+                <p className="mt-4 rounded-xl border border-[#176B62]/15 bg-[#E6F3F0] p-3 text-sm leading-6 text-[#31544F]">
                   {sellerQualityScore.reasons.join(" ")}
                 </p>
               </div>
             ) : (
-              <p className="mt-5 rounded-xl border border-dashed border-white/12 bg-white/[0.04] p-4 text-sm leading-6 text-zinc-400">
+              <p className="mt-5 rounded-xl border border-dashed border-[#D8D0C2] bg-[#F7F4ED] p-4 text-sm leading-6 text-[#66706B]">
                 Chưa tính được điểm chất lượng theo quy tắc cho tài khoản này.
               </p>
             )}

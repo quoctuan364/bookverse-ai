@@ -46,7 +46,7 @@ export default async function SellerApplyPage({ searchParams }: SellerApplyPageP
   }
 
   return (
-    <main className="bv-page">
+    <main className="bv-page bv-seller">
       <SellerHero
         description="Bật vai trò người bán để tạo listing chờ duyệt, theo dõi đơn hàng từ listing của mình và xem doanh thu demo."
         title="Đăng ký Seller"

@@ -92,7 +92,7 @@ export default async function EditSellerListingPage({ params, searchParams }: Ed
   const listing = data.listing;
 
   return (
-    <main className="bv-page">
+    <main className="bv-page bv-seller">
       <SellerHero
         description="Cập nhật listing của chính seller hiện tại. Nếu listing đã được duyệt, việc sửa nội dung sẽ chuyển về trạng thái chờ duyệt."
         title="Sửa listing"

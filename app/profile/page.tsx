@@ -135,16 +135,16 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
             <p className="mt-1 text-sm text-[#EAF5F1]">{data.user.email ?? data.user.id}</p>
             <div className="mt-3 grid grid-cols-2 gap-2">
               {[
-                { href: "/profile/settings", label: "Settings", icon: Settings },
-                { href: "/profile/security", label: "Security", icon: ShieldCheck },
-                { href: "/profile/addresses", label: "Addresses", icon: MapPin },
-                { href: "/library", label: "Library", icon: BookMarked },
+                { href: "/profile/settings", label: "Cài đặt", icon: Settings },
+                { href: "/profile/security", label: "Bảo mật", icon: ShieldCheck },
+                { href: "/profile/addresses", label: "Địa chỉ", icon: MapPin },
+                { href: "/library", label: "Thư viện", icon: BookMarked },
               ].map((item) => {
                 const Icon = item.icon;
 
                 return (
                   <Link
-                    className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#D6A84F] px-3 text-sm font-black text-slate-950 transition hover:bg-[#F2C14E]"
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#D6A84F] px-3 py-2 text-sm font-black text-slate-950 transition hover:bg-[#F2C14E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                     href={item.href}
                     key={item.href}
                   >
@@ -295,9 +295,9 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
 
         <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-3">
           <section className="bv-card rounded-lg p-5">
-            <div className="mb-5 flex items-center gap-2 text-[#17202A]">
-              <ReceiptText className="h-5 w-5" aria-hidden="true" />
-              <h2 className="text-xl font-black">Đơn hàng</h2>
+            <div className="mb-5 flex items-center justify-between gap-3 text-[#17202A]">
+              <span className="flex items-center gap-2"><ReceiptText className="h-5 w-5" aria-hidden="true" /><h2 className="text-xl font-black">Đơn hàng</h2></span>
+              <Link className="inline-flex min-h-11 items-center text-sm font-bold text-[#176B62] hover:underline" href="/orders">Xem tất cả</Link>
             </div>
             {data.orders.length > 0 ? (
               <div className="space-y-3">

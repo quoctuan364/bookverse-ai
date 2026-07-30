@@ -5,7 +5,7 @@ import React, { useEffect, useMemo, useReducer, useRef, type CSSProperties } fro
 import {
   bookCoverLoadReducer,
   createBookCoverLoadState,
-  getDemoCoverArt,
+  getDemoCoverArtPath,
   getDemoCoverLayout,
   getRealCatalogLocalCoverPath,
   getRealCatalogNormalizedCoverPath,
@@ -28,20 +28,14 @@ interface BookCoverProps {
   style?: CSSProperties;
   timeoutMs?: number;
   title: string;
+  useBookVerseArtwork?: boolean;
 }
-
-const LAYOUT_CLASSES = [
-  "inset-x-4 bottom-5 border-l-4 border-amber-300 bg-slate-950/80 p-3 text-left",
-  "inset-x-3 top-5 rounded-sm bg-stone-50/95 p-3 text-slate-950 shadow-xl",
-  "left-3 right-8 bottom-4 border-t border-white/70 bg-indigo-950/80 p-3 text-left",
-  "inset-x-4 top-1/2 -translate-y-1/2 rounded-xl bg-black/70 p-3 text-center backdrop-blur-sm",
-  "left-4 right-3 bottom-6 rounded-r-2xl bg-emerald-950/80 p-3 text-left",
-  "inset-x-3 bottom-3 border border-white/35 bg-neutral-950/80 p-3 text-center shadow-2xl",
-] as const;
 
 /**
  * Bìa sách dùng chung toàn hệ thống.
- * Bìa demo cũ/null/lỗi tải chỉ chuyển một lần sang fallback, không retry vô hạn.
+ * Sách catalog ưu tiên bìa thật đã tải về, sau đó mới thử bản chuẩn hóa và URL
+ * đúng record. Khi mọi nguồn đều lỗi, component dùng artwork BookVerse có
+ * tiêu đề và tác giả thay cho ô placeholder trống.
  */
 export function BookCover({
   alt,
@@ -55,47 +49,72 @@ export function BookCover({
   style,
   timeoutMs = 8_000,
   title,
+  useBookVerseArtwork = false,
 }: BookCoverProps) {
-  const localSource = useMemo(() => getRealCatalogLocalCoverPath(bookId), [bookId]);
-  const normalizedSource = useMemo(() => getRealCatalogNormalizedCoverPath(bookId), [bookId]);
+  // useBookVerseArtwork được giữ để tương thích với các nơi đang gọi component.
+  // Dù là sách tuyển chọn, ảnh vẫn phải là bìa đúng của chính cuốn sách.
+  const publicSource = src;
+  const localSource = useMemo(
+    () => getRealCatalogLocalCoverPath(bookId),
+    [bookId],
+  );
+  const normalizedSource = useMemo(
+    () => getRealCatalogNormalizedCoverPath(bookId),
+    [bookId],
+  );
   const [loadState, dispatch] = useReducer(
     bookCoverLoadReducer,
-    { source: src, localSource, normalizedSource },
+    { source: publicSource, localSource, normalizedSource },
     ({ source, localSource: initialLocalSource, normalizedSource: initialNormalizedSource }) =>
       createBookCoverLoadState(source, initialLocalSource, initialNormalizedSource),
   );
   const sourceImageRef = useRef<HTMLImageElement>(null);
-  const previousSourceRef = useRef<{ bookId: string; src?: string | null }>({ bookId, src });
-  const art = useMemo(() => getDemoCoverArt({ bookId, title, category }), [bookId, category, title]);
-  const layout = useMemo(() => getDemoCoverLayout(bookId), [bookId]);
+  const previousSourceRef = useRef<{ bookId: string; src?: string | null; useBookVerseArtwork: boolean }>({
+    bookId,
+    src: publicSource,
+    useBookVerseArtwork,
+  });
   const displayTitle = useMemo(() => sanitizeFallbackTitle(title), [title]);
   const displayAuthor = useMemo(() => sanitizeFallbackAuthor(author), [author]);
+  const displayCategory = category?.trim() || "Tủ sách BookVerse";
+  const generatedArtworkPath = useMemo(
+    () => getDemoCoverArtPath({ bookId, title, category }),
+    [bookId, category, title],
+  );
+  const generatedLayout = useMemo(() => getDemoCoverLayout(bookId), [bookId]);
+  const titlePosition =
+    generatedLayout % 3 === 0
+      ? "justify-start pt-[17cqw]"
+      : generatedLayout % 3 === 1
+        ? "justify-center"
+        : "justify-end pb-[14cqw]";
+  const accentClass = generatedLayout >= 3 ? "bg-[#E76F51]" : "bg-[#F2C14E]";
 
   useEffect(() => {
-    if (previousSourceRef.current.bookId === bookId && previousSourceRef.current.src === src) return;
-    previousSourceRef.current = { bookId, src };
-    dispatch({ type: "RESET", source: src, localSource, normalizedSource });
-  }, [bookId, localSource, normalizedSource, src]);
+    if (
+      previousSourceRef.current.bookId === bookId &&
+      previousSourceRef.current.src === publicSource &&
+      previousSourceRef.current.useBookVerseArtwork === useBookVerseArtwork
+    ) {
+      return;
+    }
+    previousSourceRef.current = { bookId, src: publicSource, useBookVerseArtwork };
+    dispatch({ type: "RESET", source: publicSource, localSource, normalizedSource });
+  }, [bookId, localSource, normalizedSource, publicSource, useBookVerseArtwork]);
 
-  useEffect(() => {
-    if (loadState.settled || loadState.showFallback || !loadState.normalizedSource) return;
-
-    const timer = window.setTimeout(() => {
-      dispatch({ type: "SOURCE_FAILED", reason: "TIMEOUT" });
-    }, timeoutMs);
-
-    return () => window.clearTimeout(timer);
-  }, [loadState.normalizedSource, loadState.settled, loadState.showFallback, timeoutMs]);
+  // Ảnh lazy bên dưới viewport chưa bắt đầu tải. Không dùng timer toàn cục vì timer
+  // sẽ biến một ảnh hợp lệ thành fallback trước khi người dùng cuộn tới thẻ sách.
+  void timeoutMs;
 
   useEffect(() => {
     const image = sourceImageRef.current;
     if (!image?.complete || loadState.settled || loadState.showFallback) return;
     if (isUsableBookCoverDimensions(image.naturalWidth, image.naturalHeight)) {
-      dispatch({ type: "SOURCE_LOADED", approvedReal: isApprovedRealCover(bookId, src) });
+      dispatch({ type: "SOURCE_LOADED", approvedReal: isApprovedRealCover(bookId, publicSource) });
     } else {
       dispatch({ type: "SOURCE_FAILED", reason: "ERROR" });
     }
-  }, [bookId, loadState.settled, loadState.showFallback, src]);
+  }, [bookId, loadState.settled, loadState.showFallback, publicSource]);
 
   const markLoaded = () => {
     const image = sourceImageRef.current;
@@ -103,7 +122,7 @@ export function BookCover({
       dispatch({ type: "SOURCE_FAILED", reason: "ERROR" });
       return;
     }
-    dispatch({ type: "SOURCE_LOADED", approvedReal: isApprovedRealCover(bookId, src) });
+    dispatch({ type: "SOURCE_LOADED", approvedReal: isApprovedRealCover(bookId, publicSource) });
   };
 
   const markFailed = () => {
@@ -112,12 +131,10 @@ export function BookCover({
 
   return (
     <div
-      aria-label={loadState.showFallback ? `Bìa minh họa cho ${displayTitle}` : undefined}
-      className={cn("relative isolate block overflow-hidden bg-slate-900 [container-type:inline-size]", className)}
-      data-cover-art={loadState.showFallback ? art : undefined}
+      aria-label={loadState.showFallback ? `Bìa minh họa BookVerse cho ${displayTitle}` : undefined}
+      className={cn("relative isolate block overflow-hidden bg-stone-100 [container-type:inline-size]", className)}
       data-cover-book-id={bookId}
       data-cover-fallback={loadState.showFallback ? "true" : "false"}
-      data-cover-layout={loadState.showFallback ? layout : undefined}
       data-cover-status={loadState.status}
       role={loadState.showFallback ? "img" : undefined}
       style={{ aspectRatio: "2 / 3", ...style }}
@@ -135,28 +152,41 @@ export function BookCover({
           src={loadState.normalizedSource}
         />
       ) : (
-        <>
+        <div className="absolute inset-0 overflow-hidden bg-[#102B2A] text-white">
           <img
             alt=""
             aria-hidden="true"
             className="absolute inset-0 h-full w-full object-cover"
             decoding="async"
             loading={priority ? "eager" : loading}
-            src={`/covers/demo-art-v2/${art}.webp`}
+            src={generatedArtworkPath}
           />
-          <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/35" />
-          <span className="absolute right-2 top-2 rounded-full border border-white/40 bg-black/55 px-2 py-1 text-[8px] font-semibold uppercase tracking-[0.16em] text-white backdrop-blur-sm">
-            BookVerse Demo
-          </span>
-          <div className={cn("absolute text-white backdrop-blur-[2px]", LAYOUT_CLASSES[layout])}>
-            <p className="line-clamp-3 font-serif text-[clamp(0.78rem,4.3cqw,1.25rem)] font-bold leading-[1.1] text-current">
-              {displayTitle}
-            </p>
-            <p className="mt-2 line-clamp-2 text-[clamp(0.55rem,2.8cqw,0.8rem)] font-medium leading-tight opacity-90">
-              {displayAuthor}
-            </p>
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 bg-[linear-gradient(180deg,rgba(9,24,30,0.3)_0%,rgba(9,24,30,0.18)_34%,rgba(9,24,30,0.88)_100%)]"
+          />
+          <div aria-hidden="true" className="absolute inset-[5cqw] border border-white/30" />
+          <div className={cn("relative flex h-full flex-col px-[9cqw] text-left", titlePosition)}>
+            <div>
+              <div className="flex items-center gap-[3cqw]">
+                <span className={cn("h-[2.4cqw] w-[14cqw] rounded-full", accentClass)} />
+                <p className="text-[clamp(0.42rem,2.4cqw,0.68rem)] font-black uppercase tracking-[0.17em] text-white/90">
+                  Minh họa BookVerse
+                </p>
+              </div>
+              <p className="mt-[5cqw] line-clamp-1 text-[clamp(0.46rem,2.6cqw,0.72rem)] font-bold uppercase tracking-[0.12em] text-white/75">
+                {displayCategory}
+              </p>
+              <p className="mt-[3cqw] line-clamp-4 text-[clamp(0.82rem,5cqw,1.45rem)] font-black leading-[1.05] tracking-[-0.025em] text-white [text-shadow:0_2px_12px_rgba(0,0,0,0.45)]">
+                {displayTitle}
+              </p>
+              <div className="mt-[5cqw] h-px w-[18cqw] bg-white/55" />
+              <p className="mt-[4cqw] line-clamp-2 text-[clamp(0.52rem,2.9cqw,0.82rem)] font-semibold leading-tight text-white/90">
+                {displayAuthor}
+              </p>
+            </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

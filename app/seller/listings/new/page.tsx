@@ -56,7 +56,7 @@ export default async function NewSellerListingPage({ searchParams }: NewSellerLi
   const [params, data] = await Promise.all([searchParams, getSellerListingEditorData()]);
 
   return (
-    <main className="bv-page">
+    <main className="bv-page bv-seller">
       <SellerHero
         description="Listing mới được tạo ở trạng thái chờ duyệt. Admin duyệt xong thì listing mới xuất hiện ở marketplace."
         title="Tạo listing seller"
@@ -71,7 +71,7 @@ export default async function NewSellerListingPage({ searchParams }: NewSellerLi
             <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-black uppercase tracking-[0.16em] text-[#F2C14E]">Listing mới</p>
-                <h1 className="mt-2 text-2xl font-black text-white">Thông tin sách đăng bán</h1>
+                <h2 className="mt-2 text-2xl font-black text-white">Thông tin sách đăng bán</h2>
               </div>
               <Link className={secondaryButton} href="/seller/listings">
                 <ArrowLeft className="h-4 w-4" aria-hidden="true" />

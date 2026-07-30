@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BookMarked, BookOpen, Heart, Highlighter, LibraryBig, ReceiptText, Trash2 } from "lucide-react";
+import { BarChart3, BookMarked, BookOpen, CalendarDays, Heart, Highlighter, LibraryBig, ReceiptText, Target, Trash2, Trophy } from "lucide-react";
 import { getLibraryData, toggleFavoriteBook, type LibraryBookItem } from "@/actions/library.actions";
 import { BookCover } from "@/components/shared/BookCover";
 import { Button } from "@/components/ui/button";
@@ -101,13 +101,43 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
               Sách đang đọc, đã mua, yêu thích, bookmark và highlight của tài khoản hiện tại.
             </p>
           </div>
-          <Link
-            className="inline-flex h-11 w-fit items-center justify-center gap-2 rounded-lg bg-[#FFFDF8] px-4 py-2 text-sm font-bold text-[#0F3F3C] shadow-[0_12px_30px_rgba(0,0,0,0.14)] transition hover:bg-[#F2C14E]/95"
-            href="/catalog"
-          >
-            <LibraryBig className="h-4 w-4" aria-hidden="true" />
-            Mở danh mục
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-white/20 px-4 py-2 text-sm font-bold text-white transition hover:bg-white/10"
+              href="/reading/insights"
+            >
+              <BarChart3 className="h-4 w-4" aria-hidden="true" />
+              Thống kê đọc
+            </Link>
+            <Link
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-white/20 px-4 py-2 text-sm font-bold text-white transition hover:bg-white/10"
+              href="/reading/challenges"
+            >
+              <Trophy className="h-4 w-4" aria-hidden="true" />
+              Thành tích
+            </Link>
+            <Link
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-white/20 px-4 py-2 text-sm font-bold text-white transition hover:bg-white/10"
+              href="/reading/calendar"
+            >
+              <CalendarDays className="h-4 w-4" aria-hidden="true" />
+              Lịch đọc
+            </Link>
+            <Link
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-white/20 px-4 py-2 text-sm font-bold text-white transition hover:bg-white/10"
+              href="/reading/goals"
+            >
+              <Target className="h-4 w-4" aria-hidden="true" />
+              Mục tiêu
+            </Link>
+            <Link
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#FFFDF8] px-4 py-2 text-sm font-bold text-[#0F3F3C] shadow-[0_12px_30px_rgba(0,0,0,0.14)] transition hover:bg-[#F2C14E]/95"
+              href="/catalog"
+            >
+              <LibraryBig className="h-4 w-4" aria-hidden="true" />
+              Mở danh mục
+            </Link>
+          </div>
         </div>
       </section>
 

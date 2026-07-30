@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -282,7 +281,12 @@ function csvCell(value: unknown): string {
 }
 
 function normalizedCore(record: GoldCatalogRecord): Record<string, unknown> {
-  const { normalizedChecksum: _normalizedChecksum, retrievedAt: _retrievedAt, metadataQualityScore: _score, qualityTier: _tier, rejectionReasons: _reasons, ...core } = record;
+  const core: Record<string, unknown> = { ...record };
+  delete core.normalizedChecksum;
+  delete core.retrievedAt;
+  delete core.metadataQualityScore;
+  delete core.qualityTier;
+  delete core.rejectionReasons;
   return core;
 }
 

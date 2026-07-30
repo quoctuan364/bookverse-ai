@@ -26,8 +26,8 @@ async function main(): Promise<void> {
   assert.equal(secondPage.books.length, 24);
   assert.equal(new Set([...firstPage.books, ...secondPage.books].map((book) => book.id)).size, 48);
   assert.ok(firstPage.books.every((book) => book.catalogSource === "CURATED_REAL"));
-  assert.ok(firstPage.books.every((book) => book.metadataBadge === "Metadata tuyển chọn"));
-  assert.ok(firstPage.books.every((book) => book.priceLabel === "Giá demo"));
+  assert.ok(firstPage.books.every((book) => book.metadataBadge === "Sách tuyển chọn"));
+  assert.ok(firstPage.books.every((book) => book.priceLabel === "Giá BookVerse"));
 
   const demoPage = await getCatalogData({ source: "demo", page: 1 });
   assert.equal(demoPage.totalBooks, 2_200);

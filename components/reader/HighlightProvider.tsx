@@ -19,6 +19,7 @@ export interface ReaderHighlightItem {
   endOffset: number | null;
   text: string;
   note: string | null;
+  color: "YELLOW" | "GREEN" | "PINK";
   createdAt: string;
 }
 
@@ -35,7 +36,12 @@ interface HighlightContextValue {
   isLoading: boolean;
   message: string | null;
   captureSelection: () => void;
-  saveSelectionHighlight: (note?: string) => Promise<void>;
+  saveSelectionHighlight: (
+    note?: string,
+    color?: ReaderHighlightItem["color"],
+  ) => Promise<void>;
+  deleteHighlight: (highlightId: string) => Promise<void>;
+  updateHighlightNote: (highlightId: string, note: string) => Promise<void>;
   renderHighlightedText: (text: string, blockId: string) => ReactNode;
   refreshHighlights: () => Promise<void>;
 }
@@ -63,6 +69,7 @@ function isHighlightItem(value: unknown): value is ReaderHighlightItem {
     (typeof item.startOffset === "number" || item.startOffset === null) &&
     (typeof item.endOffset === "number" || item.endOffset === null) &&
     typeof item.text === "string"
+    && ["YELLOW", "GREEN", "PINK"].includes(item.color)
   );
 }
 
@@ -197,7 +204,7 @@ export function HighlightProvider({ bookId, currentPage, children }: HighlightPr
   }, []);
 
   const saveSelectionHighlight = useCallback(
-    async (note?: string) => {
+    async (note?: string, color: ReaderHighlightItem["color"] = "YELLOW") => {
       const draft = selectionDraft ?? getSelectionDraft();
 
       if (!draft) {
@@ -218,6 +225,7 @@ export function HighlightProvider({ bookId, currentPage, children }: HighlightPr
           endOffset: draft.endOffset,
           text: draft.text,
           note,
+          color,
         }),
       });
       const payload: unknown = await response.json();
@@ -232,6 +240,63 @@ export function HighlightProvider({ bookId, currentPage, children }: HighlightPr
     },
     [bookId, currentPage, refreshHighlights, selectionDraft],
   );
+
+  const deleteHighlight = useCallback(async (highlightId: string) => {
+    setIsLoading(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/highlights?id=${encodeURIComponent(highlightId)}`, {
+        method: "DELETE",
+      });
+      const payload: unknown = await response.json();
+
+      if (!response.ok) {
+        const error = payload && typeof payload === "object" && "error" in payload
+          ? String(payload.error)
+          : "Không thể xóa highlight.";
+        throw new Error(error);
+      }
+
+      setHighlights((items) => items.filter((item) => item.id !== highlightId));
+      setMessage("Đã xóa highlight.");
+    } catch (error: unknown) {
+      setMessage(error instanceof Error ? error.message : "Không thể xóa highlight.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const updateHighlightNote = useCallback(async (highlightId: string, note: string) => {
+    setIsLoading(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch("/api/highlights", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: highlightId, note }),
+      });
+      const payload: unknown = await response.json();
+      const updatedHighlight = payload && typeof payload === "object" && "data" in payload
+        ? payload.data
+        : null;
+
+      if (!response.ok || !isHighlightItem(updatedHighlight)) {
+        const error = payload && typeof payload === "object" && "error" in payload
+          ? String(payload.error)
+          : "Không thể cập nhật ghi chú.";
+        throw new Error(error);
+      }
+
+      setHighlights((items) => items.map((item) => item.id === updatedHighlight.id ? updatedHighlight : item));
+      setMessage("Đã cập nhật ghi chú highlight.");
+    } catch (error: unknown) {
+      setMessage(error instanceof Error ? error.message : "Không thể cập nhật ghi chú.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   const renderHighlightedText = useCallback(
     (text: string, blockId: string) => {
@@ -255,7 +320,13 @@ export function HighlightProvider({ bookId, currentPage, children }: HighlightPr
         if (endOffset > startOffset) {
           segments.push(
             <mark
-              className="rounded bg-[#F2C14E]/35 px-0.5 text-inherit ring-1 ring-[#F2C14E]/30"
+              className={
+                highlight.color === "GREEN"
+                  ? "rounded bg-emerald-400/30 px-0.5 text-inherit ring-1 ring-emerald-400/35"
+                  : highlight.color === "PINK"
+                    ? "rounded bg-pink-400/30 px-0.5 text-inherit ring-1 ring-pink-400/35"
+                    : "rounded bg-[#F2C14E]/35 px-0.5 text-inherit ring-1 ring-[#F2C14E]/30"
+              }
               data-highlight-id={highlight.id}
               key={highlight.id}
               title={highlight.note ?? highlight.text}
@@ -285,11 +356,14 @@ export function HighlightProvider({ bookId, currentPage, children }: HighlightPr
       message,
       captureSelection,
       saveSelectionHighlight,
+      deleteHighlight,
+      updateHighlightNote,
       renderHighlightedText,
       refreshHighlights,
     }),
     [
       captureSelection,
+      deleteHighlight,
       highlights,
       isLoading,
       message,
@@ -297,6 +371,7 @@ export function HighlightProvider({ bookId, currentPage, children }: HighlightPr
       renderHighlightedText,
       saveSelectionHighlight,
       selectionDraft,
+      updateHighlightNote,
     ],
   );
 

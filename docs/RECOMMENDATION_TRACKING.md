@@ -17,6 +17,18 @@ Mỗi request có ID do server tạo, owner đã xác thực, `algorithmVersion`
 
 Anonymous telemetry chưa được hỗ trợ trong F1 vì chưa có session token an toàn. User không tồn tại hoặc `isLocked=true` không được ghi event.
 
+### Data-readiness extension 30/07/2026
+
+Request có thêm `collectionContext`, `pilotId`, `consentVersion` và
+`experimentGroup`; item có `sourceComponent`; telemetry event có `deviceClass`.
+Device do server suy từ User-Agent, không nhận từ JSON client. Dữ liệu mặc định
+là `STANDARD_APP`; chỉ server được cấu hình đầy đủ cho pilot sau consent mới ghi
+`PILOT_CONSENTED`. Migration không backfill dữ liệu lịch sử.
+
+Export modeling chỉ nhận `PILOT_CONSENTED`, ẩn danh user/request/item/source ID
+bằng HMAC với key cục bộ tối thiểu 32 ký tự. Search/chat text, email, tên và
+secret không được export.
+
 ### Policy position F1.1
 
 Mọi surface dùng chung `normalizeRecommendationCandidates` trước khi lưu request item. Policy giữ thứ tự output production; khi cần tie-break dùng source priority `CURRENT > DAILY > LEGACY > FALLBACK`, rank gốc hợp lệ rồi Book ID. Book được dedupe theo ID trước top-K, không cộng score và chỉ giữ evidence của candidate thắng; evidence response được dedupe theo type/label/source.
@@ -70,7 +82,9 @@ CTR = số RECOMMENDATION_CLICK hợp lệ / số RECOMMENDATION_IMPRESSION hợ
 
 Tử và mẫu phải cùng surface, cùng khoảng thời gian và cùng policy lọc. Request count không phải impression; `BOOK_VIEW` không phải click. Fixture chỉ kiểm tra công thức, không phải kết quả production.
 
-**CTR hiện tại: `NOT_AVAILABLE`.** Lý do: dữ liệu lịch sử là synthetic và chưa có kỳ thu thập telemetry instrumented thật. Không được công bố CTR thật từ các fixture đã cleanup.
+**CTR hiện tại: `NOT_AVAILABLE`.** Lý do: dữ liệu lịch sử là synthetic và chưa
+có kỳ thu thập telemetry instrumented thật. Audit mới đo 0 impression, 0 click,
+0 conversion đủ pilot provenance. Không được công bố CTR thật từ fixture.
 
 ## 8. Cách kiểm tra
 

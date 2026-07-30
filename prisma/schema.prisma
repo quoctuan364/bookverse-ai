@@ -20,11 +20,28 @@ enum BookFormat {
   BOTH
 }
 
+enum EditionType {
+  PAPER_NEW
+  PAPER_USED
+  EBOOK
+}
+
 enum BookStatus {
   ACTIVE
   DRAFT
   HIDDEN
   ARCHIVED
+}
+
+enum CoverReviewStatus {
+  VERIFIED_LOCAL
+  NEEDS_COVER_REVIEW
+}
+
+enum HighlightColor {
+  YELLOW
+  GREEN
+  PINK
 }
 
 enum ListingCondition {
@@ -121,6 +138,19 @@ enum RecommendationTelemetryType {
   CONVERSION
 }
 
+enum RecommendationCollectionContext {
+  STANDARD_APP
+  PILOT_CONSENTED
+  BLINDED_RELEVANCE
+}
+
+enum RecommendationDeviceClass {
+  DESKTOP
+  MOBILE
+  TABLET
+  UNKNOWN
+}
+
 enum ChatbotMessageRole {
   USER
   ASSISTANT
@@ -141,6 +171,25 @@ enum FeedbackValue {
   NOT_HELPFUL
   IRRELEVANT
   DISMISSED
+}
+
+enum MembershipBillingPeriod {
+  MONTHLY
+  YEARLY
+}
+
+enum SubscriptionStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum MembershipPaymentStatus {
+  PENDING
+  PAID_DEMO
+  FAILED
+  REFUNDED
 }
 
 model User {
@@ -165,6 +214,7 @@ model User {
   readingSessions         ReadingSession[]
   bookmarks               Bookmark[]
   highlights              Highlight[]
+  readingEntitlements     ReadingEntitlement[]
   favoriteBooks           FavoriteBook[]
   shippingAddresses       ShippingAddress[]
   interactionEvents       InteractionEvent[]
@@ -180,6 +230,8 @@ model User {
   recommendationRequests  RecommendationRequest[]
   recommendationTelemetry RecommendationTelemetryEvent[]
   chatbotFeedback         ChatbotFeedback[]
+  subscriptions           Subscription[]
+  membershipPayments      MembershipPayment[]
   createdAt               DateTime                       @default(now())
   updatedAt               DateTime                       @updatedAt
 
@@ -264,10 +316,16 @@ model Book {
   status                     BookStatus                  @default(ACTIVE)
   deletedAt                  DateTime?
   coverPath                  String?
+  languageCode               String?
+  coverReviewStatus          CoverReviewStatus           @default(NEEDS_COVER_REVIEW)
+  isPubliclyVisible          Boolean                     @default(false)
   categoryId                 String
   category                   Category                    @relation(fields: [categoryId], references: [id])
   tags                       BookTag[]                   @relation("BooksOnTags")
   listings                   Listing[]
+  editions                   BookEdition[]
+  chunks                     BookChunk[]
+  readingEntitlements        ReadingEntitlement[]
   orderItems                 OrderItem[]
   posts                      Post[]
   interactions               Interaction[]
@@ -283,12 +341,169 @@ model Book {
   recommendationRequestItems RecommendationRequestItem[]
   embedding                  BookEmbedding?
   sourceMetadata             BookSourceMetadata?
+  membershipPlans            MembershipPlan[]            @relation("MembershipPlanBooks")
+  subscriptionAccesses       SubscriptionBookAccess[]
   createdAt                  DateTime                    @default(now())
   updatedAt                  DateTime                    @updatedAt
 
   @@index([categoryId])
   @@index([title])
   @@index([status])
+  @@index([languageCode])
+  @@index([coverReviewStatus, isPubliclyVisible])
+}
+
+// Gói hội viên có thể bao gồm một tập sách Ebook khác nhau.
+model MembershipPlan {
+  id            String                  @id @default(cuid())
+  name          String
+  slug          String                  @unique
+  description   String?
+  price         Decimal                 @db.Decimal(12, 2)
+  durationDays  Int
+  billingPeriod MembershipBillingPeriod @default(MONTHLY)
+  isActive      Boolean                 @default(true)
+  features      String[]                @default([])
+  books         Book[]                  @relation("MembershipPlanBooks")
+  subscriptions Subscription[]
+  payments      MembershipPayment[]
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  @@index([isActive, price])
+  @@map("membership_plans")
+}
+
+model Subscription {
+  id           String                   @id @default(cuid())
+  userId       String
+  planId       String
+  status       SubscriptionStatus       @default(PENDING)
+  startsAt     DateTime
+  endsAt       DateTime
+  cancelledAt  DateTime?
+  user         User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan         MembershipPlan           @relation(fields: [planId], references: [id], onDelete: Restrict)
+  payments     MembershipPayment[]
+  bookAccesses SubscriptionBookAccess[]
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+
+  @@index([userId, status, endsAt])
+  @@index([planId, status])
+  @@map("subscriptions")
+}
+
+// Ảnh chụp kho sách tại thời điểm đăng ký để thay đổi gói sau này không tước quyền đã bán.
+model SubscriptionBookAccess {
+  id             String       @id @default(cuid())
+  subscriptionId String
+  bookId         String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  book           Book         @relation(fields: [bookId], references: [id], onDelete: Restrict)
+  createdAt      DateTime     @default(now())
+
+  @@unique([subscriptionId, bookId])
+  @@index([bookId])
+  @@map("subscription_book_accesses")
+}
+
+model MembershipPayment {
+  id             String                  @id @default(cuid())
+  userId         String
+  planId         String
+  subscriptionId String?
+  amount         Decimal                 @db.Decimal(12, 2)
+  status         MembershipPaymentStatus @default(PENDING)
+  paymentMethod  PaymentMethod
+  transactionRef String                  @unique
+  paidAt         DateTime?
+  user           User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan           MembershipPlan          @relation(fields: [planId], references: [id], onDelete: Restrict)
+  subscription   Subscription?           @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  @@index([userId, status])
+  @@index([planId, status])
+  @@index([subscriptionId])
+  @@map("membership_payments")
+}
+
+// Nội dung Ebook đã tách nhỏ theo chương/đoạn để đọc, tìm kiếm và tạo embedding.
+model BookChunk {
+  id            String   @id @default(cuid())
+  bookId        String
+  chapterNumber Int
+  chapterTitle  String
+  pageNumber    Int?
+  chunkIndex    Int
+  content       String   @db.Text
+  embedding     Json?
+  book          Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+
+  @@unique([bookId, chapterNumber, chunkIndex])
+  @@index([bookId, chapterNumber])
+  @@index([bookId, pageNumber])
+  @@map("book_chunks")
+}
+
+// Một đầu sách có thể được phát hành dưới nhiều dạng: sách mới, sách cũ hoặc Ebook.
+model BookEdition {
+  id           String        @id @default(cuid())
+  bookId       String
+  editionType  EditionType
+  price        Decimal       @db.Decimal(12, 2)
+  stock        Int           @default(0)
+  isbn         String?
+  publisher    String?
+  publishYear  Int?
+  languageCode String?
+  isActive     Boolean       @default(true)
+  book         Book          @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  digitalAsset DigitalAsset?
+  listings     Listing[]
+  orderItems   OrderItem[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([bookId])
+  @@index([editionType, isActive])
+  @@index([bookId, editionType])
+  @@index([languageCode])
+  @@map("book_editions")
+}
+
+// File Ebook thuộc đúng một phiên bản số; hash dùng để kiểm tra tính toàn vẹn file.
+model DigitalAsset {
+  id          String      @id @default(cuid())
+  editionId   String      @unique
+  fileUrl     String
+  fileHash    String
+  samplePages Int         @default(10)
+  mimeType    String?
+  fileSize    Int?
+  edition     BookEdition @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([fileHash])
+  @@map("digital_assets")
+}
+
+// Quyền đọc toàn bộ Ebook. Upsert theo cặp user-sách giúp cấp quyền an toàn, không trùng.
+model ReadingEntitlement {
+  id        String   @id @default(cuid())
+  userId    String
+  bookId    String
+  grantedAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, bookId])
+  @@index([bookId])
+  @@map("reading_entitlements")
 }
 
 model BookSourceMetadata {
@@ -385,6 +600,7 @@ model Listing {
   id              String           @id
   sellerId        String
   bookId          String?
+  editionId       String?
   title           String
   description     String?
   condition       ListingCondition @default(GOOD)
@@ -405,6 +621,7 @@ model Listing {
   targetAudience  String?
   seller          User             @relation("SellerListings", fields: [sellerId], references: [id])
   book            Book?            @relation(fields: [bookId], references: [id], onDelete: SetNull)
+  edition         BookEdition?     @relation(fields: [editionId], references: [id], onDelete: SetNull)
   images          ListingImage[]
   orderItems      OrderItem[]
   createdAt       DateTime         @default(now())
@@ -412,6 +629,7 @@ model Listing {
 
   @@index([sellerId])
   @@index([bookId])
+  @@index([editionId])
   @@index([status])
   @@index([status, stock])
   @@index([reportCount])
@@ -507,20 +725,23 @@ model ShippingAddress {
 }
 
 model OrderItem {
-  id         String   @id @default(cuid())
+  id         String       @id @default(cuid())
   orderId    String
   bookId     String
+  editionId  String?
   listingId  String?
-  quantity   Int      @default(1)
-  unitPrice  Decimal  @db.Decimal(12, 2)
-  totalPrice Decimal  @db.Decimal(12, 2)
-  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  book       Book     @relation(fields: [bookId], references: [id])
-  listing    Listing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
-  createdAt  DateTime @default(now())
+  quantity   Int          @default(1)
+  unitPrice  Decimal      @db.Decimal(12, 2)
+  totalPrice Decimal      @db.Decimal(12, 2)
+  order      Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  book       Book         @relation(fields: [bookId], references: [id])
+  edition    BookEdition? @relation(fields: [editionId], references: [id], onDelete: SetNull)
+  listing    Listing?     @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  createdAt  DateTime     @default(now())
 
   @@index([orderId])
   @@index([bookId])
+  @@index([editionId])
   @@index([listingId])
 }
 
@@ -676,34 +897,40 @@ model RecommendationEvidence {
 }
 
 model RecommendationRequest {
-  id               String                         @id @default(cuid())
-  userId           String
-  algorithmVersion String
-  taxonomyVersion  String
-  surface          RecommendationSurface
-  candidateProfile String
-  filterProfile    String
-  user             User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items            RecommendationRequestItem[]
-  events           RecommendationTelemetryEvent[]
-  generatedAt      DateTime                       @default(now())
+  id                String                          @id @default(cuid())
+  userId            String
+  algorithmVersion  String
+  taxonomyVersion   String
+  surface           RecommendationSurface
+  candidateProfile  String
+  filterProfile     String
+  collectionContext RecommendationCollectionContext @default(STANDARD_APP)
+  pilotId           String?
+  consentVersion    String?
+  experimentGroup   String?
+  user              User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items             RecommendationRequestItem[]
+  events            RecommendationTelemetryEvent[]
+  generatedAt       DateTime                        @default(now())
 
   @@index([userId, generatedAt])
   @@index([surface, generatedAt])
   @@index([algorithmVersion, generatedAt])
+  @@index([collectionContext, pilotId, generatedAt])
   @@map("recommendation_requests")
 }
 
 model RecommendationRequestItem {
-  id        String                         @id @default(cuid())
-  requestId String
-  bookId    String
-  position  Int
-  score     Float
-  evidence  String?
-  request   RecommendationRequest          @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  book      Book                           @relation(fields: [bookId], references: [id], onDelete: Restrict)
-  events    RecommendationTelemetryEvent[]
+  id              String                         @id @default(cuid())
+  requestId       String
+  bookId          String
+  position        Int
+  score           Float
+  evidence        String?
+  sourceComponent String?
+  request         RecommendationRequest          @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  book            Book                           @relation(fields: [bookId], references: [id], onDelete: Restrict)
+  events          RecommendationTelemetryEvent[]
 
   @@unique([requestId, bookId])
   @@unique([requestId, position])
@@ -722,6 +949,7 @@ model RecommendationTelemetryEvent {
   sourceType        String?
   sourceId          String?
   attributionAnchor String?
+  deviceClass       RecommendationDeviceClass   @default(UNKNOWN)
   occurredAt        DateTime                    @default(now())
   request           RecommendationRequest       @relation(fields: [requestId], references: [id], onDelete: Cascade)
   requestItem       RecommendationRequestItem   @relation(fields: [requestItemId], references: [id], onDelete: Cascade)
@@ -874,6 +1102,7 @@ model ReadingProgress {
   userId          String
   bookId          String
   currentPage     Int       @default(0)
+  currentChapter  Int       @default(1)
   progressPercent Float     @default(0)
   totalMinutes    Int       @default(0)
   lastReadAt      DateTime?
@@ -916,7 +1145,7 @@ model Bookmark {
 }
 
 model Highlight {
-  id          String   @id @default(cuid())
+  id          String         @id @default(cuid())
   userId      String
   bookId      String
   pageNumber  Int
@@ -925,9 +1154,10 @@ model Highlight {
   endOffset   Int?
   text        String
   note        String?
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  book        Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
+  color       HighlightColor @default(YELLOW)
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book        Book           @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  createdAt   DateTime       @default(now())
 
   @@index([userId, bookId])
   @@index([bookId])

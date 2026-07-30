@@ -133,11 +133,16 @@ export function normalizeRecommendationCandidates<T>(
   }
 
   const selected = deduplicated.slice(0, topK);
-  const items = selected.map(({ _inputOrder, _productionOrder, ...candidate }, index) => ({
-    ...candidate,
-    originalRank: validRank(candidate.rank) ? candidate.rank : null,
-    position: index + 1,
-  }));
+  const items = selected.map(({ _inputOrder, _productionOrder, ...candidate }, index) => {
+    // Hai field nội bộ chỉ phục vụ sắp xếp ổn định, không được lộ ra contract API.
+    void _inputOrder;
+    void _productionOrder;
+    return {
+      ...candidate,
+      originalRank: validRank(candidate.rank) ? candidate.rank : null,
+      position: index + 1,
+    };
+  });
   const stats: RecommendationNormalizationStats = {
     inputCount: candidates.length,
     outputCount: items.length,

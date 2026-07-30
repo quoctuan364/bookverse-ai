@@ -74,6 +74,52 @@ export interface OrderActionResult {
   reason?: "AUTH_REQUIRED" | "FORBIDDEN" | "VALIDATION_ERROR" | "NOT_FOUND" | "DATABASE_ERROR";
 }
 
+export async function getMyOrders(page = 1, status?: string) {
+  const user = await requireAuthenticatedUser();
+  const safePage = Math.max(1, Math.floor(page));
+  const pageSize = 12;
+  const parsedStatus = Object.values(OrderStatus).includes(status as OrderStatus)
+    ? status as OrderStatus
+    : undefined;
+  const where = {
+    buyerId: user.id,
+    ...(parsedStatus ? { status: parsedStatus } : {}),
+    NOT: { AND: [{ status: OrderStatus.PENDING }, { paymentMethod: null }] },
+  };
+  const [orders, total] = await Promise.all([
+    prisma.order.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (safePage - 1) * pageSize,
+      take: pageSize,
+      include: {
+        items: {
+          take: 3,
+          orderBy: { createdAt: "asc" },
+          select: { quantity: true, book: { select: { title: true } } },
+        },
+        _count: { select: { items: true } },
+      },
+    }),
+    prisma.order.count({ where }),
+  ]);
+  return {
+    orders: orders.map((order) => ({
+      id: order.id,
+      status: order.status,
+      paymentMethod: order.paymentMethod,
+      totalAmount: decimalToNumber(order.totalAmount),
+      createdAt: order.createdAt,
+      itemCount: order._count.items,
+      books: order.items.map((item) => ({ title: item.book.title, quantity: item.quantity })),
+    })),
+    total,
+    page: safePage,
+    pageSize,
+    status: parsedStatus ?? "",
+  };
+}
+
 function decimalToNumber(value: DecimalLike | number | string): number {
   if (typeof value === "number") {
     return value;

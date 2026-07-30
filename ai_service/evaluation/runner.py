@@ -53,12 +53,48 @@ ALGORITHMS = (
 
 
 @dataclass(frozen=True)
+class HybridWeights:
+    reading_category: float
+    reading_author: float
+    purchase_category: float
+    popularity: float
+
+    def validate(self) -> None:
+        values = (
+            self.reading_category,
+            self.reading_author,
+            self.purchase_category,
+            self.popularity,
+        )
+        if any(value < 0 for value in values) or sum(values) <= 0:
+            raise ValueError("Trọng số hybrid phải không âm và có tổng lớn hơn 0.")
+
+    def as_dict(self) -> dict[str, float]:
+        return {
+            "readingCategory": self.reading_category,
+            "readingAuthor": self.reading_author,
+            "purchaseCategory": self.purchase_category,
+            "popularity": self.popularity,
+        }
+
+
+PRODUCTION_HYBRID_WEIGHTS = HybridWeights(
+    reading_category=production.READING_CATEGORY_WEIGHT,
+    reading_author=production.READING_AUTHOR_WEIGHT,
+    purchase_category=production.PURCHASE_CATEGORY_WEIGHT,
+    popularity=production.POPULARITY_WEIGHT,
+)
+
+
+@dataclass(frozen=True)
 class EvaluationConfig:
     cutoff: str = DEFAULT_CUTOFF
     k_values: tuple[int, ...] = DEFAULT_K_VALUES
     seed: int = 20260714
     output_root: Path = Path("outputs/evaluation")
     parity_fixture: Path | None = None
+    hybrid_weights: HybridWeights | None = None
+    include_debug_data: bool = False
 
     def validate(self) -> None:
         if not self.k_values or any(k <= 0 for k in self.k_values):
@@ -68,6 +104,7 @@ class EvaluationConfig:
                 f"K không được vượt production MAX_RECOMMENDATIONS={production.MAX_RECOMMENDATIONS}."
             )
         normalize_cutoff(self.cutoff)
+        (self.hybrid_weights or PRODUCTION_HYBRID_WEIGHTS).validate()
 
 
 def _event_frame(
@@ -324,37 +361,51 @@ def _rank_content(
     return ranked.head(limit)["bookId"].astype(str).tolist()
 
 
-def rank_hybrid_snapshot(
+def score_hybrid_candidates(
     candidate_books: pd.DataFrame,
     reading_category_scores: dict[str, float],
     reading_author_scores: dict[str, float],
     purchase_category_scores: dict[str, float],
-    limit: int,
-) -> list[dict[str, Any]]:
-    """Vector hóa đúng công thức/trọng số production, nhưng chỉ dùng snapshot train."""
+    weights: HybridWeights | None = None,
+) -> pd.DataFrame:
+    """Tính từng thành phần trước khi xếp hạng để audit được thang điểm."""
+    active_weights = weights or PRODUCTION_HYBRID_WEIGHTS
+    active_weights.validate()
     normalized_categories = production.normalize_score_map(reading_category_scores)
     normalized_authors = production.normalize_score_map(reading_author_scores)
     normalized_purchases = production.normalize_score_map(purchase_category_scores)
     ranked = candidate_books.copy()
     ranked["readingScore"] = (
         ranked["categoryId"].astype(str).map(
-            lambda key: normalized_categories.get(key, 0.0) * production.READING_CATEGORY_WEIGHT
+            lambda key: normalized_categories.get(key, 0.0)
+            * active_weights.reading_category
         )
         + ranked["authorName"].astype(str).map(
-            lambda key: normalized_authors.get(key, 0.0) * production.READING_AUTHOR_WEIGHT
+            lambda key: normalized_authors.get(key, 0.0)
+            * active_weights.reading_author
         )
     )
     ranked["purchaseScore"] = ranked["categoryId"].astype(str).map(
-        lambda key: normalized_purchases.get(key, 0.0) * production.PURCHASE_CATEGORY_WEIGHT
+        lambda key: normalized_purchases.get(key, 0.0)
+        * active_weights.purchase_category
     )
-    ranked["popularityScore"] = ranked["popularityNorm"] * production.POPULARITY_WEIGHT
+    ranked["popularityScore"] = (
+        ranked["popularityNorm"] * active_weights.popularity
+    )
     ranked["score"] = (
         ranked["readingScore"] + ranked["purchaseScore"] + ranked["popularityScore"]
     ).round(4)
+    return ranked
 
+
+def _rank_scored_hybrid(
+    scored_candidates: pd.DataFrame,
+    limit: int,
+) -> list[dict[str, Any]]:
+    ranked = scored_candidates.copy()
     positive_ranked = ranked[ranked["score"] > 0]
     if positive_ranked.empty:
-        ranked["score"] = (ranked["popularityNorm"] * production.POPULARITY_WEIGHT).round(4)
+        ranked["score"] = ranked["popularityScore"].round(4)
         ranked = ranked.sort_values(
             ["score", "rating", "bookId"],
             ascending=[False, False, True],
@@ -367,9 +418,48 @@ def rank_hybrid_snapshot(
             kind="mergesort",
         )
     return [
-        {"bookId": str(row.bookId), "score": float(row.score)}
+        {
+            "bookId": str(row.bookId),
+            "score": float(row.score),
+            "readingScore": float(row.readingScore),
+            "purchaseScore": float(row.purchaseScore),
+            "popularityScore": float(row.popularityScore),
+        }
         for row in ranked.head(limit).itertuples(index=False)
     ]
+
+
+def rank_hybrid_snapshot(
+    candidate_books: pd.DataFrame,
+    reading_category_scores: dict[str, float],
+    reading_author_scores: dict[str, float],
+    purchase_category_scores: dict[str, float],
+    limit: int,
+    weights: HybridWeights | None = None,
+) -> list[dict[str, Any]]:
+    """Xếp hạng hybrid trên snapshot train; mặc định giữ đúng trọng số production."""
+    scored = score_hybrid_candidates(
+        candidate_books,
+        reading_category_scores,
+        reading_author_scores,
+        purchase_category_scores,
+        weights,
+    )
+    return _rank_scored_hybrid(scored, limit)
+
+
+def _score_summary(frame: pd.DataFrame) -> dict[str, Any]:
+    summary: dict[str, Any] = {"candidates": int(len(frame))}
+    for column in ("readingScore", "purchaseScore", "popularityScore", "score"):
+        values = pd.to_numeric(frame[column], errors="coerce").fillna(0.0)
+        summary[column] = {
+            "min": float(values.min()) if len(values) else 0.0,
+            "max": float(values.max()) if len(values) else 0.0,
+            "mean": float(values.mean()) if len(values) else 0.0,
+            "std": float(values.std(ddof=0)) if len(values) else 0.0,
+            "nonZeroRate": float((values > 0).mean()) if len(values) else 0.0,
+        }
+    return summary
 
 
 def _percentile_95(values: list[float]) -> float:
@@ -522,6 +612,7 @@ def run_evaluation(
         algorithm: {} for algorithm in ALGORITHMS
     }
     timings: dict[str, list[float]] = {algorithm: [] for algorithm in ALGORITHMS}
+    user_score_summaries: dict[str, Any] = {}
 
     empty_sessions = _empty_frame(
         ["bookId", "title", "authorName", "categoryId", "categoryName", "timeSpent", "sessionCount"]
@@ -582,16 +673,19 @@ def run_evaluation(
         timings["behavior"].append((perf_counter() - start) * 1000.0)
 
         start = perf_counter()
-        hybrid_rows = rank_hybrid_snapshot(
+        scored_hybrid = score_hybrid_candidates(
             user_candidates,
             reading_categories,
             reading_authors,
             purchase_categories,
-            max_k,
+            config.hybrid_weights,
         )
+        hybrid_rows = _rank_scored_hybrid(scored_hybrid, max_k)
         rankings["hybrid_production_weights"][user_id] = [
             row["bookId"] for row in hybrid_rows
         ]
+        if config.include_debug_data:
+            user_score_summaries[user_id] = _score_summary(scored_hybrid)
         timings["hybrid_production_weights"].append((perf_counter() - start) * 1000.0)
 
         start = perf_counter()
@@ -669,12 +763,14 @@ def run_evaluation(
             },
             "databaseProfile": data.database_name,
             "algorithmVersion": "bookverse-temporal-baselines-v1",
-            "productionWeights": {
-                "readingCategory": production.READING_CATEGORY_WEIGHT,
-                "readingAuthor": production.READING_AUTHOR_WEIGHT,
-                "purchaseCategory": production.PURCHASE_CATEGORY_WEIGHT,
-                "popularity": production.POPULARITY_WEIGHT,
-            },
+            "productionWeights": PRODUCTION_HYBRID_WEIGHTS.as_dict(),
+            "evaluatedHybridWeights": (
+                config.hybrid_weights or PRODUCTION_HYBRID_WEIGHTS
+            ).as_dict(),
+            "usesProductionHybridWeights": (
+                config.hybrid_weights is None
+                or config.hybrid_weights == PRODUCTION_HYBRID_WEIGHTS
+            ),
         },
         "datasetFingerprint": dataset_fingerprint(data),
         "statistics": {
@@ -720,7 +816,12 @@ def run_evaluation(
             "popularity": "Train-only popularity; tie-break Book ID.",
             "content": "Category/author affinity chỉ từ user train snapshot.",
             "behavior": "Item-item cosine co-occurrence chỉ từ strong-positive train.",
-            "hybrid_production_weights": "Công thức/trọng số production trên train snapshot.",
+            "hybrid_production_weights": (
+                "Công thức/trọng số production trên train snapshot."
+                if config.hybrid_weights is None
+                or config.hybrid_weights == PRODUCTION_HYBRID_WEIGHTS
+                else "Công thức hybrid với trọng số ứng viên chỉ dùng cho nghiên cứu."
+            ),
             "random_seeded_sanity": "Sanity check có seed; không phải AI baseline.",
         },
         "metrics": metrics,
@@ -744,6 +845,23 @@ def run_evaluation(
             "InteractionEvent.PURCHASE không làm label vì không có orderId để xác minh trạng thái đơn.",
         ],
     }
+    if config.include_debug_data:
+        # Chỉ phục vụ artifact nghiên cứu. Mặc định tắt để output production
+        # parity và checksum lịch sử không phình to hoặc thay đổi contract.
+        report["debugData"] = {
+            "rankings": rankings,
+            "groundTruth": {
+                user_id: sorted(book_ids)
+                for user_id, book_ids in ground_truth.items()
+            },
+            "cohortUsers": cohort_users,
+            "interactionCounts": interaction_counts,
+            "seenBooks": {
+                user_id: sorted(seen_by_user.get(user_id, set()))
+                for user_id in sorted(ground_truth)
+            },
+            "hybridScoreSummaries": user_score_summaries,
+        }
     report = _round_metrics(report)
     report["reproducibilityChecksum"] = _canonical_checksum(report)
     return report

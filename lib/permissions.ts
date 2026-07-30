@@ -25,20 +25,24 @@ export async function getCurrentUser(): Promise<CurrentUserSession | null> {
     return null;
   }
 
-  const user = await prisma.user.findUnique({
-    where: {
-      id: sessionUser.id,
-    },
-    select: {
-      id: true,
-      role: true,
-      name: true,
-      email: true,
-      isLocked: true,
-    },
-  });
-
-  return user;
+  try {
+    return await prisma.user.findUnique({
+      where: {
+        id: sessionUser.id,
+      },
+      select: {
+        id: true,
+        role: true,
+        name: true,
+        email: true,
+        isLocked: true,
+      },
+    });
+  } catch {
+    // Khi database local tạm dừng, xem session như khách để các trang công khai vẫn hiển thị được.
+    console.warn("[permissions] Database không khả dụng; chuyển sang chế độ khách.");
+    return null;
+  }
 }
 
 export async function requireAuthenticatedUser(): Promise<CurrentUserSession> {

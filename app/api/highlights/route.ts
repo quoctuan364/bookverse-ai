@@ -1,4 +1,4 @@
-import { InteractionType, TargetType } from "@prisma/client";
+import { HighlightColor, InteractionType, TargetType } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { TAXONOMY_VERSION } from "@/lib/interaction-taxonomy";
 import { getCurrentUser } from "@/lib/permissions";
@@ -11,6 +11,12 @@ interface CreateHighlightBody {
   startOffset?: number;
   endOffset?: number;
   text?: string;
+  note?: string;
+  color?: string;
+}
+
+interface UpdateHighlightBody {
+  id?: string;
   note?: string;
 }
 
@@ -28,7 +34,8 @@ function isCreateHighlightBody(value: unknown): value is CreateHighlightBody {
     (typeof body.startOffset === "number" || typeof body.startOffset === "undefined") &&
     (typeof body.endOffset === "number" || typeof body.endOffset === "undefined") &&
     (typeof body.text === "string" || typeof body.text === "undefined") &&
-    (typeof body.note === "string" || typeof body.note === "undefined")
+    (typeof body.note === "string" || typeof body.note === "undefined") &&
+    (typeof body.color === "string" || typeof body.color === "undefined")
   );
 }
 
@@ -41,6 +48,7 @@ function serializeHighlight(highlight: {
   endOffset: number | null;
   text: string;
   note: string | null;
+  color: HighlightColor;
   createdAt: Date;
 }) {
   return {
@@ -52,6 +60,7 @@ function serializeHighlight(highlight: {
     endOffset: highlight.endOffset,
     text: highlight.text,
     note: highlight.note,
+    color: highlight.color,
     createdAt: highlight.createdAt.toISOString(),
   };
 }
@@ -186,6 +195,9 @@ export async function POST(request: Request) {
     const text = payload.text?.trim();
     const blockId = payload.blockId?.trim() || null;
     const note = payload.note?.trim() || null;
+    const color = Object.values(HighlightColor).includes(payload.color as HighlightColor)
+      ? (payload.color as HighlightColor)
+      : HighlightColor.YELLOW;
     const pageNumber = Math.max(1, Math.floor(payload.pageNumber ?? 1));
     const startOffset =
       typeof payload.startOffset === "number" && Number.isFinite(payload.startOffset)
@@ -231,6 +243,7 @@ export async function POST(request: Request) {
           endOffset,
           text,
           note,
+          color,
         },
       });
 
@@ -244,6 +257,7 @@ export async function POST(request: Request) {
             pageNumber,
             startOffset,
             endOffset,
+            color,
             source: "highlight_engine",
             taxonomyVersion: TAXONOMY_VERSION,
           },
@@ -294,5 +308,93 @@ export async function POST(request: Request) {
         status: 500,
       },
     );
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const currentUser = await getCurrentUser();
+
+    if (!currentUser) {
+      return NextResponse.json({ success: false, error: "Bạn cần đăng nhập để xóa highlight." }, { status: 401 });
+    }
+
+    if (currentUser.isLocked) {
+      return NextResponse.json({ success: false, error: "Tài khoản của bạn đã bị khóa." }, { status: 403 });
+    }
+
+    const highlightId = new URL(request.url).searchParams.get("id")?.trim();
+
+    if (!highlightId) {
+      return NextResponse.json({ success: false, error: "Thiếu mã highlight." }, { status: 400 });
+    }
+
+    const highlight = await prisma.highlight.findFirst({
+      where: { id: highlightId, userId: currentUser.id },
+      select: { id: true, bookId: true, pageNumber: true },
+    });
+
+    if (!highlight) {
+      return NextResponse.json({ success: false, error: "Không tìm thấy highlight thuộc tài khoản này." }, { status: 404 });
+    }
+
+    await prisma.$transaction([
+      prisma.highlight.delete({ where: { id: highlight.id } }),
+      prisma.interactionEvent.create({
+        data: {
+          userId: currentUser.id,
+          bookId: highlight.bookId,
+          actionType: "READING_HIGHLIGHT_REMOVE",
+          metadata: {
+            pageNumber: highlight.pageNumber,
+            source: "highlight_engine",
+            taxonomyVersion: TAXONOMY_VERSION,
+          },
+        },
+      }),
+    ]);
+
+    return NextResponse.json({ success: true });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Lỗi không xác định.";
+    console.error(`[api/highlights][DELETE] ${message}`);
+    return NextResponse.json({ success: false, error: "Không thể xóa highlight." }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const currentUser = await getCurrentUser();
+
+    if (!currentUser) {
+      return NextResponse.json({ success: false, error: "Bạn cần đăng nhập để sửa highlight." }, { status: 401 });
+    }
+    if (currentUser.isLocked) {
+      return NextResponse.json({ success: false, error: "Tài khoản của bạn đã bị khóa." }, { status: 403 });
+    }
+
+    const payload = await request.json().catch(() => null) as UpdateHighlightBody | null;
+    const highlightId = payload?.id?.trim();
+    const note = payload?.note?.trim() || null;
+
+    if (!highlightId || (payload?.note?.length ?? 0) > 500) {
+      return NextResponse.json({ success: false, error: "Mã highlight hoặc ghi chú không hợp lệ." }, { status: 400 });
+    }
+
+    const existing = await prisma.highlight.findFirst({
+      where: { id: highlightId, userId: currentUser.id },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ success: false, error: "Không tìm thấy highlight thuộc tài khoản này." }, { status: 404 });
+    }
+
+    const updated = await prisma.highlight.update({ where: { id: existing.id }, data: { note } });
+    return NextResponse.json({ success: true, data: serializeHighlight(updated) });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Lỗi không xác định.";
+    console.error(`[api/highlights][PATCH] ${message}`);
+    return NextResponse.json({ success: false, error: "Không thể cập nhật ghi chú." }, { status: 500 });
   }
 }

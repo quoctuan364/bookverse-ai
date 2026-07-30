@@ -1,5 +1,5 @@
 param(
-  [string[]]$Images = @("bookverse-web:g2-1-local", "bookverse-ai:g2-1-local")
+  [string[]]$Images = @("doantotnghiep-web:latest", "doantotnghiep-ai_service:latest")
 )
 
 $ErrorActionPreference = "Stop"

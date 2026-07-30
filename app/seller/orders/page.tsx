@@ -37,7 +37,7 @@ export default async function SellerOrdersPage({ searchParams }: SellerOrdersPag
   });
 
   return (
-    <main className="bv-page">
+    <main className="bv-page bv-seller">
       <SellerHero
         description="Theo dõi các đơn có item thuộc listing của bạn. Seller chỉ được chuyển PAID/PAID_DEMO sang SHIPPED và SHIPPED sang COMPLETED."
         title="Đơn hàng seller"
@@ -46,7 +46,7 @@ export default async function SellerOrdersPage({ searchParams }: SellerOrdersPag
       {data.gate.status !== "SELLER" ? (
         <SellerGatePanel gate={data.gate} />
       ) : (
-        <section className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:px-8">
+        <section className="mx-auto grid min-w-0 w-full max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <SellerNav />
           <SellerAlert message={params?.message} tone="success" />
           <SellerAlert message={params?.error} tone="error" />
@@ -58,6 +58,7 @@ export default async function SellerOrdersPage({ searchParams }: SellerOrdersPag
                 aria-hidden="true"
               />
               <Input
+                aria-label="Tìm đơn hàng của người bán"
                 className="h-11 pl-10"
                 defaultValue={data.filters.q}
                 name="q"
@@ -65,7 +66,7 @@ export default async function SellerOrdersPage({ searchParams }: SellerOrdersPag
                 type="search"
               />
             </div>
-            <select className={selectClass} defaultValue={data.filters.status} name="status">
+            <select aria-label="Lọc đơn hàng theo trạng thái" className={selectClass} defaultValue={data.filters.status} name="status">
               <option value="ALL">Tất cả trạng thái</option>
               {Object.values(OrderStatus).map((status) => (
                 <option key={status} value={status}>
@@ -79,7 +80,7 @@ export default async function SellerOrdersPage({ searchParams }: SellerOrdersPag
             </button>
           </form>
 
-          <section className="bv-card rounded-lg p-5">
+          <section className="bv-card min-w-0 rounded-lg p-5">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="inline-flex items-center gap-2 text-xl font-black text-white">

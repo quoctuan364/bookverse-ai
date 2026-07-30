@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { BookCover } from "@/components/shared/BookCover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { normalizeCatalogLanguageFilter } from "@/lib/book-language";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ interface MarketplacePageProps {
     error?: string;
     q?: string;
     condition?: string;
+    language?: string;
   }>;
 }
 
@@ -112,9 +114,11 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
   const params = await searchParams;
   const query = params?.q ?? "";
   const condition = params?.condition ?? "";
+  const language = normalizeCatalogLanguageFilter(params?.language) ?? "";
   const { listings, totalListings, visibleListings } = await getMarketplacePageData({
     query,
     condition,
+    language,
   });
 
   return (
@@ -123,11 +127,11 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-10 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-8">
           <div>
             <p className="text-sm font-black uppercase tracking-[0.16em] text-[#F2C14E]">
-              Chợ sách cũ BookVerse
+              Gian hàng sách BookVerse
             </p>
             <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-5xl">Mua bán và trao đổi sách</h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-[#EAF5F1]">
-              Khám phá tin bán đã duyệt, xem tình trạng sách, thêm vào giỏ và tạo đơn demo.
+              Chọn sách thật từ catalog BookVerse, xem tình trạng, thêm vào giỏ hoặc mua ngay.
             </p>
           </div>
 
@@ -154,13 +158,14 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
           </div>
         ) : null}
 
-        <form className="bv-panel grid gap-3 rounded-lg p-4 md:grid-cols-[1fr_220px_auto]">
+        <form className="bv-panel grid gap-3 rounded-lg p-4 md:grid-cols-[1fr_180px_180px_auto]">
           <div className="relative">
             <Search
               aria-hidden="true"
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#66706B]"
             />
             <Input
+              aria-label="Tìm trong chợ sách cũ"
               className="h-11 pl-10"
               defaultValue={query}
               name="q"
@@ -185,6 +190,20 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
             ))}
           </select>
 
+          <label className="sr-only" htmlFor="language">
+            Ngôn ngữ sách
+          </label>
+          <select
+            className="h-11 rounded-lg border border-[#D8D0C2] bg-[#FFFDF8] px-3 text-sm font-medium text-[#17202A] outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E]/30"
+            defaultValue={language}
+            id="language"
+            name="language"
+          >
+            <option value="">Tất cả ngôn ngữ</option>
+            <option value="vi">Tiếng Việt</option>
+            <option value="en">Tiếng Anh</option>
+          </select>
+
           <Button className="h-11 gap-2" type="submit">
             <Filter className="h-4 w-4" aria-hidden="true" />
             Lọc tin bán
@@ -199,14 +218,14 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
             </span>{" "}
             tin bán đang mở.
           </p>
-          <Link className="text-sm font-black text-[#0F766E] hover:underline" href="/marketplace">
+          <Link className="inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-black text-[#0F766E] transition hover:bg-[#EAF2EF] hover:underline" href="/marketplace">
             Xóa bộ lọc
           </Link>
         </div>
 
         {listings.length === 0 ? (
           <div className="bv-card mt-6 rounded-lg p-8 text-center text-sm text-[#66706B]">
-            Chưa có tin bán phù hợp. Hãy đổi bộ lọc hoặc đăng bán sách đầu tiên để demo.
+            Chưa có sách phù hợp. Hãy thử từ khóa hoặc tình trạng khác.
           </div>
         ) : (
           <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -326,7 +345,7 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
                       type="submit"
                     >
                       <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-                      Mua demo
+                      Mua ngay
                     </Button>
                   </form>
                 </div>

@@ -18,6 +18,9 @@ Cập nhật: 16/07/2026. Đây là snapshot hardening trước regression cuố
 - `.env.example` chỉ chứa placeholder. Giá trị thật phải đi qua secret manager hoặc environment của máy triển khai.
 - Không truyền secret bằng Docker build arg; chỉ inject lúc runtime.
 - Production phải dùng `npm run start:production` để chạy validation trước Next.js.
+- Password reset production phải cấu hình `NEXT_PUBLIC_APP_URL` HTTPS và webhook gửi email HTTPS có Bearer token mạnh; không log hoặc trả reset token về UI.
+- Rate limit password reset trong source hiện là best-effort theo từng tiến trình. Deployment nhiều replica phải dùng Redis/rate limiter dùng chung.
+- FastAPI recommendation production yêu cầu `BOOKVERSE_AI_SERVICE_TOKEN`; CORS chỉ nhận `BOOKVERSE_AI_ALLOWED_ORIGINS`. Không expose token trong biến `NEXT_PUBLIC_*` hoặc log.
 - Không bật development mock trên production. Nếu provider ngoài không có credential, hệ thống dùng local fallback có nhãn, không gọi là provider thật.
 - Database test phải tách database/project/volume và chỉ test ghi khi có cleanup chính xác.
 

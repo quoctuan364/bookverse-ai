@@ -338,7 +338,7 @@ export default async function CartPage({ searchParams }: CartPageProps) {
                   <MapPin className="h-4 w-4 text-[#F2C14E]" aria-hidden="true" />
                   Địa chỉ giao hàng
                 </h3>
-                <Link className="text-xs font-black text-[#F2C14E] hover:underline" href="/profile/addresses">
+                <Link className="inline-flex min-h-11 items-center rounded-lg px-2 text-xs font-black text-[#F2C14E] transition hover:bg-white/[0.07] hover:underline" href="/profile/addresses">
                   Quản lý
                 </Link>
               </div>
@@ -380,7 +380,7 @@ export default async function CartPage({ searchParams }: CartPageProps) {
               ) : (
                 <div className="mt-3 rounded-lg border border-dashed border-[#F2C14E]/35 bg-[#F2C14E]/10 p-3 text-sm leading-6 text-[#F7D98A]">
                   Bạn chưa có địa chỉ giao hàng.
-                  <Link className="ml-1 font-black text-[#F2C14E] hover:underline" href="/profile/addresses">
+                  <Link className="ml-1 inline-flex min-h-11 items-center rounded-lg px-2 font-black text-[#F2C14E] transition hover:bg-white/[0.07] hover:underline" href="/profile/addresses">
                     Thêm địa chỉ
                   </Link>
                 </div>

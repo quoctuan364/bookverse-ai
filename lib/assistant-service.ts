@@ -21,12 +21,27 @@ import {
   runWithAssistantFallback,
   sanitizeAssistantLog,
 } from "@/lib/assistant-runtime";
+import { inferAssistantRequestedLanguage } from "@/lib/assistant-language";
+import {
+  classifyBookVerseIntent,
+  formatStoreFacts,
+  retrieveBookVerseKnowledge,
+  shouldRetrieveBooks,
+  type AssistantAccountContext,
+  type AssistantStoreContext,
+  type BookVerseIntent,
+  type BookVerseKnowledgeArticle,
+} from "@/lib/assistant-knowledge";
 import type { CurrentUserSession } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
 
 const SYSTEM_PROMPT = `Bạn là Trợ lý AI của nhà sách BookVerse.
-Hãy tư vấn ngắn gọn, chuyên nghiệp và thân thiện.
-Chỉ nhắc đến sách có trong ngữ cảnh đã xác minh. Không tự tạo mã sách, giá hoặc đường dẫn.`;
+Trả lời bằng tiếng Việt, rõ ràng, thân thiện và ưu tiên câu trả lời trực tiếp.
+Bạn có thể hỗ trợ: tìm sách, hội viên, đọc Ebook, thư viện cá nhân, đơn hàng, chợ sách, tài khoản và chính sách.
+Chỉ nhắc đến sách, số liệu, trạng thái tài khoản hoặc route có trong ngữ cảnh đã xác minh.
+Không tự tạo mã sách, giá, đường dẫn, trạng thái đơn hoặc quyền hội viên.
+Nếu ngữ cảnh không đủ, hãy nói rõ điều chưa biết và hướng dẫn người dùng tới trang phù hợp.
+Không gọi dữ liệu demo là giao dịch thật và không tuyên bố cá nhân hóa khi không có dữ liệu tài khoản.`;
 
 interface AssistantServiceInput {
   message: string;
@@ -53,6 +68,13 @@ interface ReplyResult {
   mocked: boolean;
   degraded: boolean;
   errorCode: AssistantDegradedCode | null;
+}
+
+interface AssistantGroundingContext {
+  intent: BookVerseIntent;
+  knowledge: BookVerseKnowledgeArticle[];
+  store: AssistantStoreContext;
+  account: AssistantAccountContext;
 }
 
 export class AssistantServiceError extends Error {
@@ -84,9 +106,11 @@ function failureForAccess(code: AssistantFailureCode): AssistantServiceError {
   }
 }
 
-function buildSystemPrompt(books: AssistantValidatedBook[]): string {
-  if (books.length === 0) return SYSTEM_PROMPT;
-  const context = books
+function buildSystemPrompt(
+  books: AssistantValidatedBook[],
+  grounding: AssistantGroundingContext,
+): string {
+  const bookContext = books
     .map(
       (book, index) =>
         `${index + 1}. ${book.title}\nTác giả: ${book.author}\nĐiểm phù hợp: ${book.score.toFixed(
@@ -94,7 +118,41 @@ function buildSystemPrompt(books: AssistantValidatedBook[]): string {
         )}\nMô tả: ${book.description ?? "Chưa có mô tả."}`,
     )
     .join("\n\n");
-  return `${SYSTEM_PROMPT}\n\nNgữ cảnh kho sách BookVerse đã xác minh:\n${context}`;
+  const knowledgeContext = grounding.knowledge
+    .map(
+      (article, index) =>
+        `${index + 1}. ${article.title}\n${article.summary}\n${article.details.join(
+          "\n",
+        )}\nRoute: ${article.href}`,
+    )
+    .join("\n\n");
+  const account = grounding.account;
+  const accountContext = account.authenticated
+    ? [
+        `Tên: ${account.displayName ?? "Chưa có"}`,
+        `Vai trò: ${account.role ?? "Chưa rõ"}`,
+        `Hội viên còn hạn: ${account.membership?.active ? "Có" : "Không"}`,
+        `Gói: ${account.membership?.planName ?? "Không có"}`,
+        `Hết hạn: ${account.membership?.endsAt?.toISOString() ?? "Không có"}`,
+        `Sản phẩm trong giỏ: ${account.cartItemCount}`,
+        `Số đơn đã tạo: ${account.orderCount}`,
+        `Sách đã bắt đầu: ${account.readingBooks}`,
+        `Sách hoàn thành: ${account.completedBooks}`,
+      ].join("\n")
+    : "Người dùng chưa đăng nhập. Không được suy đoán dữ liệu cá nhân.";
+
+  return [
+    SYSTEM_PROMPT,
+    `Ý định đã phân loại: ${grounding.intent}`,
+    `Số liệu nhà sách hiện tại: ${formatStoreFacts(grounding.store)}`,
+    `Ngữ cảnh tài khoản hiện tại:\n${accountContext}`,
+    knowledgeContext
+      ? `Tri thức nghiệp vụ BookVerse đã xác minh:\n${knowledgeContext}`
+      : "Không có bài tri thức nghiệp vụ khớp trực tiếp.",
+    bookContext
+      ? `Ngữ cảnh catalog sách đã xác minh:\n${bookContext}`
+      : "Không có sách nào được truy xuất cho câu hỏi này. Không được tự đề xuất tên sách.",
+  ].join("\n\n");
 }
 
 function normalizedSearchTerms(query: string): string[] {
@@ -111,11 +169,15 @@ function normalizedSearchTerms(query: string): string[] {
     "mot",
     "nguoi",
     "sach",
+    "tieng",
     "toi",
     "tu",
     "van",
     "ve",
+    "viet",
+    "vietnamese",
     "voi",
+    "english",
   ]);
   const terms = query
     .normalize("NFD")
@@ -124,8 +186,15 @@ function normalizedSearchTerms(query: string): string[] {
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
     .map((term) => term.trim())
-    .filter((term) => (term === "ai" || term.length >= 3) && !stopWords.has(term));
-  return Array.from(new Set([query, ...terms])).filter(Boolean);
+    .filter((term) => term.length >= 3 && !stopWords.has(term));
+  const normalizedQuery = query
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  const semanticExpansions = normalizedQuery.match(/\bai\b/)
+    ? ["trí tuệ nhân tạo", "machine learning", "học máy", "chatbot"]
+    : [];
+  return Array.from(new Set([query, ...semanticExpansions, ...terms])).filter(Boolean);
 }
 
 function mapBook(
@@ -143,6 +212,7 @@ function mapBook(
 }
 
 async function keywordSearchBooks(query: string, take = 5): Promise<AssistantValidatedBook[]> {
+  const requestedLanguage = inferAssistantRequestedLanguage(query);
   const searchFilters: Prisma.BookWhereInput[] = normalizedSearchTerms(query).flatMap((value) => [
     { title: { contains: value, mode: "insensitive" } },
     { authorName: { contains: value, mode: "insensitive" } },
@@ -154,23 +224,14 @@ async function keywordSearchBooks(query: string, take = 5): Promise<AssistantVal
   const books = await prisma.book.findMany({
     where: {
       status: BookStatus.ACTIVE,
+      ...(requestedLanguage ? { languageCode: requestedLanguage } : {}),
       ...(searchFilters.length > 0 ? { OR: searchFilters } : {}),
     },
     take,
     orderBy: [{ rating: "desc" }, { createdAt: "desc" }],
     select: { id: true, title: true, authorName: true, description: true },
   });
-  const fallbackBooks =
-    books.length > 0
-      ? books
-      : await prisma.book.findMany({
-          where: { status: BookStatus.ACTIVE },
-          take,
-          orderBy: [{ rating: "desc" }, { createdAt: "desc" }],
-          select: { id: true, title: true, authorName: true, description: true },
-        });
-
-  return fallbackBooks.map((book, index) => mapBook(book, Math.max(0.1, 0.75 - index * 0.08)));
+  return books.map((book, index) => mapBook(book, Math.max(0.1, 0.75 - index * 0.08)));
 }
 
 function providerTimeoutSignal(): AbortSignal {
@@ -232,6 +293,7 @@ function toVectorLiteral(embedding: number[]): string {
 
 async function findRelevantBooks(query: string): Promise<RetrievalResult> {
   try {
+    const requestedLanguage = inferAssistantRequestedLanguage(query);
     const embedding = await createQueryEmbedding(query);
     if (!embedding) {
       return {
@@ -261,10 +323,12 @@ async function findRelevantBooks(query: string): Promise<RetrievalResult> {
       FROM "book_embeddings" be
       INNER JOIN "Book" b ON b."id" = be."bookId"
       WHERE b."status" = 'ACTIVE'
+        AND ($2::text IS NULL OR b."languageCode" = $2)
       ORDER BY be."embedding" <=> $1::vector
       LIMIT 5
       `,
       toVectorLiteral(embedding),
+      requestedLanguage,
     );
 
     if (rows.length > 0) {
@@ -290,6 +354,99 @@ async function findRelevantBooks(query: string): Promise<RetrievalResult> {
       errorCode: "EMBEDDING_UNAVAILABLE",
     };
   }
+}
+
+async function getAssistantStoreContext(): Promise<AssistantStoreContext> {
+  const [activeBooks, readableBooks, categories, activePlans, approvedListings] =
+    await Promise.all([
+      prisma.book.count({ where: { status: BookStatus.ACTIVE, deletedAt: null } }),
+      prisma.book.count({
+        where: {
+          status: BookStatus.ACTIVE,
+          deletedAt: null,
+          chunks: { some: {} },
+        },
+      }),
+      prisma.category.count({
+        where: {
+          books: { some: { status: BookStatus.ACTIVE, deletedAt: null } },
+        },
+      }),
+      prisma.membershipPlan.count({ where: { isActive: true } }),
+      prisma.listing.count({ where: { status: "APPROVED", stock: { gt: 0 } } }),
+    ]);
+
+  return { activeBooks, readableBooks, categories, activePlans, approvedListings };
+}
+
+async function getAssistantAccountContext(
+  currentUser: CurrentUserSession | null,
+): Promise<AssistantAccountContext> {
+  if (!currentUser || currentUser.isLocked) {
+    return {
+      authenticated: false,
+      displayName: null,
+      role: null,
+      membership: null,
+      cartItemCount: 0,
+      orderCount: 0,
+      readingBooks: 0,
+      completedBooks: 0,
+    };
+  }
+
+  const [membership, cart, orderCount, readingBooks, completedBooks] =
+    await Promise.all([
+      prisma.subscription.findFirst({
+        where: {
+          userId: currentUser.id,
+          status: "ACTIVE",
+          endsAt: { gt: new Date() },
+        },
+        orderBy: { endsAt: "desc" },
+        select: {
+          endsAt: true,
+          plan: { select: { name: true } },
+        },
+      }),
+      prisma.order.findFirst({
+        where: {
+          buyerId: currentUser.id,
+          status: "PENDING",
+          paymentMethod: null,
+        },
+        orderBy: { updatedAt: "desc" },
+        select: {
+          items: { select: { quantity: true } },
+        },
+      }),
+      prisma.order.count({
+        where: {
+          buyerId: currentUser.id,
+          NOT: { status: "PENDING", paymentMethod: null },
+        },
+      }),
+      prisma.readingProgress.count({ where: { userId: currentUser.id } }),
+      prisma.readingProgress.count({
+        where: { userId: currentUser.id, progressPercent: { gte: 99 } },
+      }),
+    ]);
+
+  return {
+    authenticated: true,
+    displayName: currentUser.name ?? null,
+    role: currentUser.role,
+    membership: {
+      active: Boolean(membership),
+      planName: membership?.plan.name ?? null,
+      endsAt: membership?.endsAt ?? null,
+    },
+    cartItemCount:
+      cart?.items.reduce((total, item) => total + item.quantity, 0) ?? 0,
+    orderCount,
+    readingBooks,
+    completedBooks,
+  };
 }
 
 function resolveProvider(): AssistantProvider {
@@ -374,6 +531,7 @@ async function resolveReply(
   message: string,
   messages: ChatMessageForLlm[],
   books: AssistantValidatedBook[],
+  grounding: AssistantGroundingContext,
 ): Promise<ReplyResult> {
   const provider = resolveProvider();
   if (provider === "mock") {
@@ -389,8 +547,8 @@ async function resolveReply(
   if (provider === "local") {
     return {
       provider,
-      model: "local-catalog-v1",
-      answer: buildGroundedLocalAnswer(message, books),
+      model: "local-bookverse-knowledge-v2",
+      answer: buildGroundedLocalAnswer(message, books, grounding),
       mocked: false,
       degraded: true,
       errorCode: "AI_PROVIDER_UNAVAILABLE",
@@ -401,8 +559,8 @@ async function resolveReply(
     async () => {
       const result =
         provider === "openai"
-          ? await callOpenAi(messages, buildSystemPrompt(books))
-          : await callGemini(messages, buildSystemPrompt(books));
+          ? await callOpenAi(messages, buildSystemPrompt(books, grounding))
+          : await callGemini(messages, buildSystemPrompt(books, grounding));
       return {
         provider,
         model: result.model,
@@ -416,8 +574,8 @@ async function resolveReply(
       console.error(`[assistant/provider] Dùng local fallback: ${sanitizeAssistantLog(error)}`);
       return {
         provider: "local",
-        model: "local-catalog-v1",
-        answer: buildGroundedLocalAnswer(message, books),
+        model: "local-bookverse-knowledge-v2",
+        answer: buildGroundedLocalAnswer(message, books, grounding),
         mocked: false,
         degraded: true,
         errorCode: "AI_PROVIDER_UNAVAILABLE",
@@ -479,11 +637,26 @@ export async function runAssistantMessage(
   input: AssistantServiceInput,
 ): Promise<AssistantSuccessResponse> {
   const session = await createOrContinueSession(input);
-  const recentMessages = await prisma.chatbotMessage.findMany({
-    where: { sessionId: session.id },
-    orderBy: { createdAt: "desc" },
-    take: 8,
-  });
+  const intent = classifyBookVerseIntent(input.message);
+  const knowledge = retrieveBookVerseKnowledge(input.message);
+  const needsBooks = shouldRetrieveBooks(input.message, intent);
+  const [recentMessages, retrieval, store, account] = await Promise.all([
+    prisma.chatbotMessage.findMany({
+      where: { sessionId: session.id },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+    }),
+    needsBooks
+      ? findRelevantBooks(input.message)
+      : Promise.resolve<RetrievalResult>({
+          books: [],
+          source: "keyword",
+          degraded: false,
+          errorCode: null,
+        }),
+    getAssistantStoreContext(),
+    getAssistantAccountContext(input.currentUser),
+  ]);
   const messages: ChatMessageForLlm[] = recentMessages
     .reverse()
     .filter((message) => message.role !== ChatbotMessageRole.SYSTEM)
@@ -492,8 +665,13 @@ export async function runAssistantMessage(
       content: message.content,
     }));
 
-  const retrieval = await findRelevantBooks(input.message);
-  const reply = await resolveReply(input.message, messages, retrieval.books);
+  const grounding: AssistantGroundingContext = {
+    intent,
+    knowledge,
+    store,
+    account,
+  };
+  const reply = await resolveReply(input.message, messages, retrieval.books, grounding);
   const degraded = retrieval.degraded || reply.degraded;
   const errorCode = reply.errorCode ?? retrieval.errorCode;
 
@@ -512,6 +690,9 @@ export async function runAssistantMessage(
           errorCode,
           contractVersion: ASSISTANT_CONTRACT_VERSION,
           ragBookIds: retrieval.books.map((book) => book.id),
+          knowledgeArticleIds: knowledge.map((article) => article.id),
+          intent,
+          accountContextUsed: account.authenticated,
         },
       },
     });
@@ -528,6 +709,9 @@ export async function runAssistantMessage(
           degraded,
           errorCode,
           lastRagBookIds: retrieval.books.map((book) => book.id),
+          lastKnowledgeArticleIds: knowledge.map((article) => article.id),
+          lastIntent: intent,
+          accountContextUsed: account.authenticated,
         },
       },
     });

@@ -221,7 +221,7 @@ export default async function ProfileAddressesPage({ searchParams }: ProfileAddr
               </p>
             </div>
             <Link
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.07] px-4 text-sm font-bold text-zinc-100 transition hover:bg-white/[0.12]"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.07] px-4 text-sm font-bold text-zinc-100 transition hover:bg-white/[0.12]"
               href="/profile"
             >
               Về hồ sơ
@@ -248,7 +248,7 @@ export default async function ProfileAddressesPage({ searchParams }: ProfileAddr
           </h2>
           <form action={createAddressAction} className="mt-5 grid gap-5">
             <AddressFields />
-            <label className="flex w-fit cursor-pointer items-center gap-2 text-sm font-bold text-zinc-200">
+            <label className="flex min-h-11 w-fit cursor-pointer items-center gap-3 rounded-lg px-2 text-sm font-bold text-zinc-200 transition hover:bg-white/[0.07]">
               <input className="h-4 w-4 accent-[#D6A84F]" name="makeDefault" type="checkbox" />
               Đặt làm mặc định
             </label>
@@ -303,7 +303,7 @@ export default async function ProfileAddressesPage({ searchParams }: ProfileAddr
                   <form action={deleteAddressAction}>
                     <input name="addressId" type="hidden" value={address.id} />
                     <ConfirmSubmitButton
-                      className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-red-400/30 bg-red-500/10 px-4 text-sm font-bold text-red-200 transition hover:bg-red-500/20"
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-red-400/30 bg-red-500/10 px-4 text-sm font-bold text-red-200 transition hover:bg-red-500/20"
                       confirmMessage="Bạn chắc chắn muốn xóa địa chỉ này?"
                     >
                       <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -322,7 +322,7 @@ export default async function ProfileAddressesPage({ searchParams }: ProfileAddr
                   <input name="addressId" type="hidden" value={address.id} />
                   <AddressFields address={address} />
                   <div className="flex justify-end">
-                    <SubmitButton className="h-10 bg-[#D6A84F] px-4 text-slate-950 hover:bg-[#F2C14E]" pendingLabel="Đang lưu...">
+                    <SubmitButton className="min-h-11 bg-[#D6A84F] px-4 text-slate-950 hover:bg-[#F2C14E]" pendingLabel="Đang lưu...">
                       Lưu địa chỉ
                     </SubmitButton>
                   </div>

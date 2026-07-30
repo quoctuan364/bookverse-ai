@@ -60,7 +60,7 @@ export default async function SellerListingsPage({ searchParams }: SellerListing
   });
 
   return (
-    <main className="bv-page">
+    <main className="bv-page bv-seller">
       <SellerHero
         action={
           data.gate.status === "SELLER" ? (
@@ -89,6 +89,7 @@ export default async function SellerListingsPage({ searchParams }: SellerListing
                 aria-hidden="true"
               />
               <Input
+                aria-label="Tìm listing của tôi"
                 className="h-11 pl-10"
                 defaultValue={data.filters.q}
                 name="q"
@@ -96,7 +97,7 @@ export default async function SellerListingsPage({ searchParams }: SellerListing
                 type="search"
               />
             </div>
-            <select className={selectClass} defaultValue={data.filters.status} name="status">
+            <select aria-label="Lọc listing theo trạng thái" className={selectClass} defaultValue={data.filters.status} name="status">
               <option value="ALL">Tất cả trạng thái</option>
               {Object.values(ListingStatus).map((status) => (
                 <option key={status} value={status}>

@@ -8,6 +8,9 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["var(--font-bookverse-sans)", "\"Segoe UI\"", "Arial", "sans-serif"],
+      },
       colors: {
         bookverse: {
           teal: "#153A3F",

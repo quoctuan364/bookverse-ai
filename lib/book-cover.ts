@@ -34,17 +34,6 @@ export const DEMO_COVER_ART: readonly DemoCoverArt[] = [
   "travel",
 ] as const;
 
-const COVER_KEYWORDS: Readonly<Record<DemoCoverArt, readonly string[]>> = {
-  technology: ["ai", "công nghệ", "lập trình", "phần mềm", "dữ liệu", "machine learning", "technology"],
-  business: ["kinh doanh", "marketing", "tài chính", "quản trị", "khởi nghiệp", "business", "đầu tư"],
-  literature: ["văn học", "tiểu thuyết", "truyện", "thơ", "manga", "literature", "novel"],
-  history: ["lịch sử", "chính trị", "triết học", "văn hóa", "history", "philosophy"],
-  health: ["sức khỏe", "y học", "tâm lý", "dinh dưỡng", "health", "medical"],
-  language: ["ngoại ngữ", "ngôn ngữ", "tiếng anh", "tiếng nhật", "language", "english"],
-  science: ["khoa học", "toán", "vật lý", "hóa học", "sinh học", "science", "physics"],
-  travel: ["du lịch", "địa lý", "khám phá", "travel", "geography"],
-};
-
 function hasUnsafePathSegment(value: string): boolean {
   return value.split("/").some((segment) => segment === ".." || segment === ".");
 }
@@ -106,7 +95,19 @@ export function getRealCatalogNormalizedCoverPath(bookId: string): string | null
     : null;
 }
 
-/** Các bìa demo cũ không được dùng như bìa thật, dù file vẫn còn để bảo toàn dữ liệu gốc. */
+/**
+ * Bìa BookVerse edition được thiết kế lại riêng cho từng đầu sách.
+ * Nếu file chưa tồn tại, component sẽ tự chuyển sang artwork BookVerse theo thể loại.
+ */
+export function getBookVerseEditionCoverPath(bookId: string): string | null {
+  return /^RB\d{5}$/.test(bookId) ? `/covers/bookverse-editions/${bookId}.webp` : null;
+}
+
+/**
+ * Chỉ loại các nguồn placeholder từ xa hoặc PNG thử nghiệm cũ.
+ * Bộ SVG `covers/flat` và `covers/3d` là asset gốc đi kèm dataset 2.200 sách,
+ * nên phải được giữ và hiển thị đúng theo `cover_url`.
+ */
 export function isLegacySyntheticCover(value?: string | null): boolean {
   const normalized = normalizeBookCoverUrl(value)?.toLowerCase();
   if (!normalized) {
@@ -114,8 +115,6 @@ export function isLegacySyntheticCover(value?: string | null): boolean {
   }
 
   return (
-    normalized.includes("/covers/flat/") ||
-    normalized.includes("/covers/3d/") ||
     /\/covers\/b\d{3}\.png(?:\?|$)/.test(normalized) ||
     /\/data\/demo\/covers\/b\d{3}\.png(?:\?|$)/.test(normalized) ||
     normalized.includes("picsum.photos")
@@ -183,6 +182,15 @@ export function getDemoCoverArt(input: {
   void input.title;
   void input.category;
   return DEMO_COVER_ART[stableBookCoverSeed(input.bookId) % DEMO_COVER_ART.length];
+}
+
+/** Asset minh họa nội bộ dùng khi sách chưa có bìa nhà xuất bản hợp lệ. */
+export function getDemoCoverArtPath(input: {
+  bookId: string;
+  title: string;
+  category?: string | null;
+}): string {
+  return `/covers/demo-art-v2/${getDemoCoverArt(input)}.webp`;
 }
 
 export function getDemoCoverLayout(bookId: string): number {

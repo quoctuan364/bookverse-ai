@@ -110,6 +110,37 @@ def test_evaluation_checksum_is_reproducible_and_future_features_are_zero(tmp_pa
     assert first["statistics"]["cohorts"]["cold_0"] == 1
 
 
+def test_debug_data_is_opt_in_and_uses_same_eligible_users(tmp_path: Path) -> None:
+    regular = run_evaluation(
+        sample_data(),
+        EvaluationConfig(
+            cutoff="2026-06-01T00:00:00",
+            k_values=(2,),
+            seed=42,
+            output_root=tmp_path,
+            parity_fixture=None,
+        ),
+    )
+    debug = run_evaluation(
+        sample_data(),
+        EvaluationConfig(
+            cutoff="2026-06-01T00:00:00",
+            k_values=(2,),
+            seed=42,
+            output_root=tmp_path,
+            parity_fixture=None,
+            include_debug_data=True,
+        ),
+    )
+    assert "debugData" not in regular
+    assert sorted(debug["debugData"]["groundTruth"]) == ["U1", "U2", "U3"]
+    assert sorted(debug["debugData"]["rankings"]["content"]) == ["U1", "U2", "U3"]
+    assert debug["debugData"]["hybridScoreSummaries"]["U1"]["score"]["max"] >= 0
+    # Debug không được làm thay đổi metric/checksum chuẩn hóa.
+    assert debug["metrics"] == regular["metrics"]
+    assert debug["reproducibilityChecksum"] == regular["reproducibilityChecksum"]
+
+
 def test_snapshot_hybrid_matches_production_formula_and_tie_break() -> None:
     books = pd.DataFrame(
         [

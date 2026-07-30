@@ -55,7 +55,10 @@ async function createApiRequestSafely(
     surface: RecommendationSurface.RECOMMENDATION_API,
     candidateProfile: "persisted-recommendation-catalog",
     filterProfile: "active-user-owned-request",
-    items,
+    items: items.map((item) => ({
+      ...item,
+      sourceComponent: "PERSISTED_RECOMMENDATION",
+    })),
   });
 }
 
@@ -331,9 +334,10 @@ export async function GET(request: Request) {
       where: {
         id: {
           in: bookIds,
+          startsWith: "RB",
         },
         sourceMetadata: {
-          is: null,
+          isNot: null,
         },
       },
       select: {
@@ -422,7 +426,7 @@ export async function GET(request: Request) {
         status: 200,
       },
     );
-  } catch (error: unknown) {
+  } catch {
     // Không log raw Prisma/SQL/connection string.
     console.error("[api/recommendations] request failed");
 

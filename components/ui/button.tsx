@@ -14,10 +14,10 @@ const variantClass: Record<ButtonVariant, string> = {
 };
 
 const sizeClass: Record<ButtonSize, string> = {
-  default: "h-10 px-4 py-2",
-  sm: "h-9 px-3",
-  lg: "h-11 px-6",
-  icon: "h-10 w-10"
+  default: "min-h-11 px-4 py-2",
+  sm: "min-h-11 px-3",
+  lg: "min-h-12 px-6",
+  icon: "h-11 w-11"
 };
 
 export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -29,7 +29,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = "default", size = "default", type = "button", ...props }, ref) => (
     <button
       className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+        "inline-flex cursor-pointer items-center justify-center whitespace-nowrap rounded-lg text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:pointer-events-none disabled:opacity-50",
         variantClass[variant],
         sizeClass[size],
         className

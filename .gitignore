@@ -3,9 +3,12 @@ node_modules
 out
 dist
 .env
+.env.demo
 .env*.local
 *.tsbuildinfo
 coverage
+playwright-report/
+test-results/
 prisma/dev.db
 __pycache__/
 *.pyc

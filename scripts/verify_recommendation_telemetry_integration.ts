@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
-import crypto from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { OrderStatus, RecommendationSurface, RecommendationTelemetryType } from "@prisma/client";
+import {
+  OrderStatus,
+  RecommendationCollectionContext,
+  RecommendationDeviceClass,
+  RecommendationSurface,
+  RecommendationTelemetryType,
+} from "@prisma/client";
 
 import { assertSafeDatabase } from "@/lib/database-safety";
 import prisma from "@/lib/prisma";
@@ -89,6 +94,10 @@ async function main(): Promise<void> {
       ],
     });
 
+    process.env.RECOMMENDATION_PILOT_MODE = "consented";
+    process.env.RECOMMENDATION_PILOT_ID = "integration-pilot";
+    process.env.RECOMMENDATION_CONSENT_VERSION = "v1";
+    process.env.RECOMMENDATION_EXPERIMENT_GROUP = "integration-a";
     const normalizedSnapshot = await createRecommendationRequestSnapshotResult({
       userId: ownerId,
       algorithmVersion: "integration-fixture-v1",
@@ -96,25 +105,58 @@ async function main(): Promise<void> {
       candidateProfile: "integration",
       filterProfile: "integration",
       items: [
-        { bookId: books[0].id, position: 1, score: 9.5, evidence: "current", source: "CURRENT" },
+        {
+          bookId: books[0].id,
+          position: 1,
+          score: 9.5,
+          evidence: "current",
+          source: "CURRENT",
+          sourceComponent: "BEHAVIOR",
+        },
         { bookId: books[1].id, position: 1, score: 8.5, evidence: "legacy", source: "LEGACY" },
         { bookId: books[0].id, position: 2, score: 7.5, evidence: "duplicate Book" },
         { bookId: books[2].id, position: 0, score: 6.5, evidence: "invalid rank" },
       ],
     });
+    delete process.env.RECOMMENDATION_PILOT_MODE;
+    delete process.env.RECOMMENDATION_PILOT_ID;
+    delete process.env.RECOMMENDATION_CONSENT_VERSION;
+    delete process.env.RECOMMENDATION_EXPERIMENT_GROUP;
     assert.equal(normalizedSnapshot.trackingStatus, "TRACKED");
     assert.equal(normalizedSnapshot.trackingReason, "DUPLICATE_BOOK_NORMALIZED");
     const requestId = normalizedSnapshot.requestId;
     assert.ok(requestId);
+    const requestMetadata = await prisma.recommendationRequest.findUniqueOrThrow({
+      where: { id: requestId },
+      select: {
+        collectionContext: true,
+        pilotId: true,
+        consentVersion: true,
+        experimentGroup: true,
+      },
+    });
+    assert.deepEqual(requestMetadata, {
+      collectionContext: RecommendationCollectionContext.PILOT_CONSENTED,
+      pilotId: "integration-pilot",
+      consentVersion: "v1",
+      experimentGroup: "integration-a",
+    });
 
     const normalizedItems = await prisma.recommendationRequestItem.findMany({
       where: { requestId },
       orderBy: { position: "asc" },
-      select: { bookId: true, position: true, score: true, evidence: true },
+      select: {
+        bookId: true,
+        position: true,
+        score: true,
+        evidence: true,
+        sourceComponent: true,
+      },
     });
     assert.deepEqual(normalizedItems.map((item) => item.position), [1, 2, 3]);
     assert.deepEqual(normalizedItems.map((item) => item.bookId), books.slice(0, 3).map((book) => book.id));
     assert.deepEqual(normalizedItems.map((item) => item.score), [9.5, 8.5, 6.5]);
+    assert.equal(normalizedItems[0]?.sourceComponent, "BEHAVIOR");
 
     const beforeAtomicFailure = await Promise.all([
       prisma.recommendationRequest.count({ where: { userId: ownerId } }),
@@ -182,28 +224,37 @@ async function main(): Promise<void> {
       requestId,
       bookId: books[0].id,
       eventType: "IMPRESSION",
+      deviceClass: RecommendationDeviceClass.MOBILE,
     });
     const duplicateImpression = await recordRecommendationTelemetry({
       currentUserId: ownerId,
       requestId,
       bookId: books[0].id,
       eventType: "IMPRESSION",
+      deviceClass: RecommendationDeviceClass.MOBILE,
     });
     assert.equal(impression.duplicate, false);
     assert.equal(duplicateImpression.duplicate, true);
     assert.equal(impression.eventId, duplicateImpression.eventId);
+    const storedImpression = await prisma.recommendationTelemetryEvent.findUniqueOrThrow({
+      where: { id: impression.eventId },
+      select: { deviceClass: true },
+    });
+    assert.equal(storedImpression.deviceClass, RecommendationDeviceClass.MOBILE);
 
     const click = await recordRecommendationTelemetry({
       currentUserId: ownerId,
       requestId,
       bookId: books[0].id,
       eventType: "CLICK",
+      deviceClass: RecommendationDeviceClass.MOBILE,
     });
     const duplicateClick = await recordRecommendationTelemetry({
       currentUserId: ownerId,
       requestId,
       bookId: books[0].id,
       eventType: "CLICK",
+      deviceClass: RecommendationDeviceClass.MOBILE,
     });
     assert.equal(click.duplicate, false);
     assert.equal(duplicateClick.duplicate, true);
@@ -301,13 +352,18 @@ async function main(): Promise<void> {
     const conversions = await prisma.recommendationTelemetryEvent.findMany({
       where: { requestId, type: RecommendationTelemetryType.CONVERSION },
       orderBy: { sourceType: "asc" },
-      select: { sourceType: true, attributionAnchor: true },
+      select: { sourceType: true, attributionAnchor: true, deviceClass: true },
     });
     assert.deepEqual(
       conversions.map((item) => item.sourceType),
       ["BOOKMARK", "ORDER_ITEM"],
     );
     assert.ok(conversions.every((item) => item.attributionAnchor === "LAST_CLICK"));
+    assert.ok(
+      conversions.every(
+        (item) => item.deviceClass === RecommendationDeviceClass.MOBILE,
+      ),
+    );
 
     const during = await counts();
     const report = {
