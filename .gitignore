@@ -1,0 +1,63 @@
+node_modules
+.next
+out
+dist
+.env
+.env.demo
+.env*.local
+*.tsbuildinfo
+coverage
+playwright-report/
+test-results/
+prisma/dev.db
+__pycache__/
+*.pyc
+.venv/
+
+# Dữ liệu nhạy cảm, backup và output runtime không đưa vào Git.
+backups/
+*.dump
+*.log
+outputs/
+# Temporal evaluation tạo JSON/CSV/Markdown theo run ID; không commit artifact runtime lớn.
+outputs/evaluation/
+
+# Dataset/ebook lớn vẫn được giữ nguyên trên máy để import và demo.
+# Không stage vào baseline local theo yêu cầu an toàn dữ liệu.
+data/json/bookverse_ultra_seed_2200.json
+data/backups/
+public/ebooks/html/
+public/ebooks/json/
+public/covers/3d/
+public/covers/flat/
+
+# Docker/runtime bundle cục bộ của lượt audit, không stage hoặc commit.
+.tmp-.tmp-bookverse-web-g2-1-local-20880.tar189125015
+/.runtime/
+
+# Ảnh cover tải cục bộ phục vụ demo; artifact được quản lý ngoài Git.
+/public/covers/real-catalog-local/
+/public/covers/real-catalog-local-normalized/
+
+# Ảnh đại diện do người dùng tải lên là dữ liệu runtime, không đưa vào Git.
+/public/uploads/avatars/*
+!/public/uploads/avatars/.gitkeep
+
+# Cache raw provenance Open Library của Gold pilot; artifact normalized/reports mới được review và commit.
+/data/gold-catalog-v1/raw/
+
+# Chỉ giữ cấu hình mẫu; không đưa secret hoặc artifact cục bộ lên GitHub.
+.env*
+!.env.example
+GOI_GUI_CHATGPT_*/
+.codex_word_work/
+_qa*/
+_backup_file_goc/
+tmp/
+artifacts/
+*.inspect.ndjson
+mobile/.expo/
+public/uploads/
+# Dataset tổng hợp và bìa SVG gốc được gửi kèm để tái lập demo.
+!data/json/bookverse_ultra_seed_2200.json
+!public/covers/flat/

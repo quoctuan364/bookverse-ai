@@ -1,0 +1,15 @@
+.git
+.env
+.env.*
+!.env.example
+.next
+node_modules
+.venv
+**/.venv
+outputs
+backups
+.pytest_cache
+**/__pycache__
+*.pyc
+*.pyo
+npm-debug.log*

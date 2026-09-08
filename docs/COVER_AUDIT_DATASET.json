@@ -1,0 +1,64 @@
+{
+  "generatedAt": "2026-07-16T04:40:50.019Z",
+  "dataLabel": "SYNTHETIC_DATA",
+  "source": "data/json/bookverse_ultra_seed_2200.json",
+  "sourceNote": "Synthetic academic dataset. No copyrighted book text or real cover images.",
+  "scope": "Dataset JSON read-only; không phải trạng thái database demo",
+  "recordCount": 2200,
+  "statusCounts": {
+    "NOT_VERIFIED": 2200
+  },
+  "sourceTypeCounts": {
+    "LEGACY_SYNTHETIC": 2200
+  },
+  "localFileCounts": {
+    "gitTracked": 0,
+    "presentButUntracked": 2200,
+    "missing": 0
+  },
+  "remoteHttpCounts": {
+    "checked": 0,
+    "http404": 0,
+    "loadFailed": 0
+  },
+  "approvedRealCoverCount": 0,
+  "samples": {
+    "NOT_VERIFIED": [
+      {
+        "bookId": "B0001",
+        "source": "/covers/flat/book-0001.svg",
+        "sourceType": "LEGACY_SYNTHETIC",
+        "status": "NOT_VERIFIED",
+        "gitTracked": false
+      },
+      {
+        "bookId": "B0002",
+        "source": "/covers/flat/book-0002.svg",
+        "sourceType": "LEGACY_SYNTHETIC",
+        "status": "NOT_VERIFIED",
+        "gitTracked": false
+      },
+      {
+        "bookId": "B0003",
+        "source": "/covers/flat/book-0003.svg",
+        "sourceType": "LEGACY_SYNTHETIC",
+        "status": "NOT_VERIFIED",
+        "gitTracked": false
+      },
+      {
+        "bookId": "B0004",
+        "source": "/covers/flat/book-0004.svg",
+        "sourceType": "LEGACY_SYNTHETIC",
+        "status": "NOT_VERIFIED",
+        "gitTracked": false
+      },
+      {
+        "bookId": "B0005",
+        "source": "/covers/flat/book-0005.svg",
+        "sourceType": "LEGACY_SYNTHETIC",
+        "status": "NOT_VERIFIED",
+        "gitTracked": false
+      }
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "artifactFile": "BookVerse_Real_Covers_3046_Local_Partial.zip",
+  "artifactSha256": "73dcb9bcf0a89c7d8969f135e26025da75e9f5fe654c826cae6f05d26d52a6bf",
+  "manifestSha256": "ce3c268f136d4915d9fa324c0d0490101b2df1cd42b1d999d82e908d27f77d31",
+  "manifestRecordCount": 3046,
+  "bookIdPattern": "RB\\d{5}",
+  "localPathPattern": "/covers/real-catalog-local/{bookId}.jpg",
+  "normalizedPathPattern": "/covers/real-catalog-local-normalized/{bookId}.webp",
+  "sourceProvider": "OPEN_LIBRARY",
+  "rightsStatus": "RIGHTS_NOT_VERIFIED",
+  "fallbackOrder": [
+    "LOCAL_VALID",
+    "VALID_LOCAL_NORMALIZED",
+    "REMOTE_URL_LOAD_SUCCESS",
+    "NEUTRAL_MISSING_COVER"
+  ],
+  "sourceDatasetIsReadOnly": true
+}

@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "provider": "OPEN_LIBRARY",
+  "sourceAllowlist": [
+    {
+      "protocol": "https:",
+      "hostname": "covers.openlibrary.org",
+      "pathPrefix": "/b/id/",
+      "pathSuffix": "-L.jpg",
+      "requiredQuery": {
+        "default": "false"
+      }
+    }
+  ],
+  "followedStorageRedirectAllowlist": [
+    "archive.org"
+  ],
+  "maxRedirects": 5,
+  "maxConcurrency": 2,
+  "maxRetries": 2,
+  "minImageBytes": 1000,
+  "minWidth": 80,
+  "minHeight": 120,
+  "minAspectRatio": 0.4,
+  "maxAspectRatio": 0.9,
+  "targetAspectRatio": 0.666667,
+  "maxImageBytes": 10485760,
+  "rightsStatus": "NOT_VERIFIED"
+}

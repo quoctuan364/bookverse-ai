@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "BookVerse AI",
+    "slug": "bookverse-ai-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "backgroundColor": "#09090b"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.bookverse.ai"
+    },
+    "android": {
+      "package": "com.bookverse.ai"
+    },
+    "plugins": [
+      "expo-asset"
+    ]
+  }
+}

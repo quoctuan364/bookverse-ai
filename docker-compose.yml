@@ -1,0 +1,59 @@
+services:
+  db:
+    image: pgvector/pgvector:0.8.5-pg16
+    container_name: ${BOOKVERSE_DB_CONTAINER_NAME:-bookverse-db}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${BOOKVERSE_POSTGRES_USER:?BOOKVERSE_POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${BOOKVERSE_POSTGRES_PASSWORD:?BOOKVERSE_POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${BOOKVERSE_POSTGRES_DB:?BOOKVERSE_POSTGRES_DB is required}
+    ports:
+      - "${BOOKVERSE_BIND_ADDRESS:-127.0.0.1}:${BOOKVERSE_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - bookverse-network
+
+  web:
+    build:
+      context: .
+    container_name: ${BOOKVERSE_WEB_CONTAINER_NAME:-bookverse-web}
+    command: npm run start:docker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${BOOKVERSE_DOCKER_DATABASE_URL:?BOOKVERSE_DOCKER_DATABASE_URL is required}
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is required}
+      AUTH_TRUST_HOST: ${AUTH_TRUST_HOST:-true}
+      AUTH_GOOGLE_ID: ${AUTH_GOOGLE_ID:-}
+      AUTH_GOOGLE_SECRET: ${AUTH_GOOGLE_SECRET:-}
+      AI_SERVICE_URL: ${BOOKVERSE_DOCKER_AI_SERVICE_URL:-http://ai_service:8000}
+      BOOKVERSE_CHAT_MOCK_ENABLED: "false"
+    ports:
+      - "${BOOKVERSE_BIND_ADDRESS:-127.0.0.1}:${BOOKVERSE_WEB_PORT:-3000}:3000"
+    depends_on:
+      - db
+      - ai_service
+    networks:
+      - bookverse-network
+
+  ai_service:
+    build:
+      context: .
+      dockerfile: ai_service/Dockerfile
+    container_name: ${BOOKVERSE_AI_CONTAINER_NAME:-bookverse-ai-service}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${BOOKVERSE_AI_DATABASE_URL:?BOOKVERSE_AI_DATABASE_URL is required}
+    ports:
+      - "${BOOKVERSE_BIND_ADDRESS:-127.0.0.1}:${BOOKVERSE_AI_PORT:-8000}:8000"
+    depends_on:
+      - db
+    networks:
+      - bookverse-network
+
+volumes:
+  pgdata:
+
+networks:
+  bookverse-network:
+    driver: bridge

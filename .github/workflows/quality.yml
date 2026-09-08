@@ -1,0 +1,86 @@
+name: Quality gates
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  source-quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:unit
+      - run: npm run test:production-env
+      - run: npm run test:production-mock-policy
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm run build
+        env:
+          DATABASE_URL: postgresql://bookverse:bookverse_ci_password@127.0.0.1:5432/bookverse_ci
+          AUTH_SECRET: bookverse-ci-auth-secret-at-least-32-characters
+
+  python-quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ai_service/requirements-dev.txt
+      - run: pip install -r ai_service/requirements-dev.txt
+      - run: python -m pytest ai_service/tests -q
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: bookverse
+          POSTGRES_PASSWORD: bookverse_ci_password
+          POSTGRES_DB: bookverse_e2e_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bookverse -d bookverse_e2e_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://bookverse:bookverse_ci_password@127.0.0.1:5432/bookverse_e2e_test
+      AUTH_SECRET: bookverse-ci-auth-secret-at-least-32-characters
+      AUTH_TRUST_HOST: "true"
+      ALLOWED_DESTRUCTIVE_DATABASES: bookverse_e2e_test
+      BOOKVERSE_E2E_MODE: "1"
+      BOOKVERSE_CHAT_MOCK_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx prisma migrate deploy
+      - run: npx tsx scripts/seed_e2e_fixture.ts
+      - run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-failure-evidence
+          path: test-results/
+          retention-days: 7

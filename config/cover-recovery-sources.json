@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "retrievedAt": "2026-07-23",
+  "purpose": "Bổ sung ba bìa đúng đầu sách mà máy chủ ảnh ban đầu trả lỗi 503.",
+  "records": [
+    {
+      "bookId": "RB00583",
+      "isbn": "9781417934621",
+      "title": "By the Stage Door",
+      "sourcePage": "https://www.ebay.de/p/9044648848",
+      "imageUrl": "https://i.ebayimg.com/images/g/7A0AAOSwwnlgO58H/s-l640.jpg",
+      "matchEvidence": "Trang sản phẩm ghi đúng ISBN, tiêu đề, tác giả, nhà xuất bản và năm phát hành."
+    },
+    {
+      "bookId": "RB01287",
+      "isbn": "9780735273696",
+      "title": "Hyperfocus",
+      "sourcePage": "https://www.indigo.ca/en-ca/hyperfocus-how-to-manage-your-attention-in-a-world-of-distraction/9780735273696.html",
+      "imageUrl": "https://cdn.kobo.com/book-images/Images/6c3ff4ef-12d2-405f-99ec-368d13921ce1/1200/1200/False/image.jpg",
+      "matchEvidence": "Trang sản phẩm ghi đúng ISBN, tiêu đề, tác giả, nhà xuất bản và ảnh bìa trước."
+    },
+    {
+      "bookId": "RB02062",
+      "isbn": "9780141982656",
+      "title": "Skin in the Game",
+      "sourcePage": "https://www.penguin.co.uk/books/290669/skin-in-the-game-by-taleb-nassim-nicholas/9780141982656",
+      "imageUrl": "https://cdn.penguin.co.uk/dam-assets/books/9780141982656/9780141982656-jacket-large.jpg",
+      "matchEvidence": "Trang chính thức của nhà xuất bản ghi đúng ISBN, tiêu đề, tác giả và ấn bản paperback 2019."
+    }
+  ]
+}

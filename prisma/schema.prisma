@@ -1,0 +1,1312 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  BUYER
+  SELLER
+  MODERATOR
+  ADMIN
+}
+
+enum BookFormat {
+  EBOOK
+  PAPER
+  BOTH
+}
+
+enum EditionType {
+  PAPER_NEW
+  PAPER_USED
+  EBOOK
+}
+
+enum BookStatus {
+  ACTIVE
+  DRAFT
+  HIDDEN
+  ARCHIVED
+}
+
+enum CoverReviewStatus {
+  VERIFIED_LOCAL
+  NEEDS_COVER_REVIEW
+}
+
+enum HighlightColor {
+  YELLOW
+  GREEN
+  PINK
+}
+
+enum ListingCondition {
+  NEW
+  LIKE_NEW
+  GOOD
+  FAIR
+  POOR
+  DIGITAL
+}
+
+enum ListingStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  SOLD
+  REJECTED
+  HIDDEN
+  ARCHIVED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PAID_DEMO
+  SHIPPED
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  COD
+  BANK_TRANSFER_DEMO
+  WALLET_DEMO
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+  HIDDEN
+  REMOVED
+}
+
+enum ReactionType {
+  LIKE
+  LOVE
+  INSIGHTFUL
+  SAVE
+  REPORT
+}
+
+enum InteractionType {
+  VIEW
+  CART_ADD
+  PURCHASE
+  LIKE
+  RATE
+  READ
+  BOOKMARK
+  HIGHLIGHT
+  REVIEW
+  SEARCH
+}
+
+enum TargetType {
+  BOOK
+  LISTING
+  POST
+  COMMENT
+  USER
+  CATEGORY
+  SEARCH_QUERY
+}
+
+enum RecommendationEvidenceType {
+  GENRE_MATCH
+  TAG_MATCH
+  BEHAVIOR_MATCH
+  TRENDING
+  COLLABORATIVE
+  PRICE_MATCH
+}
+
+enum RecommendationSurface {
+  HOME
+  RECOMMENDATION_API
+  DASHBOARD
+}
+
+enum RecommendationTelemetryType {
+  IMPRESSION
+  CLICK
+  CONVERSION
+}
+
+enum RecommendationCollectionContext {
+  STANDARD_APP
+  PILOT_CONSENTED
+  BLINDED_RELEVANCE
+}
+
+enum RecommendationDeviceClass {
+  DESKTOP
+  MOBILE
+  TABLET
+  UNKNOWN
+}
+
+enum ChatbotMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum NotificationType {
+  SYSTEM
+  MARKETPLACE
+  ORDER
+  COMMUNITY
+  AI
+  SECURITY
+}
+
+enum FeedbackValue {
+  HELPFUL
+  NOT_HELPFUL
+  IRRELEVANT
+  DISMISSED
+}
+
+enum MembershipBillingPeriod {
+  MONTHLY
+  YEARLY
+}
+
+enum SubscriptionStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum MembershipPaymentStatus {
+  PENDING
+  PAID_DEMO
+  FAILED
+  REFUNDED
+}
+
+model User {
+  id                      String                         @id
+  email                   String?                        @unique
+  password                String?
+  name                    String
+  role                    UserRole                       @default(BUYER)
+  isLocked                Boolean                        @default(false)
+  lockedAt                DateTime?
+  lockReason              String?
+  lastActiveAt            DateTime?
+  profile                 Profile?
+  listings                Listing[]                      @relation("SellerListings")
+  orders                  Order[]                        @relation("BuyerOrders")
+  posts                   Post[]                         @relation("UserPosts")
+  comments                Comment[]
+  reactions               Reaction[]
+  interactions            Interaction[]
+  reviews                 Review[]
+  readingProgress         ReadingProgress[]
+  readingSessions         ReadingSession[]
+  bookmarks               Bookmark[]
+  highlights              Highlight[]
+  readingEntitlements     ReadingEntitlement[]
+  favoriteBooks           FavoriteBook[]
+  shippingAddresses       ShippingAddress[]
+  interactionEvents       InteractionEvent[]
+  recommendations         Recommendation[]
+  dailyRecommendations    DailyRecommendation[]
+  chatbotSessions         ChatbotSession[]
+  sellerAiScore           SellerAiScore?
+  passwordResetTokens     PasswordResetToken[]
+  auditLogs               AuditLog[]                     @relation("AuditActor")
+  notifications           Notification[]
+  orderTimelineEvents     OrderTimelineEvent[]           @relation("OrderTimelineActor")
+  recommendationFeedback  RecommendationFeedback[]
+  recommendationRequests  RecommendationRequest[]
+  recommendationTelemetry RecommendationTelemetryEvent[]
+  chatbotFeedback         ChatbotFeedback[]
+  marketplaceBuyerChats   MarketplaceConversation[]      @relation("MarketplaceBuyer")
+  marketplaceSellerChats  MarketplaceConversation[]      @relation("MarketplaceSeller")
+  marketplaceMessages     MarketplaceMessage[]
+  subscriptions           Subscription[]
+  membershipPayments      MembershipPayment[]
+  researchConsents        UserResearchConsent[]
+  interactionLogs         UserInteractionLog[]
+  createdAt               DateTime                       @default(now())
+  updatedAt               DateTime                       @updatedAt
+
+  @@index([role])
+  @@index([isLocked])
+  @@index([lastActiveAt])
+}
+
+model PasswordResetToken {
+  id          String    @id @default(cuid())
+  userId      String
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  requestedIp String?
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+model Profile {
+  id                      String   @id @default(cuid())
+  userId                  String   @unique
+  persona                 String?
+  preferredGenres         String[] @default([])
+  level                   String?
+  budget                  Decimal? @db.Decimal(12, 2)
+  avatarUrl               String?
+  bio                     String?
+  dailyReadingGoalMinutes Int?
+  dailyReadingGoalPages   Int?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Category {
+  id            String     @id
+  name          String     @unique
+  slug          String     @unique
+  description   String?
+  parentId      String?
+  level         Int?
+  canonicalKey  String?
+  canonicalName String?
+  parent        Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children      Category[] @relation("CategoryHierarchy")
+  books         Book[]
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([parentId])
+  @@index([canonicalKey])
+  @@index([level])
+}
+
+model BookTag {
+  id        String   @id
+  name      String   @unique
+  slug      String   @unique
+  books     Book[]   @relation("BooksOnTags")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Book {
+  id                         String                      @id
+  title                      String
+  slug                       String                      @unique
+  authorName                 String
+  description                String?
+  level                      String?
+  format                     BookFormat                  @default(EBOOK)
+  price                      Decimal                     @db.Decimal(12, 2)
+  rating                     Decimal?                    @db.Decimal(3, 2)
+  pages                      Int?
+  publishYear                Int?
+  isEbook                    Boolean                     @default(true)
+  status                     BookStatus                  @default(ACTIVE)
+  deletedAt                  DateTime?
+  coverPath                  String?
+  languageCode               String?
+  coverReviewStatus          CoverReviewStatus           @default(NEEDS_COVER_REVIEW)
+  isPubliclyVisible          Boolean                     @default(false)
+  categoryId                 String
+  category                   Category                    @relation(fields: [categoryId], references: [id])
+  tags                       BookTag[]                   @relation("BooksOnTags")
+  listings                   Listing[]
+  editions                   BookEdition[]
+  chunks                     BookChunk[]
+  readingEntitlements        ReadingEntitlement[]
+  orderItems                 OrderItem[]
+  posts                      Post[]
+  interactions               Interaction[]
+  reviews                    Review[]
+  readingProgress            ReadingProgress[]
+  readingSessions            ReadingSession[]
+  bookmarks                  Bookmark[]
+  highlights                 Highlight[]
+  favoriteBooks              FavoriteBook[]
+  interactionEvents          InteractionEvent[]
+  dailyRecommendations       DailyRecommendation[]
+  recommendationFeedback     RecommendationFeedback[]
+  recommendationRequestItems RecommendationRequestItem[]
+  embedding                  BookEmbedding?
+  sourceMetadata             BookSourceMetadata?
+  membershipPlans            MembershipPlan[]            @relation("MembershipPlanBooks")
+  subscriptionAccesses       SubscriptionBookAccess[]
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+
+  @@index([categoryId])
+  @@index([title])
+  @@index([status])
+  @@index([languageCode])
+  @@index([coverReviewStatus, isPubliclyVisible])
+}
+
+// Gói hội viên có thể bao gồm một tập sách Ebook khác nhau.
+model MembershipPlan {
+  id            String                  @id @default(cuid())
+  name          String
+  slug          String                  @unique
+  description   String?
+  price         Decimal                 @db.Decimal(12, 2)
+  durationDays  Int
+  billingPeriod MembershipBillingPeriod @default(MONTHLY)
+  isActive      Boolean                 @default(true)
+  features      String[]                @default([])
+  books         Book[]                  @relation("MembershipPlanBooks")
+  subscriptions Subscription[]
+  payments      MembershipPayment[]
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  @@index([isActive, price])
+  @@map("membership_plans")
+}
+
+model Subscription {
+  id           String                   @id @default(cuid())
+  userId       String
+  planId       String
+  status       SubscriptionStatus       @default(PENDING)
+  startsAt     DateTime
+  endsAt       DateTime
+  cancelledAt  DateTime?
+  user         User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan         MembershipPlan           @relation(fields: [planId], references: [id], onDelete: Restrict)
+  payments     MembershipPayment[]
+  bookAccesses SubscriptionBookAccess[]
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+
+  @@index([userId, status, endsAt])
+  @@index([planId, status])
+  @@map("subscriptions")
+}
+
+// Ảnh chụp kho sách tại thời điểm đăng ký để thay đổi gói sau này không tước quyền đã bán.
+model SubscriptionBookAccess {
+  id             String       @id @default(cuid())
+  subscriptionId String
+  bookId         String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  book           Book         @relation(fields: [bookId], references: [id], onDelete: Restrict)
+  createdAt      DateTime     @default(now())
+
+  @@unique([subscriptionId, bookId])
+  @@index([bookId])
+  @@map("subscription_book_accesses")
+}
+
+model MembershipPayment {
+  id             String                  @id @default(cuid())
+  userId         String
+  planId         String
+  subscriptionId String?
+  amount         Decimal                 @db.Decimal(12, 2)
+  status         MembershipPaymentStatus @default(PENDING)
+  paymentMethod  PaymentMethod
+  transactionRef String                  @unique
+  paidAt         DateTime?
+  user           User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan           MembershipPlan          @relation(fields: [planId], references: [id], onDelete: Restrict)
+  subscription   Subscription?           @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  @@index([userId, status])
+  @@index([planId, status])
+  @@index([subscriptionId])
+  @@map("membership_payments")
+}
+
+// Nội dung Ebook đã tách nhỏ theo chương/đoạn để đọc, tìm kiếm và tạo embedding.
+model BookChunk {
+  id            String   @id @default(cuid())
+  bookId        String
+  chapterNumber Int
+  chapterTitle  String
+  pageNumber    Int?
+  chunkIndex    Int
+  content       String   @db.Text
+  embedding     Json?
+  book          Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+
+  @@unique([bookId, chapterNumber, chunkIndex])
+  @@index([bookId, chapterNumber])
+  @@index([bookId, pageNumber])
+  @@map("book_chunks")
+}
+
+// Một đầu sách có thể được phát hành dưới nhiều dạng: sách mới, sách cũ hoặc Ebook.
+model BookEdition {
+  id           String        @id @default(cuid())
+  bookId       String
+  editionType  EditionType
+  price        Decimal       @db.Decimal(12, 2)
+  stock        Int           @default(0)
+  isbn         String?
+  publisher    String?
+  publishYear  Int?
+  languageCode String?
+  isActive     Boolean       @default(true)
+  book         Book          @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  digitalAsset DigitalAsset?
+  listings     Listing[]
+  orderItems   OrderItem[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([bookId])
+  @@index([editionType, isActive])
+  @@index([bookId, editionType])
+  @@index([languageCode])
+  @@map("book_editions")
+}
+
+// File Ebook thuộc đúng một phiên bản số; hash dùng để kiểm tra tính toàn vẹn file.
+model DigitalAsset {
+  id          String      @id @default(cuid())
+  editionId   String      @unique
+  fileUrl     String
+  fileHash    String
+  samplePages Int         @default(10)
+  mimeType    String?
+  fileSize    Int?
+  edition     BookEdition @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([fileHash])
+  @@map("digital_assets")
+}
+
+// Quyền đọc toàn bộ Ebook. Upsert theo cặp user-sách giúp cấp quyền an toàn, không trùng.
+model ReadingEntitlement {
+  id        String   @id @default(cuid())
+  userId    String
+  bookId    String
+  grantedAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, bookId])
+  @@index([bookId])
+  @@map("reading_entitlements")
+}
+
+model BookSourceMetadata {
+  id                        String   @id @default(cuid())
+  bookId                    String   @unique
+  sourceProvider            String
+  sourceRecordKey           String
+  sourceRecordType          String
+  sourceWorkKey             String?
+  sourceWorkKeyRaw          String?
+  sourceEditionKey          String?
+  sourcePageUrl             String
+  dataLabel                 String
+  metadataQuality           String
+  coverId                   String?
+  coverRightsStatus         String
+  priceStatus               String
+  languageProfile           String
+  languages                 String[] @default([])
+  isbn                      String?  @unique
+  publisher                 String?
+  sourceFormat              String
+  descriptionStatus         String
+  sourceRatingStatus        String
+  sourceRatingAverage       Float?
+  sourceRatingCount         Int?
+  primarySourceCategoryId   String
+  primarySourceCategoryName String
+  sourceCategoryIds         String[] @default([])
+  isVietnameseEdition       Boolean  @default(false)
+  authorNationality         String
+  importedAt                DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+  book                      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceProvider, sourceRecordKey])
+  @@unique([sourceProvider, sourceWorkKey])
+  @@index([sourceRecordType])
+  @@index([dataLabel])
+  @@index([languageProfile])
+  @@index([isVietnameseEdition])
+  @@index([primarySourceCategoryId])
+  @@map("book_source_metadata")
+}
+
+// Catalog metadata có nguồn, tách khỏi Book/listing/giá/stock của marketplace.
+model GoldCatalogRecord {
+  catalogId             String   @id
+  recordType            String
+  title                 String
+  subtitle              String?
+  authors               String[] @default([])
+  description           String?
+  language              String?
+  publisher             String?
+  publishedDate         String?
+  publishedYear         Int?
+  isbn10                String?
+  isbn13                String?
+  pageCount             Int?
+  sourceCategories      String[] @default([])
+  canonicalCategoryKeys String[] @default([])
+  coverUrl              String?
+  coverProvider         String?
+  coverFinalUrl         String?
+  coverWidth            Int?
+  coverHeight           Int?
+  coverHttpStatus       Int?
+  coverContentType      String?
+  coverTechnicalStatus  String
+  coverRightsStatus     String
+  provider              String
+  providerBookId        String?
+  providerWorkId        String?
+  providerEditionId     String?
+  sourceUrl             String?
+  retrievedAt           DateTime
+  rawChecksum           String?
+  normalizedChecksum    String
+  metadataQualityScore  Int
+  qualityTier           String
+  rejectionReasons      String[] @default([])
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([provider, providerBookId])
+  @@index([qualityTier])
+  @@index([language])
+  @@index([publishedYear])
+  @@map("gold_catalog_records")
+}
+
+model Listing {
+  id              String                    @id
+  sellerId        String
+  bookId          String?
+  editionId       String?
+  title           String
+  description     String?
+  condition       ListingCondition          @default(GOOD)
+  price           Decimal                   @db.Decimal(12, 2)
+  status          ListingStatus             @default(PENDING_REVIEW)
+  rejectionReason String?
+  moderationNote  String?
+  reviewedAt      DateTime?
+  hiddenAt        DateTime?
+  reportCount     Int                       @default(0)
+  views           Int                       @default(0)
+  cartAdds        Int                       @default(0)
+  purchases       Int                       @default(0)
+  stock           Int                       @default(1)
+  soldAt          DateTime?
+  tags            String[]                  @default([])
+  hasCover        Boolean                   @default(false)
+  targetAudience  String?
+  seller          User                      @relation("SellerListings", fields: [sellerId], references: [id])
+  book            Book?                     @relation(fields: [bookId], references: [id], onDelete: SetNull)
+  edition         BookEdition?              @relation(fields: [editionId], references: [id], onDelete: SetNull)
+  images          ListingImage[]
+  conversations   MarketplaceConversation[]
+  orderItems      OrderItem[]
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  @@index([sellerId])
+  @@index([bookId])
+  @@index([editionId])
+  @@index([status])
+  @@index([status, stock])
+  @@index([reportCount])
+}
+
+model SellerAiScore {
+  id              String   @id @default(cuid())
+  sellerId        String   @unique
+  score           Float    @default(0)
+  completedOrders Int      @default(0)
+  responseRate    Float    @default(0)
+  trusted         Boolean  @default(false)
+  explanation     String?
+  metadata        Json?
+  seller          User     @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([score])
+  @@map("seller_ai_scores")
+}
+
+model BookEmbedding {
+  id        String                @id @default(cuid())
+  bookId    String                @unique
+  content   String
+  embedding Unsupported("vector")
+  model     String                @default("text-embedding-3-small")
+  book      Book                  @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
+  @@index([bookId])
+  @@map("book_embeddings")
+}
+
+model ListingImage {
+  id        String   @id @default(cuid())
+  listingId String
+  url       String
+  altText   String?
+  sortOrder Int      @default(0)
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([listingId])
+}
+
+model MarketplaceConversation {
+  id        String               @id @default(cuid())
+  listingId String
+  buyerId   String
+  sellerId  String
+  listing   Listing              @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyer     User                 @relation("MarketplaceBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
+  seller    User                 @relation("MarketplaceSeller", fields: [sellerId], references: [id], onDelete: Cascade)
+  messages  MarketplaceMessage[]
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  @@unique([listingId, buyerId])
+  @@index([buyerId, updatedAt])
+  @@index([sellerId, updatedAt])
+  @@map("marketplace_conversations")
+}
+
+model MarketplaceMessage {
+  id             String                  @id @default(cuid())
+  conversationId String
+  senderId       String
+  content        String                  @db.Text
+  readAt         DateTime?
+  conversation   MarketplaceConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User                    @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  createdAt      DateTime                @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+  @@map("marketplace_messages")
+}
+
+model Order {
+  id                  String               @id
+  buyerId             String
+  status              OrderStatus          @default(PENDING)
+  paymentMethod       PaymentMethod?
+  checkoutKey         String?
+  shippingSnapshot    Json?
+  shippingFullName    String?
+  shippingPhone       String?
+  shippingProvince    String?
+  shippingDistrict    String?
+  shippingWard        String?
+  shippingAddressLine String?
+  shippingNote        String?
+  totalAmount         Decimal              @db.Decimal(12, 2)
+  buyer               User                 @relation("BuyerOrders", fields: [buyerId], references: [id])
+  items               OrderItem[]
+  timelineEvents      OrderTimelineEvent[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@unique([buyerId, checkoutKey])
+  @@index([buyerId])
+  @@index([status])
+}
+
+model ShippingAddress {
+  id          String   @id @default(cuid())
+  userId      String
+  fullName    String
+  phone       String
+  province    String
+  district    String
+  ward        String
+  addressLine String
+  note        String?
+  isDefault   Boolean  @default(false)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, isDefault])
+  @@index([userId, createdAt])
+  @@map("shipping_addresses")
+}
+
+model OrderItem {
+  id         String       @id @default(cuid())
+  orderId    String
+  bookId     String
+  editionId  String?
+  listingId  String?
+  quantity   Int          @default(1)
+  unitPrice  Decimal      @db.Decimal(12, 2)
+  totalPrice Decimal      @db.Decimal(12, 2)
+  order      Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  book       Book         @relation(fields: [bookId], references: [id])
+  edition    BookEdition? @relation(fields: [editionId], references: [id], onDelete: SetNull)
+  listing    Listing?     @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  createdAt  DateTime     @default(now())
+
+  @@index([orderId])
+  @@index([bookId])
+  @@index([editionId])
+  @@index([listingId])
+}
+
+model Post {
+  id               String     @id
+  authorId         String
+  bookId           String?
+  title            String
+  content          String
+  tags             String[]   @default([])
+  reactionCount    Int        @default(0)
+  commentCount     Int        @default(0)
+  reportCount      Int        @default(0)
+  status           PostStatus @default(PUBLISHED)
+  moderationReason String?
+  moderatedAt      DateTime?
+  author           User       @relation("UserPosts", fields: [authorId], references: [id], onDelete: Cascade)
+  book             Book?      @relation(fields: [bookId], references: [id], onDelete: SetNull)
+  comments         Comment[]
+  reactions        Reaction[]
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  @@index([authorId])
+  @@index([bookId])
+  @@index([status])
+}
+
+model Comment {
+  id               String     @id @default(cuid())
+  postId           String
+  authorId         String
+  parentId         String?
+  content          String
+  status           PostStatus @default(PUBLISHED)
+  moderationReason String?
+  moderatedAt      DateTime?
+  post             Post       @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author           User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent           Comment?   @relation("CommentReplies", fields: [parentId], references: [id], onDelete: SetNull)
+  replies          Comment[]  @relation("CommentReplies")
+  reactions        Reaction[]
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  @@index([postId])
+  @@index([authorId])
+  @@index([parentId])
+}
+
+model Reaction {
+  id         String       @id @default(cuid())
+  userId     String
+  type       ReactionType @default(LIKE)
+  targetType TargetType
+  targetId   String
+  postId     String?
+  commentId  String?
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post       Post?        @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment    Comment?     @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  createdAt  DateTime     @default(now())
+
+  @@unique([userId, targetType, targetId, type])
+  @@index([targetType, targetId])
+  @@index([postId])
+  @@index([commentId])
+}
+
+model Interaction {
+  id              String          @id
+  userId          String
+  bookId          String?
+  type            InteractionType
+  targetType      TargetType
+  targetId        String
+  query           String?
+  minutesRead     Int             @default(0)
+  progressPercent Float           @default(0)
+  value           Decimal?        @db.Decimal(12, 2)
+  metadata        Json?
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book            Book?           @relation(fields: [bookId], references: [id], onDelete: SetNull)
+  createdAt       DateTime        @default(now())
+
+  @@index([userId, createdAt])
+  @@index([bookId])
+  @@index([type])
+  @@index([targetType, targetId])
+}
+
+model Recommendation {
+  id          String                   @id @default(cuid())
+  userId      String
+  targetType  TargetType
+  targetId    String
+  algorithm   String
+  score       Float
+  rank        Int
+  reason      String?
+  isDismissed Boolean                  @default(false)
+  clickedAt   DateTime?
+  purchasedAt DateTime?
+  generatedAt DateTime                 @default(now())
+  expiresAt   DateTime?
+  user        User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  evidence    RecommendationEvidence[]
+  feedback    RecommendationFeedback[]
+
+  @@unique([userId, targetType, targetId, algorithm])
+  @@index([userId, rank])
+  @@index([targetType, targetId])
+}
+
+model DailyRecommendation {
+  id          String                   @id @default(cuid())
+  userId      String
+  bookId      String
+  rank        Int
+  score       Float
+  reason      String?
+  algorithm   String                   @default("daily_hybrid_v1")
+  generatedAt DateTime                 @default(now())
+  expiresAt   DateTime?
+  user        User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book        Book                     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  evidence    RecommendationEvidence[]
+  feedback    RecommendationFeedback[]
+
+  @@unique([userId, bookId, algorithm])
+  @@index([userId, rank])
+  @@index([bookId])
+  @@map("daily_recommendations")
+}
+
+model RecommendationEvidence {
+  id                    String                     @id @default(cuid())
+  recommendationId      String?
+  dailyRecommendationId String?
+  type                  RecommendationEvidenceType
+  label                 String
+  weight                Float
+  sourceType            TargetType?
+  sourceId              String?
+  metadata              Json?
+  recommendation        Recommendation?            @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
+  dailyRecommendation   DailyRecommendation?       @relation(fields: [dailyRecommendationId], references: [id], onDelete: Cascade)
+  createdAt             DateTime                   @default(now())
+
+  @@index([recommendationId])
+  @@index([dailyRecommendationId])
+  @@index([sourceType, sourceId])
+}
+
+model RecommendationRequest {
+  id                String                          @id @default(cuid())
+  userId            String
+  algorithmVersion  String
+  taxonomyVersion   String
+  surface           RecommendationSurface
+  candidateProfile  String
+  filterProfile     String
+  collectionContext RecommendationCollectionContext @default(STANDARD_APP)
+  pilotId           String?
+  consentVersion    String?
+  experimentGroup   String?
+  user              User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items             RecommendationRequestItem[]
+  events            RecommendationTelemetryEvent[]
+  generatedAt       DateTime                        @default(now())
+
+  @@index([userId, generatedAt])
+  @@index([surface, generatedAt])
+  @@index([algorithmVersion, generatedAt])
+  @@index([collectionContext, pilotId, generatedAt])
+  @@map("recommendation_requests")
+}
+
+model RecommendationRequestItem {
+  id              String                         @id @default(cuid())
+  requestId       String
+  bookId          String
+  position        Int
+  score           Float
+  evidence        String?
+  sourceComponent String?
+  request         RecommendationRequest          @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  book            Book                           @relation(fields: [bookId], references: [id], onDelete: Restrict)
+  events          RecommendationTelemetryEvent[]
+
+  @@unique([requestId, bookId])
+  @@unique([requestId, position])
+  @@index([bookId])
+  @@map("recommendation_request_items")
+}
+
+model RecommendationTelemetryEvent {
+  id                String                      @id @default(cuid())
+  requestId         String
+  requestItemId     String
+  userId            String
+  type              RecommendationTelemetryType
+  canonicalEvent    String
+  deduplicationKey  String                      @unique
+  sourceType        String?
+  sourceId          String?
+  attributionAnchor String?
+  deviceClass       RecommendationDeviceClass   @default(UNKNOWN)
+  occurredAt        DateTime                    @default(now())
+  request           RecommendationRequest       @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  requestItem       RecommendationRequestItem   @relation(fields: [requestItemId], references: [id], onDelete: Cascade)
+  user              User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime                    @default(now())
+
+  @@index([requestId, type, occurredAt])
+  @@index([requestItemId, type])
+  @@index([userId, type, occurredAt])
+  @@index([sourceType, sourceId])
+  @@map("recommendation_telemetry_events")
+}
+
+model ChatbotSession {
+  id        String            @id @default(cuid())
+  userId    String?
+  title     String?
+  metadata  Json?
+  user      User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  messages  ChatbotMessage[]
+  feedback  ChatbotFeedback[]
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@index([userId, updatedAt])
+  @@map("chatbot_sessions")
+}
+
+model ChatbotMessage {
+  id        String             @id @default(cuid())
+  sessionId String
+  role      ChatbotMessageRole
+  content   String
+  metadata  Json?
+  session   ChatbotSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  feedback  ChatbotFeedback[]
+  createdAt DateTime           @default(now())
+
+  @@index([sessionId, createdAt])
+  @@map("chatbot_messages")
+}
+
+model OrderTimelineEvent {
+  id        String      @id @default(cuid())
+  orderId   String
+  actorId   String?
+  status    OrderStatus
+  note      String?
+  metadata  Json?
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  actor     User?       @relation("OrderTimelineActor", fields: [actorId], references: [id], onDelete: SetNull)
+  createdAt DateTime    @default(now())
+
+  @@index([orderId, createdAt])
+  @@index([actorId])
+  @@map("order_timeline_events")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      NotificationType @default(SYSTEM)
+  href      String?
+  readAt    DateTime?
+  metadata  Json?
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime         @default(now())
+
+  @@index([userId, readAt, createdAt])
+  @@index([type])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String
+  metadata   Json?
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+model RecommendationFeedback {
+  id                    String               @id @default(cuid())
+  userId                String
+  recommendationId      String?
+  dailyRecommendationId String?
+  bookId                String?
+  value                 FeedbackValue
+  note                  String?
+  metadata              Json?
+  user                  User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recommendation        Recommendation?      @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
+  dailyRecommendation   DailyRecommendation? @relation(fields: [dailyRecommendationId], references: [id], onDelete: Cascade)
+  book                  Book?                @relation(fields: [bookId], references: [id], onDelete: SetNull)
+  createdAt             DateTime             @default(now())
+
+  @@index([userId, createdAt])
+  @@index([recommendationId])
+  @@index([dailyRecommendationId])
+  @@index([bookId])
+  @@map("recommendation_feedback")
+}
+
+model ChatbotFeedback {
+  id        String          @id @default(cuid())
+  userId    String?
+  sessionId String
+  messageId String?
+  value     FeedbackValue
+  note      String?
+  metadata  Json?
+  user      User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  session   ChatbotSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  message   ChatbotMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  createdAt DateTime        @default(now())
+
+  @@index([userId, createdAt])
+  @@index([sessionId])
+  @@index([messageId])
+  @@map("chatbot_feedback")
+}
+
+model Review {
+  id         String   @id
+  userId     String
+  bookId     String
+  rating     Int
+  reviewText String?
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book       Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
+  @@index([bookId])
+}
+
+model ReadingProgress {
+  id              String    @id @default(cuid())
+  userId          String
+  bookId          String
+  currentPage     Int       @default(0)
+  currentChapter  Int       @default(1)
+  progressPercent Float     @default(0)
+  totalMinutes    Int       @default(0)
+  lastReadAt      DateTime?
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book            Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([userId, bookId])
+  @@index([bookId])
+}
+
+model ReadingSession {
+  id              String   @id @default(cuid())
+  userId          String
+  bookId          String
+  currentPage     Int      @default(1)
+  progressPercent Float    @default(0)
+  timeSpent       Int      @default(0)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book            Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([bookId])
+  @@map("reading_sessions")
+}
+
+model Bookmark {
+  id         String   @id @default(cuid())
+  userId     String
+  bookId     String
+  pageNumber Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book       Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, bookId, pageNumber])
+  @@index([bookId])
+  @@map("bookmarks")
+}
+
+model Highlight {
+  id          String         @id @default(cuid())
+  userId      String
+  bookId      String
+  pageNumber  Int
+  blockId     String?
+  startOffset Int?
+  endOffset   Int?
+  text        String
+  note        String?
+  color       HighlightColor @default(YELLOW)
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book        Book           @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  createdAt   DateTime       @default(now())
+
+  @@index([userId, bookId])
+  @@index([bookId])
+  @@index([bookId, blockId])
+  @@map("highlights")
+}
+
+model FavoriteBook {
+  id        String   @id @default(cuid())
+  userId    String
+  bookId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, bookId])
+  @@index([bookId])
+  @@map("favorite_books")
+}
+
+model InteractionEvent {
+  id         String   @id @default(cuid())
+  userId     String
+  bookId     String
+  actionType String
+  metadata   Json?
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book       Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([bookId])
+  @@index([actionType])
+  @@map("interaction_events")
+}
+
+// ==================== RESEARCH COLLECTION (additive, không ghi đè dữ liệu cũ) ====================
+
+// Phân loại event theo spec thu thập tương tác người dùng thật
+enum UserInteractionEventType {
+  IMPRESSION
+  VIEW
+  RECOMMENDATION_CLICK
+  SEARCH
+  FAVORITE
+  BOOKMARK
+  ADD_TO_CART
+  PURCHASE
+  RATING
+
+  @@map("user_interaction_event_type")
+}
+
+// Bảng lưu trạng thái đồng ý tham gia nghiên cứu của từng người dùng
+model UserResearchConsent {
+  id             String   @id @default(cuid())
+  userId         String
+  consentVersion String   // Ví dụ: "v1"
+  consented      Boolean
+  // IP không lưu để bảo vệ quyền riêng tư; chỉ dùng server timestamp
+  consentedAt    DateTime @default(now())
+  revokedAt      DateTime?
+  metadata       Json?    // Thông tin không định danh: device class, locale
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, consentVersion])
+  @@index([userId, consented])
+  @@index([consentVersion, consented])
+  @@map("user_research_consents")
+}
+
+// Bảng ghi tương tác cho nghiên cứu — CHỈ ghi khi user đã đồng ý (consented=true)
+// Không ghi mật khẩu, email, nội dung riêng tư vào metadata
+// book_id có thể null cho event SEARCH (không có sách cụ thể)
+model UserInteractionLog {
+  id                        String                   @id @default(cuid())
+  // userId null = user chưa đăng nhập (chỉ dùng anonymousId)
+  userId                    String?
+  // anonymousId dùng cho user chưa đăng nhập hoặc khi muốn ẩn danh
+  anonymousId               String?
+  bookId                    String?
+  eventType                 UserInteractionEventType
+  // Giá trị số học tùy theo event, ví dụ: rating 1-5, scroll % ...
+  eventValue                Float?
+  // Trang nguồn: home, book_detail, search, cart, ...
+  sourcePage                String?
+  // Liên kết với RecommendationRequest để audit impression → click
+  recommendationRequestId   String?
+  // Model gợi ý đã sinh ra item này, ví dụ: fastapi_hybrid_v2
+  recommendationModel       String?
+  // Vị trí trong danh sách gợi ý (1-indexed)
+  position                  Int?
+  // Phiên bản consent đã được đồng ý — bắt buộc, dùng để truy nguồn
+  consentVersion            String
+  // Idempotency key để chống ghi trùng từ client retry
+  idempotencyKey            String?                  @unique
+  // Metadata bổ sung (device, locale, ...) — không chứa PII
+  metadata                  Json?
+  // Timestamp phía server (không dùng client time)
+  createdAt                 DateTime                 @default(now())
+  // Quan hệ
+  user                      User?                    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([anonymousId, createdAt])
+  @@index([bookId, eventType])
+  @@index([eventType, createdAt])
+  @@index([recommendationRequestId])
+  @@index([consentVersion, eventType])
+  @@map("user_interaction_logs")
+}

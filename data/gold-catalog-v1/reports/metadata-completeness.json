@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "gold-catalog-metadata-completeness.v1",
+  "selectedCount": 300,
+  "fields": {
+    "title": {
+      "present": 300,
+      "total": 300,
+      "percentage": 100
+    },
+    "authors": {
+      "present": 300,
+      "total": 300,
+      "percentage": 100
+    },
+    "description": {
+      "present": 232,
+      "total": 300,
+      "percentage": 77.33
+    },
+    "language": {
+      "present": 300,
+      "total": 300,
+      "percentage": 100
+    },
+    "publisher": {
+      "present": 300,
+      "total": 300,
+      "percentage": 100
+    },
+    "publishedDate": {
+      "present": 0,
+      "total": 300,
+      "percentage": 0
+    },
+    "publishedYear": {
+      "present": 300,
+      "total": 300,
+      "percentage": 100
+    },
+    "isbn10": {
+      "present": 92,
+      "total": 300,
+      "percentage": 30.67
+    },
+    "isbn13": {
+      "present": 208,
+      "total": 300,
+      "percentage": 69.33
+    },
+    "pageCount": {
+      "present": 300,
+      "total": 300,
+      "percentage": 100
+    },
+    "canonicalCategoryKeys": {
+      "present": 300,
+      "total": 300,
+      "percentage": 100
+    },
+    "coverUrl": {
+      "present": 300,
+      "total": 300,
+      "percentage": 100
+    },
+    "coverTechnicalStatus": {
+      "present": 300,
+      "total": 300,
+      "percentage": 100
+    },
+    "providerBookId": {
+      "present": 300,
+      "total": 300,
+      "percentage": 100
+    },
+    "sourceUrl": {
+      "present": 300,
+      "total": 300,
+      "percentage": 100
+    }
+  }
+}

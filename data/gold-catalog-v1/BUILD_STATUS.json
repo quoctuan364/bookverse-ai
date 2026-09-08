@@ -1,0 +1,15 @@
+{
+  "status": "VERIFIED",
+  "sourceCatalogChecksum": "79aed37578a638757216af19e80634b9b6ad925ca77fa47f3a55ccfe203bd3a3",
+  "candidates": 360,
+  "selected": 300,
+  "qualityCounts": {
+    "GOLD": 129,
+    "FEATURED": 222,
+    "REVIEW": 0,
+    "REJECTED": 9
+  },
+  "generatedFromCachedSource": true,
+  "rawCachePath": "raw/open-library-work/",
+  "rightsStatus": "RIGHTS_NOT_VERIFIED"
+}
