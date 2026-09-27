@@ -32,15 +32,23 @@ export function publicDemoBookWhere(): Prisma.BookWhereInput {
 export function isDemoCatalogExperienceEnabled(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
+  const allowsDemoCatalog =
+    env.BOOKVERSE_ALLOW_DEMO_CATALOG?.trim().toLowerCase() === "true";
+
+  if (!allowsDemoCatalog) return false;
+  if (env.NODE_ENV !== "production") return true;
+
+  // Production thật vẫn khóa catalog demo. Cờ thứ hai chỉ dành cho bản
+  // triển khai học thuật công khai, nơi giao diện đã ghi nhãn dữ liệu demo.
   return (
-    env.NODE_ENV !== "production" &&
-    env.BOOKVERSE_ALLOW_DEMO_CATALOG?.trim().toLowerCase() === "true"
+    env.BOOKVERSE_PUBLIC_DEMO_DEPLOYMENT?.trim().toLowerCase() === "true"
   );
 }
 
 /**
  * Cho phép bản demo chạy trọn hành trình catalog → chi tiết → reader.
- * Production luôn chỉ nhận catalog thật đã qua quality gate.
+ * Production thật chỉ nhận catalog đã qua quality gate; bản demo công khai
+ * phải bật đồng thời hai cờ môi trường rõ ràng mới được dùng dữ liệu mẫu.
  */
 export function publicExperienceBookWhere(): Prisma.BookWhereInput {
   if (!isDemoCatalogExperienceEnabled()) return publicBookQualityWhere();
