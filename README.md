@@ -4,10 +4,10 @@
 
 Project có sẵn [`render.yaml`](render.yaml) để tạo đồng thời ba tài nguyên tại
 Singapore: web Next.js, dịch vụ gợi ý FastAPI và PostgreSQL 16. Render tự tạo
-secret, chạy migration rồi seed dữ liệu mẫu từ `data/demo`; quy trình này không
-sao chép hoặc thay đổi database gốc trên máy.
+secret, chạy migration rồi chỉ seed dữ liệu mẫu từ `data/demo` khi database mới
+chưa có sách; quy trình này không sao chép hoặc thay đổi database gốc trên máy.
 
-1. Đẩy source lên một repository GitHub riêng tư.
+1. Đẩy source lên một repository GitHub mà tài khoản Render có quyền truy cập.
 2. Trong Render, chọn **New > Blueprint** và kết nối repository đó.
 3. Xác nhận tạo các tài nguyên được khai báo trong `render.yaml`.
 4. Chờ cả web và AI service chuyển sang trạng thái `Live`, sau đó mở
