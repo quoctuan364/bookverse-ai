@@ -61,8 +61,8 @@ export default async function HomePage() {
   const newestBooks = selectHomeShelfBooks(shelves.newest.books, seenBookIds, HOME_SHELF_SIZE, dayOfYear);
   const topRatedBooks = selectHomeShelfBooks(shelves.topRated.books, seenBookIds, HOME_SHELF_SIZE, dayOfYear);
   const readableBooks = selectHomeShelfBooks(shelves.readable.books, seenBookIds, HOME_SHELF_SIZE, dayOfYear);
-  // Hero dùng sách mới; recommendations hiển riêng trong section stream bên dưới.
-  const heroBooks = newestBooks.slice(0, 5);
+  // Hero ưu tiên sách mới và dùng kệ phổ biến làm dự phòng để không hiện khung rỗng.
+  const heroBooks = (newestBooks.length > 0 ? newestBooks : popularBooks).slice(0, 5);
 
   return (
     <main className="bv-page overflow-x-hidden pb-16">

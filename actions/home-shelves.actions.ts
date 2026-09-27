@@ -195,12 +195,16 @@ const getCachedHasRealCatalog = unstable_cache(
 const getCachedNewestBooks = unstable_cache(
   async (hasRealCatalog: boolean) =>
     prisma.book.findMany({
-      where: { ...catalogBookQualityWhere(hasRealCatalog), languageCode: "vi" },
+      where: {
+        ...catalogBookQualityWhere(hasRealCatalog),
+        // Catalog thật ưu tiên ấn bản Việt; dữ liệu demo cũ chưa có languageCode.
+        ...(hasRealCatalog ? { languageCode: "vi" } : {}),
+      },
       orderBy: [{ createdAt: "desc" }, { id: "asc" }],
       take: 30,
       select: homeBookSelect,
     }),
-  ["home-newest-books"],
+  ["home-newest-books-v2"],
   { revalidate: 120, tags: ["home-shelves"] },
 );
 
