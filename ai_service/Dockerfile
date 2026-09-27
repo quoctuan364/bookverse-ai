@@ -1,4 +1,4 @@
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
@@ -7,6 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY ai_service/*.py ./ai_service/
 COPY ai_service/evaluation ./ai_service/evaluation
+COPY ai_service/pipeline ./ai_service/pipeline
 COPY shared ./shared
 
 EXPOSE 8000

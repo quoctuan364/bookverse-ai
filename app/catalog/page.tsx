@@ -1,34 +1,54 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowUpDown, ChevronLeft, ChevronRight, Filter, Search, SearchX, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, SearchX, X } from "lucide-react";
 
-import { getCatalogData, type CatalogSourceFilter } from "@/actions/catalog.actions";
+import { getCatalogData } from "@/actions/catalog.actions";
+import { CatalogSearchPanel } from "@/components/catalog/CatalogSearchPanel";
+import { CatalogSearchTracker } from "@/components/catalog/CatalogSearchTracker";
 import { BookCard } from "@/components/shared/BookCard";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { normalizeCatalogLanguageFilter } from "@/lib/book-language";
+import {
+  buildCatalogPaginationItems,
+  type CatalogPaginationItem,
+} from "@/lib/catalog-pagination";
 import type { CatalogSearchSort } from "@/lib/catalog-search";
+import { getCatalogHeroDescription } from "@/lib/catalog-presentation";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Danh mục sách | BookVerse",
+  description: "Tìm kiếm và lọc sách theo thể loại, ngôn ngữ, giá và đánh giá trên BookVerse.",
+};
 
 interface CatalogPageProps {
   searchParams?: Promise<{
     q?: string;
     category?: string;
-    source?: string;
     language?: string;
     year?: string;
+    minPrice?: string;
+    maxPrice?: string;
+    minRating?: string;
+    inStock?: string;
     sort?: string;
     page?: string;
   }>;
 }
 
-function safeSource(value?: string): CatalogSourceFilter {
-  return value === "real" || value === "demo" ? value : "all";
-}
-
 function safePositiveInteger(value?: string): number | undefined {
   const parsed = Number.parseInt(value ?? "", 10);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function safePrice(value?: string): number | undefined {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : undefined;
+}
+
+function safeRating(value?: string): number | undefined {
+  const parsed = Number(value);
+  return [3, 4, 4.5].includes(parsed) ? parsed : undefined;
 }
 
 function safeSort(value?: string): CatalogSearchSort {
@@ -41,24 +61,34 @@ function safeSort(value?: string): CatalogSearchSort {
     : "relevance";
 }
 
+function paginationKey(item: CatalogPaginationItem): string {
+  return typeof item === "number" ? `page-${item}` : item;
+}
+
 export default async function CatalogPage({ searchParams }: CatalogPageProps) {
   const params = await searchParams;
   const query = params?.q ?? "";
   const categoryId = params?.category ?? "";
-  const source = safeSource(params?.source);
   const language =
     params?.language === "NOT_AVAILABLE"
       ? "NOT_AVAILABLE"
       : normalizeCatalogLanguageFilter(params?.language) ?? "";
   const publishYear = safePositiveInteger(params?.year);
+  const minPrice = safePrice(params?.minPrice);
+  const maxPrice = safePrice(params?.maxPrice);
+  const minRating = safeRating(params?.minRating);
+  const inStock = params?.inStock === "1";
   const sort = safeSort(params?.sort);
   const requestedPage = safePositiveInteger(params?.page) ?? 1;
   const data = await getCatalogData({
     query,
     categoryId,
-    source,
     language,
     publishYear,
+    minPrice,
+    maxPrice,
+    minRating,
+    inStock,
     sort,
     page: requestedPage,
   });
@@ -67,9 +97,12 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
     const next = new URLSearchParams();
     if (query) next.set("q", query);
     if (categoryId) next.set("category", categoryId);
-    if (source !== "all") next.set("source", source);
     if (language) next.set("language", language);
     if (publishYear) next.set("year", String(publishYear));
+    if (minPrice !== undefined) next.set("minPrice", String(minPrice));
+    if (maxPrice !== undefined) next.set("maxPrice", String(maxPrice));
+    if (minRating) next.set("minRating", String(minRating));
+    if (inStock) next.set("inStock", "1");
     if (sort !== "relevance") next.set("sort", sort);
     return next;
   };
@@ -87,6 +120,8 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
     return queryString ? `/catalog?${queryString}` : "/catalog";
   };
   const activeCategoryName = data.categories.find((category) => category.id === categoryId)?.name;
+  const mobilePaginationItems = buildCatalogPaginationItems(data.page, data.totalPages, true);
+  const desktopPaginationItems = buildCatalogPaginationItems(data.page, data.totalPages);
   const activeFilters = [
     query ? { key: "q", label: `Tìm: ${query}` } : null,
     activeCategoryName ? { key: "category", label: activeCategoryName } : null,
@@ -98,89 +133,61 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
               ? "Tiếng Việt"
               : language === "en"
                 ? "Tiếng Anh"
-                : "Thiếu metadata ngôn ngữ",
+                : "Chưa có thông tin ngôn ngữ",
         }
       : null,
     publishYear ? { key: "year", label: `Năm ${publishYear}` } : null,
+    minPrice !== undefined ? { key: "minPrice", label: `Từ ${minPrice.toLocaleString("vi-VN")}đ` } : null,
+    maxPrice !== undefined ? { key: "maxPrice", label: `Đến ${maxPrice.toLocaleString("vi-VN")}đ` } : null,
+    minRating ? { key: "minRating", label: `Từ ${minRating} sao` } : null,
+    inStock ? { key: "inStock", label: "Còn hàng" } : null,
   ].filter((item): item is { key: string; label: string } => Boolean(item));
 
   return (
     <main className="bv-page">
+      {query ? <CatalogSearchTracker query={query} /> : null}
       <section className="bv-hero">
         <div className="relative z-10 mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-          <p className="text-sm font-black uppercase tracking-[0.16em] text-[#F5D98B]">Danh mục sách BookVerse</p>
+          <p className="text-sm font-black uppercase tracking-[0.16em] text-[#F5D98B]">Góc sách BookVerse</p>
           <h1 className="bv-editorial mt-2 text-4xl font-bold tracking-tight sm:text-5xl">Tìm cuốn sách tiếp theo</h1>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-[#EAF5F1]">
-            Khám phá hàng nghìn đầu sách, tìm nhanh theo tên, tác giả, thể loại hoặc ngôn ngữ.
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-bv-mint-soft">
+            {getCatalogHeroDescription()}
           </p>
         </div>
       </section>
 
       <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <form className="bv-panel grid min-w-0 grid-cols-1 gap-4 rounded-2xl p-4 sm:p-5 md:grid-cols-2 xl:grid-cols-4">
-          <div className="grid gap-1 md:col-span-2">
-            <div className="relative">
-              <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#66706B]" />
-              <Input aria-label="Tìm trong danh mục sách" className="h-11 pl-10" defaultValue={query} name="q" placeholder="Tên sách, tác giả, ISBN, nhà xuất bản..." type="search" />
-            </div>
-            <p className="text-xs font-medium text-[#687083]">
-              Hỗ trợ tiếng Việt không dấu, ISBN liền số và lỗi gõ nhẹ.
-            </p>
-          </div>
+        {data.books.some((book) => book.catalogSource === "SYNTHETIC_DEMO") ? (
+          <p className="mb-4 rounded-xl border border-[#E7D7A8] bg-[#FFF8E7] px-4 py-3 text-sm font-medium text-[#684F16]">
+            Một số thông tin sách và giá bán được dùng để minh họa; tình trạng còn hàng sẽ được cập nhật khi bạn chọn mua.
+          </p>
+        ) : null}
+        <CatalogSearchPanel
+          activeFilterCount={activeFilters.length}
+          categories={data.categories}
+          initialValues={{
+            categoryId,
+            inStock,
+            language,
+            maxPrice,
+            minPrice,
+            minRating,
+            publishYear,
+            query,
+            sort,
+          }}
+        />
 
-          <label className="grid gap-1 text-xs font-bold text-[#42524D]">
-            Thể loại
-            <select className="h-11 rounded-lg border border-[#D8D0C2] bg-[#FFFDF8] px-3 text-sm text-[#1D2433]" defaultValue={categoryId} name="category">
-              <option value="">Tất cả thể loại</option>
-              {data.categories.map((category) => (
-                <option key={category.id} value={category.id}>{category.name}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="grid gap-1 text-xs font-bold text-[#42524D]">
-            Ngôn ngữ
-            <select className="h-11 rounded-lg border border-[#D8D0C2] bg-[#FFFDF8] px-3 text-sm text-[#1D2433]" defaultValue={language} name="language">
-              <option value="">Tất cả</option>
-              <option value="vi">Tiếng Việt</option>
-              <option value="en">Tiếng Anh</option>
-            </select>
-          </label>
-
-          <label className="grid gap-1 text-xs font-bold text-[#42524D]">
-            Năm xuất bản
-            <Input className="h-11" defaultValue={publishYear?.toString() ?? ""} min="1000" max="2100" name="year" placeholder="Ví dụ: 2020" type="number" />
-          </label>
-
-          <label className="grid gap-1 text-xs font-bold text-[#42524D]">
-            Sắp xếp
-            <span className="relative">
-              <ArrowUpDown className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#687083]" aria-hidden="true" />
-              <select className="h-11 w-full rounded-lg border border-[#D8D0C2] bg-[#FFFDF8] pl-9 pr-3 text-sm text-[#1D2433]" defaultValue={sort} name="sort">
-                <option value="relevance">Độ liên quan</option>
-                <option value="title">Tên A–Z</option>
-                <option value="rating">Đánh giá cao</option>
-                <option value="newest">Năm mới nhất</option>
-                <option value="price-low">Giá thấp đến cao</option>
-                <option value="price-high">Giá cao đến thấp</option>
-              </select>
-            </span>
-          </label>
-
-          <Button className="h-11 gap-2 self-end md:col-span-2 xl:col-span-2" type="submit">
-            <Filter className="h-4 w-4" aria-hidden="true" /> Lọc sách
-          </Button>
-        </form>
 
         {activeFilters.length > 0 ? (
           <div aria-label="Bộ lọc đang áp dụng" className="mt-4 flex flex-wrap items-center gap-2">
-            <span className="text-xs font-black uppercase tracking-[0.12em] text-[#687083]">
+            <span className="text-xs font-black uppercase tracking-[0.12em] text-bv-text-subtle">
               Đang lọc
             </span>
             {activeFilters.map((filter) => (
               <Link
                 aria-label={`Xóa bộ lọc ${filter.label}`}
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-[#B8DBD5] bg-[#EDF8F5] px-3 py-1.5 text-xs font-bold text-[#176B62] transition hover:border-[#176B62]/45 hover:bg-[#DDF0EB] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#176B62]"
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-[#B8DBD5] bg-[#EDF8F5] px-3 py-1.5 text-xs font-bold text-bv-primary transition hover:border-bv-primary/45 hover:bg-[#DDF0EB] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bv-primary"
                 href={removeFilterHref(filter.key)}
                 key={filter.key}
               >
@@ -188,23 +195,20 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
                 <X className="h-3.5 w-3.5" aria-hidden="true" />
               </Link>
             ))}
-            <Link className="inline-flex min-h-9 items-center rounded-full px-3 py-1.5 text-xs font-bold text-[#C65D43] hover:bg-[#FBEDE8]" href="/catalog">
+            <Link className="inline-flex min-h-9 items-center rounded-full px-3 py-1.5 text-xs font-bold text-bv-accent hover:bg-[#FBEDE8]" href="/catalog">
               Xóa tất cả
             </Link>
           </div>
         ) : null}
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
-          <p className="text-sm font-medium text-[#687083]">
-            Trang <span className="font-black text-[#1D2433]">{data.page}</span>/{data.totalPages} · hiển thị{" "}
-            <span className="font-black text-[#1D2433]">{data.visibleBooks}</span> trong{" "}
-            <span className="font-black text-[#1D2433]">{data.totalBooks.toLocaleString("vi-VN")}</span> sách phù hợp.
+          <p className="text-sm font-medium text-bv-text-subtle">
+            Đang xem trang <span className="font-black text-bv-ink">{data.page}</span>/{data.totalPages}
           </p>
-          <Link className="inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-black text-[#176B62] hover:bg-[#EAF2EF] hover:underline" href="/catalog">Xóa bộ lọc</Link>
         </div>
 
         {data.books.length > 0 ? (
-          <div className="mt-6 grid auto-rows-fr grid-cols-1 items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+          <div className="mt-6 grid grid-cols-1 items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
             {data.books.map((book) => (
               <BookCard
                 book={{
@@ -227,36 +231,106 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
             ))}
           </div>
         ) : (
-          <div className="mt-6 rounded-3xl border border-dashed border-[#176B62]/30 bg-white/80 px-6 py-12 text-center shadow-[0_12px_34px_rgba(39,44,51,0.06)]">
-            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#DDF0EB] text-[#176B62]">
+          <div className="mt-6 rounded-3xl border border-dashed border-bv-primary/30 bg-white/80 px-6 py-12 text-center shadow-[0_12px_34px_rgba(39,44,51,0.06)]">
+            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#DDF0EB] text-bv-primary">
               <SearchX className="h-7 w-7" aria-hidden="true" />
             </span>
-            <h2 className="mt-5 text-xl font-black text-[#1D2433]">Chưa tìm thấy cuốn phù hợp</h2>
-            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#687083]">
-              Thử rút gọn từ khóa, bỏ bớt bộ lọc hoặc mô tả nhu cầu bằng ngôn ngữ tự nhiên để Trợ lý AI hỗ trợ.
+            <h2 className="mt-5 text-xl font-black text-bv-ink">Chưa tìm thấy cuốn phù hợp</h2>
+            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-bv-text-subtle">
+              Thử từ khóa khác, bỏ bớt bộ lọc hoặc nhờ Nova tìm theo sở thích của bạn.
             </p>
             <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
-              <Link className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#176B62] px-5 text-sm font-bold text-white hover:bg-[#104C47]" href="/catalog">
+              <Link className="inline-flex min-h-11 items-center justify-center rounded-lg bg-bv-primary px-5 text-sm font-bold text-white hover:bg-bv-primary-dark" href="/catalog">
                 Xóa toàn bộ bộ lọc
               </Link>
-              <Link className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[#D8D0C2] bg-[#FFFDF8] px-5 text-sm font-bold text-[#1D2433] hover:bg-[#EDF7F5]" href="/assistant">
-                Hỏi Trợ lý AI
+              <Link className="inline-flex min-h-11 items-center justify-center rounded-lg border border-bv-border bg-bv-ivory px-5 text-sm font-bold text-bv-ink hover:bg-[#EDF7F5]" href="/assistant">
+                Hỏi Nova
               </Link>
             </div>
           </div>
         )}
 
-        <nav aria-label="Phân trang catalog" className="mt-8 flex items-center justify-center gap-3">
+        <nav
+          aria-label="Chuyển trang danh mục sách"
+          className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row sm:flex-wrap"
+        >
           {data.hasPreviousPage ? (
-            <Link className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#D8D0C2] bg-[#FFFDF8] px-4 text-sm font-bold text-[#17202A]" href={pageHref(data.page - 1)}>
-              <ChevronLeft className="h-4 w-4" aria-hidden="true" /> Trang trước
+            <Link
+              aria-label={`Về trang ${data.page - 1}`}
+              className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border border-bv-border bg-bv-ivory px-4 text-sm font-bold text-bv-heading transition hover:border-bv-primary/40 hover:bg-bv-mint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bv-primary"
+              href={pageHref(data.page - 1)}
+            >
+              <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+              <span>Trang trước</span>
             </Link>
-          ) : null}
+          ) : (
+            <span
+              aria-disabled="true"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border border-bv-border bg-bv-muted px-4 text-sm font-bold text-bv-text-muted opacity-60"
+            >
+              <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+              <span>Trang trước</span>
+            </span>
+          )}
+
+          {[mobilePaginationItems, desktopPaginationItems].map((items, index) => (
+            <div
+              aria-label="Danh sách số trang"
+              className={`${index === 0 ? "flex sm:hidden" : "hidden sm:flex"} flex-wrap items-center justify-center gap-2`}
+              key={index === 0 ? "mobile" : "desktop"}
+            >
+              {items.map((item) =>
+                typeof item === "number" ? (
+                  item === data.page ? (
+                    <span
+                      aria-current="page"
+                      aria-label={`Trang ${item}, trang hiện tại`}
+                      className="inline-flex h-11 min-w-11 items-center justify-center rounded-lg bg-bv-primary px-3 text-sm font-black text-white shadow-sm"
+                      key={paginationKey(item)}
+                    >
+                      {item}
+                    </span>
+                  ) : (
+                    <Link
+                      aria-label={`Đến trang ${item}`}
+                      className="inline-flex h-11 min-w-11 items-center justify-center rounded-lg border border-bv-border bg-white px-3 text-sm font-bold text-bv-heading transition hover:border-bv-primary/40 hover:bg-bv-mint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bv-primary"
+                      href={pageHref(item)}
+                      key={paginationKey(item)}
+                    >
+                      {item}
+                    </Link>
+                  )
+                ) : (
+                  <span
+                    aria-hidden="true"
+                    className="inline-flex h-11 min-w-6 items-center justify-center text-sm font-bold text-bv-text-muted"
+                    key={paginationKey(item)}
+                  >
+                    …
+                  </span>
+                ),
+              )}
+            </div>
+          ))}
+
           {data.hasNextPage ? (
-            <Link className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#0F766E] px-4 text-sm font-bold text-white" href={pageHref(data.page + 1)}>
-              Trang sau <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            <Link
+              aria-label={`Đến trang ${data.page + 1}`}
+              className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg bg-bv-focus px-4 text-sm font-bold text-white transition hover:bg-bv-primary-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bv-primary focus-visible:ring-offset-2"
+              href={pageHref(data.page + 1)}
+            >
+              <span>Tiếp theo</span>
+              <ChevronRight className="h-4 w-4" aria-hidden="true" />
             </Link>
-          ) : null}
+          ) : (
+            <span
+              aria-disabled="true"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg bg-bv-muted px-4 text-sm font-bold text-bv-text-muted opacity-60"
+            >
+              <span>Tiếp theo</span>
+              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            </span>
+          )}
         </nav>
       </section>
     </main>

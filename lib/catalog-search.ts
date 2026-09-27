@@ -1,6 +1,7 @@
 export interface CatalogSearchCandidate {
   id: string;
   title: string;
+  originalTitle?: string;
   authorName: string;
   description?: string | null;
   categoryName?: string | null;
@@ -125,7 +126,12 @@ export function rankCatalogSearchCandidates(
       };
       const fieldScores = (Object.keys(FIELD_WEIGHTS) as SearchField[]).map((field) => ({
         field,
-        score: scoreField(query, queryTokens, normalizedFields[field], FIELD_WEIGHTS[field]),
+        score: Math.max(
+          scoreField(query, queryTokens, normalizedFields[field], FIELD_WEIGHTS[field]),
+          field === "title" && candidate.originalTitle
+            ? scoreField(query, queryTokens, normalizeVietnameseSearchText(candidate.originalTitle), FIELD_WEIGHTS.title)
+            : 0,
+        ),
       }));
       fieldScores.sort((left, right) => right.score - left.score);
       const best = fieldScores[0];

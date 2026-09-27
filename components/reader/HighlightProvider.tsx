@@ -49,6 +49,7 @@ interface HighlightContextValue {
 interface HighlightProviderProps {
   bookId: string;
   currentPage: number;
+  enabled?: boolean;
   children: ReactNode;
 }
 
@@ -162,13 +163,24 @@ function getHighlightsForBlock(text: string, blockId: string, highlights: Reader
     .sort((left, right) => left.startOffset - right.startOffset);
 }
 
-export function HighlightProvider({ bookId, currentPage, children }: HighlightProviderProps) {
+export function HighlightProvider({
+  bookId,
+  currentPage,
+  enabled = true,
+  children,
+}: HighlightProviderProps) {
   const [highlights, setHighlights] = useState<ReaderHighlightItem[]>([]);
   const [selectionDraft, setSelectionDraft] = useState<SelectionDraft | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const refreshHighlights = useCallback(async () => {
+    if (!enabled) {
+      setHighlights([]);
+      setMessage(null);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -178,17 +190,17 @@ export function HighlightProvider({ bookId, currentPage, children }: HighlightPr
       const payload: unknown = await response.json();
 
       if (!response.ok || !isHighlightsResponse(payload)) {
-        throw new Error("API highlight trả dữ liệu không hợp lệ.");
+        throw new Error("API đoạn tô sáng trả dữ liệu không hợp lệ.");
       }
 
       setHighlights(payload.data);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Không thể tải highlight.";
+      const errorMessage = error instanceof Error ? error.message : "Không thể tải đoạn tô sáng.";
       setMessage(errorMessage);
     } finally {
       setIsLoading(false);
     }
-  }, [bookId]);
+  }, [bookId, enabled]);
 
   useEffect(() => {
     void refreshHighlights();
@@ -199,7 +211,7 @@ export function HighlightProvider({ bookId, currentPage, children }: HighlightPr
     setSelectionDraft(draft);
 
     if (!draft) {
-      setMessage("Hãy bôi đen một đoạn trong nội dung đọc trước khi lưu highlight.");
+      setMessage("Hãy bôi đen một đoạn trong nội dung đọc trước khi lưu đoạn tô sáng.");
     }
   }, []);
 
@@ -231,11 +243,11 @@ export function HighlightProvider({ bookId, currentPage, children }: HighlightPr
       const payload: unknown = await response.json();
 
       if (!response.ok || !payload || typeof payload !== "object" || (payload as { success?: unknown }).success !== true) {
-        throw new Error("Không thể lưu highlight.");
+        throw new Error("Không thể lưu đoạn tô sáng.");
       }
 
       setSelectionDraft(null);
-      setMessage("Đã lưu highlight từ đoạn bôi đen.");
+      setMessage("Đã lưu đoạn tô sáng từ đoạn bôi đen.");
       await refreshHighlights();
     },
     [bookId, currentPage, refreshHighlights, selectionDraft],
@@ -254,14 +266,14 @@ export function HighlightProvider({ bookId, currentPage, children }: HighlightPr
       if (!response.ok) {
         const error = payload && typeof payload === "object" && "error" in payload
           ? String(payload.error)
-          : "Không thể xóa highlight.";
+          : "Không thể xóa đoạn tô sáng.";
         throw new Error(error);
       }
 
       setHighlights((items) => items.filter((item) => item.id !== highlightId));
-      setMessage("Đã xóa highlight.");
+      setMessage("Đã xóa đoạn tô sáng.");
     } catch (error: unknown) {
-      setMessage(error instanceof Error ? error.message : "Không thể xóa highlight.");
+      setMessage(error instanceof Error ? error.message : "Không thể xóa đoạn tô sáng.");
     } finally {
       setIsLoading(false);
     }
@@ -290,7 +302,7 @@ export function HighlightProvider({ bookId, currentPage, children }: HighlightPr
       }
 
       setHighlights((items) => items.map((item) => item.id === updatedHighlight.id ? updatedHighlight : item));
-      setMessage("Đã cập nhật ghi chú highlight.");
+      setMessage("Đã cập nhật ghi chú đoạn tô sáng.");
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : "Không thể cập nhật ghi chú.");
     } finally {
@@ -325,7 +337,7 @@ export function HighlightProvider({ bookId, currentPage, children }: HighlightPr
                   ? "rounded bg-emerald-400/30 px-0.5 text-inherit ring-1 ring-emerald-400/35"
                   : highlight.color === "PINK"
                     ? "rounded bg-pink-400/30 px-0.5 text-inherit ring-1 ring-pink-400/35"
-                    : "rounded bg-[#F2C14E]/35 px-0.5 text-inherit ring-1 ring-[#F2C14E]/30"
+                    : "rounded bg-bv-gold/35 px-0.5 text-inherit ring-1 ring-bv-gold/30"
               }
               data-highlight-id={highlight.id}
               key={highlight.id}

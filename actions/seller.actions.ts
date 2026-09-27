@@ -12,12 +12,15 @@ import {
 import { grantEbookEntitlementsForOrder } from "@/lib/ebook-entitlement";
 import { recordAuditLog } from "@/lib/audit";
 import { normalizeBookCoverUrl } from "@/lib/book-cover";
+import { getVietnameseBookTitle } from "@/lib/book-display-title";
+import { evaluateListingForAutoApproval } from "@/lib/listing-auto-moderation";
 import { createNotification, createNotifications } from "@/lib/notifications";
 import { checkOrderTransition, getAllowedOrderNextStatuses } from "@/lib/order-workflow";
 import { filterSellerOwnedItems } from "@/lib/order-ownership";
 import { getCurrentUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
 import { calculateSellerQualityScore, type SellerQualityScoreResult } from "@/lib/seller-score";
+import { logResearchInteraction } from "@/actions/tracking.actions";
 
 type DecimalLike = {
   toNumber: () => number;
@@ -30,6 +33,10 @@ export interface SellerActionResult {
 }
 
 export interface SellerGateData {
+  authenticated: boolean;
+  canSell: boolean;
+  listingCount: number;
+  /** @deprecated Use `authenticated` and `canSell` */
   status: "UNAUTHENTICATED" | "NEEDS_SELLER" | "SELLER";
   user: {
     id: string;
@@ -53,6 +60,7 @@ export interface SellerListingInput {
   condition: string;
   targetAudience?: string;
   imageUrl?: string;
+  imageUrls?: string[];
 }
 
 export interface SellerListingItem {
@@ -70,6 +78,7 @@ export interface SellerListingItem {
   purchases: number;
   targetAudience: string | null;
   imageUrl: string | null;
+  imageUrls: string[];
   orderCount: number;
   createdAt: Date;
   updatedAt: Date;
@@ -290,6 +299,15 @@ function normalizeImageUrl(value?: string): string | null {
   return null;
 }
 
+function normalizeImageUrls(input: SellerListingInput): { urls: string[]; hasInvalidUrl: boolean } {
+  const rawUrls = (input.imageUrls?.length ? input.imageUrls : [input.imageUrl ?? ""])
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .slice(0, 6);
+  const urls = rawUrls.map(normalizeImageUrl).filter((url): url is string => Boolean(url));
+  return { urls: [...new Set(urls)], hasInvalidUrl: urls.length !== rawUrls.length };
+}
+
 function handleSellerError(error: unknown, fallbackMessage: string): SellerActionResult {
   const message = error instanceof Error ? error.message : "Lỗi không xác định.";
   console.error(`[seller] ${message}`);
@@ -321,20 +339,26 @@ export async function getSellerGateData(): Promise<SellerGateData> {
 
   if (!user) {
     return {
+      authenticated: false,
+      canSell: false,
+      listingCount: 0,
       status: "UNAUTHENTICATED",
       user: null,
     };
   }
 
-  if (user.role !== UserRole.SELLER && user.role !== UserRole.ADMIN) {
-    return {
-      status: "NEEDS_SELLER",
-      user,
-    };
-  }
+  // Under Unified User Model, all authenticated users have seller permissions.
+  const listingCount = await prisma.listing.count({
+    where: {
+      sellerId: user.id,
+    },
+  });
 
   return {
-    status: "SELLER",
+    authenticated: true,
+    canSell: true,
+    listingCount,
+    status: "SELLER", // Preserved for backward compatibility with legacy consumers
     user,
   };
 }
@@ -342,11 +366,11 @@ export async function getSellerGateData(): Promise<SellerGateData> {
 async function requireSellerFromDb(): Promise<NonNullable<SellerGateData["user"]>> {
   const gate = await getSellerGateData();
 
-  if (!gate.user) {
+  if (!gate.authenticated || !gate.user) {
     throw new Error("AUTH_REQUIRED");
   }
 
-  if (gate.status !== "SELLER") {
+  if (!gate.canSell) {
     throw new Error("FORBIDDEN");
   }
 
@@ -439,16 +463,19 @@ function serializeListing(listing: {
     purchases: listing.purchases,
     targetAudience: listing.targetAudience,
     imageUrl: normalizeBookCoverUrl(listing.images?.[0]?.url ?? null),
+    imageUrls: (listing.images ?? [])
+      .map((image) => normalizeBookCoverUrl(image.url))
+      .filter((url): url is string => Boolean(url)),
     orderCount: listing._count?.orderItems ?? 0,
     createdAt: listing.createdAt,
     updatedAt: listing.updatedAt,
     book: listing.book
       ? {
-          id: listing.book.id,
-          title: listing.book.title,
-          author: listing.book.authorName,
-          coverImage: normalizeBookCoverUrl(listing.book.coverPath),
-        }
+        id: listing.book.id,
+        title: getVietnameseBookTitle(listing.book.id, listing.book.title),
+        author: listing.book.authorName,
+        coverImage: normalizeBookCoverUrl(listing.book.coverPath),
+      }
       : null,
   };
 }
@@ -468,7 +495,7 @@ async function getBookOptions(): Promise<SellerBookOption[]> {
 
   return books.map((book) => ({
     id: book.id,
-    title: book.title,
+    title: getVietnameseBookTitle(book.id, book.title),
     author: book.authorName,
   }));
 }
@@ -567,7 +594,7 @@ function serializeSellerOrder(order: {
     listingId: string | null;
     quantity: number;
     totalPrice: DecimalLike | number | string;
-    book: { title: string };
+    book: { id: string; title: string };
     listing: { title: string; sellerId: string } | null;
   }>;
 }, sellerId: string): SellerOrderListItem {
@@ -586,7 +613,7 @@ function serializeSellerOrder(order: {
       id: item.id,
       listingId: item.listingId,
       listingTitle: item.listing?.title ?? null,
-      bookTitle: item.book.title,
+      bookTitle: getVietnameseBookTitle(item.book.id, item.book.title),
       quantity: item.quantity,
       totalPrice: decimalToNumber(item.totalPrice),
     })),
@@ -615,6 +642,7 @@ async function loadSellerOrders(
         include: {
           book: {
             select: {
+              id: true,
               title: true,
             },
           },
@@ -684,74 +712,32 @@ async function getSellerQualityScore(sellerId: string): Promise<SellerQualitySco
   });
 }
 
+/**
+ * @deprecated All members can sell by default under the Unified User Model.
+ * This compatibility wrapper exists for legacy callers and returns immediately with success
+ * without mutating the database role.
+ */
 export async function becomeSeller(): Promise<SellerActionResult> {
-  try {
-    const user = await getUserFromSession();
+  const user = await getUserFromSession();
 
-    if (!user) {
-      return {
-        success: false,
-        message: "Bạn cần đăng nhập để trở thành người bán.",
-        reason: "AUTH_REQUIRED",
-      };
-    }
-
-    if (user.role === UserRole.SELLER || user.role === UserRole.ADMIN) {
-      return {
-        success: true,
-        message: "Tài khoản đã có quyền người bán.",
-      };
-    }
-
-    await prisma.$transaction(async (tx) => {
-      await tx.user.update({
-        where: {
-          id: user.id,
-        },
-        data: {
-          role: UserRole.SELLER,
-        },
-      });
-
-      await createNotification(
-        {
-          userId: user.id,
-          title: "Đã bật vai trò người bán",
-          message: "Bạn có thể mở Seller Dashboard và đăng listing chờ duyệt.",
-          type: NotificationType.MARKETPLACE,
-          href: "/seller",
-        },
-        tx,
-      );
-
-      await recordAuditLog(
-        {
-          actorId: user.id,
-          action: "USER_BECOME_SELLER",
-          entityType: "USER",
-          entityId: user.id,
-        },
-        tx,
-      );
-    });
-
-    revalidatePath("/seller");
-    revalidatePath("/seller/apply");
-    revalidatePath("/profile");
-
+  if (!user) {
     return {
-      success: true,
-      message: "Đã bật vai trò người bán. Bạn có thể dùng Seller Dashboard ngay.",
+      success: false,
+      message: "Bạn cần đăng nhập để truy cập kênh bán sách.",
+      reason: "AUTH_REQUIRED",
     };
-  } catch (error: unknown) {
-    return handleSellerError(error, "Không thể bật vai trò người bán.");
   }
+
+  return {
+    success: true,
+    message: "Tài khoản thành viên đã có thể đăng bán sách.",
+  };
 }
 
 export async function getSellerOverviewData(): Promise<SellerOverviewData> {
   const gate = await getSellerGateData();
 
-  if (gate.status !== "SELLER" || !gate.user) {
+  if (!gate.canSell || !gate.user) {
     return {
       gate,
       metrics: [],
@@ -843,7 +829,8 @@ export async function getSellerOverviewData(): Promise<SellerOverviewData> {
           },
         },
         images: {
-          take: 1,
+          take: 6,
+          orderBy: { sortOrder: "asc" },
           select: {
             url: true,
           },
@@ -894,11 +881,11 @@ export async function getSellerOverviewData(): Promise<SellerOverviewData> {
     },
     orderCounts,
     metrics: [
-      { label: "Tổng listing", value: totalListings },
-      { label: "Listing chờ duyệt", value: pendingListings, tone: "warning" },
-      { label: "Listing đã duyệt", value: approvedListings, tone: "success" },
-      { label: "Listing bị từ chối", value: rejectedListings, tone: "warning" },
-      { label: "Listing bị ẩn", value: hiddenListings, tone: "warning" },
+      { label: "Tổng tin bán sách", value: totalListings },
+      { label: "tin bán sách chờ duyệt", value: pendingListings, tone: "warning" },
+      { label: "tin bán sách đã duyệt", value: approvedListings, tone: "success" },
+      { label: "tin bán sách bị từ chối", value: rejectedListings, tone: "warning" },
+      { label: "tin bán sách bị ẩn", value: hiddenListings, tone: "warning" },
       { label: "Tổng đơn liên quan", value: sellerOrders.length },
       { label: "Doanh thu completed", value: totalCompletedRevenue, tone: "money" },
       { label: "Doanh thu tháng này", value: monthRevenue, tone: "money" },
@@ -914,7 +901,7 @@ export async function getSellerOverviewData(): Promise<SellerOverviewData> {
 export async function getSellerListingsData(filters: { q?: string; status?: string } = {}): Promise<SellerListingsData> {
   const gate = await getSellerGateData();
 
-  if (gate.status !== "SELLER" || !gate.user) {
+  if (!gate.canSell || !gate.user) {
     return {
       gate,
       listings: [],
@@ -942,7 +929,8 @@ export async function getSellerListingsData(filters: { q?: string; status?: stri
           },
         },
         images: {
-          take: 1,
+          take: 6,
+          orderBy: { sortOrder: "asc" },
           select: {
             url: true,
           },
@@ -970,9 +958,9 @@ export async function getSellerListingsData(filters: { q?: string; status?: stri
 
 export async function getSellerListingEditorData(listingId?: string): Promise<SellerListingEditorData> {
   const gate = await getSellerGateData();
-  const bookOptions = gate.status === "SELLER" ? await getBookOptions() : [];
+  const bookOptions = gate.canSell ? await getBookOptions() : [];
 
-  if (gate.status !== "SELLER" || !gate.user || !listingId) {
+  if (!gate.canSell || !gate.user || !listingId) {
     return {
       gate,
       listing: null,
@@ -995,7 +983,8 @@ export async function getSellerListingEditorData(listingId?: string): Promise<Se
         },
       },
       images: {
-        take: 1,
+        take: 6,
+        orderBy: { sortOrder: "asc" },
         select: {
           url: true,
         },
@@ -1021,7 +1010,7 @@ export async function createSellerListing(input: SellerListingInput): Promise<Se
     const title = cleanText(input.title, 180);
     const description = cleanText(input.description, 2_000);
     const targetAudience = cleanText(input.targetAudience ?? "", 160) || null;
-    const imageUrl = normalizeImageUrl(input.imageUrl);
+    const { urls: imageUrls, hasInvalidUrl } = normalizeImageUrls(input);
     const price = parsePrice(input.price);
     const condition = parseCondition(input.condition);
     const bookId = cleanText(input.bookId ?? "", 120) || null;
@@ -1034,13 +1023,24 @@ export async function createSellerListing(input: SellerListingInput): Promise<Se
       };
     }
 
-    if ((input.imageUrl ?? "").trim() && !imageUrl) {
+    if (hasInvalidUrl) {
       return {
         success: false,
         message: "URL ảnh phải bắt đầu bằng http://, https:// hoặc /.",
         reason: "VALIDATION_ERROR",
       };
     }
+
+    const autoModeration = evaluateListingForAutoApproval({
+      title,
+      description,
+      price,
+      hasCatalogBook: Boolean(bookId),
+      imageCount: imageUrls.length,
+    });
+    const initialStatus = autoModeration.approved
+      ? ListingStatus.APPROVED
+      : ListingStatus.PENDING_REVIEW;
 
     await prisma.$transaction(async (tx) => {
       const listing = await tx.listing.create({
@@ -1052,17 +1052,21 @@ export async function createSellerListing(input: SellerListingInput): Promise<Se
           description,
           price,
           condition,
-          status: ListingStatus.PENDING_REVIEW,
+          status: initialStatus,
+          moderationNote: autoModeration.approved
+            ? `Tự động duyệt theo quy tắc chất lượng (${autoModeration.score}/100).`
+            : autoModeration.reasons.join(" "),
+          reviewedAt: autoModeration.approved ? new Date() : null,
           targetAudience,
-          hasCover: Boolean(bookId || imageUrl),
-          images: imageUrl
+          hasCover: Boolean(bookId || imageUrls.length),
+          images: imageUrls.length
             ? {
-                create: {
-                  url: imageUrl,
-                  altText: title,
-                  sortOrder: 0,
-                },
-              }
+              create: imageUrls.map((url, sortOrder) => ({
+                url,
+                altText: title,
+                sortOrder,
+              })),
+            }
             : undefined,
         },
         select: {
@@ -1070,32 +1074,38 @@ export async function createSellerListing(input: SellerListingInput): Promise<Se
           title: true,
         },
       });
-      const moderators = await tx.user.findMany({
-        where: {
-          role: {
-            in: [UserRole.ADMIN, UserRole.MODERATOR],
-          },
-          isLocked: false,
-        },
-        select: {
-          id: true,
-        },
-        take: 20,
-      });
+      const moderators = autoModeration.approved
+        ? []
+        : await tx.user.findMany({
+            where: {
+              role: {
+                in: [UserRole.ADMIN, UserRole.MODERATOR],
+              },
+              isLocked: false,
+            },
+            select: {
+              id: true,
+            },
+            take: 20,
+          });
 
       await createNotifications(
         [
           {
             userId: seller.id,
-            title: "Listing đã gửi duyệt",
-            message: `Tin bán "${listing.title}" đang chờ admin duyệt.`,
+            title: autoModeration.approved
+              ? "Tin bán đã được đăng"
+              : "Tin bán cần bổ sung thông tin",
+            message: autoModeration.approved
+              ? `Tin bán "${listing.title}" đã vượt kiểm tra tự động và đang hiển thị.`
+              : `Tin bán "${listing.title}" đang chờ kiểm tra: ${autoModeration.reasons.join(" ")}`,
             type: NotificationType.MARKETPLACE,
             href: `/seller/listings/${listing.id}/edit`,
           },
           ...moderators.map((moderator) => ({
             userId: moderator.id,
-            title: "Listing mới chờ duyệt",
-            message: `Seller ${seller.name} vừa gửi tin bán "${listing.title}".`,
+            title: "Tin bán cần kiểm tra ngoại lệ",
+            message: `Tin của ${seller.name} chưa vượt kiểm tra tự động: "${listing.title}".`,
             type: NotificationType.MARKETPLACE,
             href: "/admin#marketplace",
           })),
@@ -1110,7 +1120,9 @@ export async function createSellerListing(input: SellerListingInput): Promise<Se
           entityType: "LISTING",
           entityId: listing.id,
           metadata: {
-            status: ListingStatus.PENDING_REVIEW,
+            status: initialStatus,
+            autoModerationScore: autoModeration.score,
+            autoModerationReasons: autoModeration.reasons,
           } satisfies Prisma.InputJsonObject,
         },
         tx,
@@ -1123,13 +1135,15 @@ export async function createSellerListing(input: SellerListingInput): Promise<Se
 
     return {
       success: true,
-      message: "Đã tạo listing và gửi admin duyệt.",
+      message: autoModeration.approved
+        ? "Tin bán đã vượt kiểm tra tự động và hiển thị ngay trên chợ sách."
+        : `Đã lưu tin bán. Vui lòng bổ sung để được tự duyệt: ${autoModeration.reasons.join(" ")}`,
     };
   } catch (error: unknown) {
     if (error instanceof Error && error.message === "AUTH_REQUIRED") {
       return {
         success: false,
-        message: "Bạn cần đăng nhập để tạo listing.",
+        message: "Bạn cần đăng nhập để tạo tin bán sách.",
         reason: "AUTH_REQUIRED",
       };
     }
@@ -1137,12 +1151,12 @@ export async function createSellerListing(input: SellerListingInput): Promise<Se
     if (error instanceof Error && error.message === "FORBIDDEN") {
       return {
         success: false,
-        message: "Bạn cần trở thành người bán trước khi tạo listing.",
+        message: "Bạn cần trở thành người bán trước khi tạo tin bán sách.",
         reason: "FORBIDDEN",
       };
     }
 
-    return handleSellerError(error, "Không thể tạo listing.");
+    return handleSellerError(error, "Không thể tạo tin bán sách.");
   }
 }
 
@@ -1153,7 +1167,7 @@ export async function updateSellerListing(listingId: string, input: SellerListin
     const title = cleanText(input.title, 180);
     const description = cleanText(input.description, 2_000);
     const targetAudience = cleanText(input.targetAudience ?? "", 160) || null;
-    const imageUrl = normalizeImageUrl(input.imageUrl);
+    const { urls: imageUrls, hasInvalidUrl } = normalizeImageUrls(input);
     const price = parsePrice(input.price);
     const condition = parseCondition(input.condition);
     const bookId = cleanText(input.bookId ?? "", 120) || null;
@@ -1166,13 +1180,21 @@ export async function updateSellerListing(listingId: string, input: SellerListin
       };
     }
 
-    if ((input.imageUrl ?? "").trim() && !imageUrl) {
+    if (hasInvalidUrl) {
       return {
         success: false,
         message: "URL ảnh phải bắt đầu bằng http://, https:// hoặc /.",
         reason: "VALIDATION_ERROR",
       };
     }
+
+    const autoModeration = evaluateListingForAutoApproval({
+      title,
+      description,
+      price,
+      hasCatalogBook: Boolean(bookId),
+      imageCount: imageUrls.length,
+    });
 
     const listing = await prisma.listing.findFirst({
       where: {
@@ -1189,15 +1211,22 @@ export async function updateSellerListing(listingId: string, input: SellerListin
     if (!listing) {
       return {
         success: false,
-        message: "Không tìm thấy listing thuộc tài khoản người bán.",
+        message: "Không tìm thấy tin bán sách thuộc tài khoản người bán.",
         reason: "NOT_FOUND",
       };
     }
 
-    const nextStatus =
-      listing.status === ListingStatus.APPROVED || listing.status === ListingStatus.REJECTED
-        ? ListingStatus.PENDING_REVIEW
-        : listing.status;
+    const reevaluableStatuses: ListingStatus[] = [
+      ListingStatus.APPROVED,
+      ListingStatus.REJECTED,
+      ListingStatus.PENDING_REVIEW,
+    ];
+    const canReevaluate = reevaluableStatuses.includes(listing.status);
+    const nextStatus = canReevaluate
+      ? autoModeration.approved
+        ? ListingStatus.APPROVED
+        : ListingStatus.PENDING_REVIEW
+      : listing.status;
 
     await prisma.$transaction(async (tx) => {
       await tx.listing.update({
@@ -1213,76 +1242,67 @@ export async function updateSellerListing(listingId: string, input: SellerListin
           targetAudience,
           status: nextStatus,
           rejectionReason: nextStatus === ListingStatus.PENDING_REVIEW ? null : undefined,
-          moderationNote: nextStatus === ListingStatus.PENDING_REVIEW ? null : undefined,
-          reviewedAt: nextStatus === ListingStatus.PENDING_REVIEW ? null : undefined,
+          moderationNote: canReevaluate
+            ? autoModeration.approved
+              ? `Tự động duyệt theo quy tắc chất lượng (${autoModeration.score}/100).`
+              : autoModeration.reasons.join(" ")
+            : undefined,
+          reviewedAt: canReevaluate
+            ? autoModeration.approved
+              ? new Date()
+              : null
+            : undefined,
           hiddenAt: nextStatus === ListingStatus.HIDDEN ? new Date() : undefined,
-          hasCover: Boolean(bookId || imageUrl),
+          hasCover: Boolean(bookId || imageUrls.length),
         },
       });
 
-      if (imageUrl) {
-        const existingImage = await tx.listingImage.findFirst({
-          where: {
-            listingId: listing.id,
-          },
-          select: {
-            id: true,
-          },
-        });
+      await tx.listingImage.deleteMany({
+        where: { listingId: listing.id },
+      });
 
-        if (existingImage) {
-          await tx.listingImage.update({
-            where: {
-              id: existingImage.id,
-            },
-            data: {
-              url: imageUrl,
-              altText: title,
-            },
-          });
-        } else {
-          await tx.listingImage.create({
-            data: {
-              listingId: listing.id,
-              url: imageUrl,
-              altText: title,
-              sortOrder: 0,
-            },
-          });
-        }
+      if (imageUrls.length) {
+        await tx.listingImage.createMany({
+          data: imageUrls.map((url, sortOrder) => ({
+            listingId: listing.id,
+            url,
+            altText: title,
+            sortOrder,
+          })),
+        });
       }
 
       const moderators =
         nextStatus === ListingStatus.PENDING_REVIEW
           ? await tx.user.findMany({
-              where: {
-                role: {
-                  in: [UserRole.ADMIN, UserRole.MODERATOR],
-                },
-                isLocked: false,
+            where: {
+              role: {
+                in: [UserRole.ADMIN, UserRole.MODERATOR],
               },
-              select: {
-                id: true,
-              },
-              take: 20,
-            })
+              isLocked: false,
+            },
+            select: {
+              id: true,
+            },
+            take: 20,
+          })
           : [];
 
       await createNotifications(
         [
           {
             userId: seller.id,
-            title: "Listing đã cập nhật",
+            title: "tin bán sách đã cập nhật",
             message:
               nextStatus === ListingStatus.PENDING_REVIEW
-                ? `Tin bán "${title}" đã chuyển về chờ duyệt.`
+                ? `Tin bán "${title}" cần bổ sung: ${autoModeration.reasons.join(" ")}`
                 : `Tin bán "${title}" đã được lưu.`,
             type: NotificationType.MARKETPLACE,
             href: `/seller/listings/${listing.id}/edit`,
           },
           ...moderators.map((moderator) => ({
             userId: moderator.id,
-            title: "Listing cần duyệt lại",
+            title: "Tin bán cần kiểm tra lại",
             message: `Seller ${seller.name} vừa chỉnh sửa tin "${title}".`,
             type: NotificationType.MARKETPLACE,
             href: "/admin#marketplace",
@@ -1315,11 +1335,13 @@ export async function updateSellerListing(listingId: string, input: SellerListin
       success: true,
       message:
         nextStatus === ListingStatus.PENDING_REVIEW
-          ? "Đã lưu listing và chuyển về trạng thái chờ duyệt."
-          : "Đã lưu listing.",
+          ? `Đã lưu tin bán. Vui lòng bổ sung để được tự duyệt: ${autoModeration.reasons.join(" ")}`
+          : autoModeration.approved
+            ? "Đã lưu và tự động duyệt tin bán sách."
+            : "Đã lưu tin bán sách.",
     };
   } catch (error: unknown) {
-    return handleSellerError(error, "Không thể cập nhật listing.");
+    return handleSellerError(error, "Không thể cập nhật tin bán sách.");
   }
 }
 
@@ -1345,7 +1367,7 @@ export async function setSellerListingVisibility(
     if (!listing) {
       return {
         success: false,
-        message: "Không tìm thấy listing thuộc tài khoản người bán.",
+        message: "Không tìm thấy tin bán sách thuộc tài khoản người bán.",
         reason: "NOT_FOUND",
       };
     }
@@ -1368,11 +1390,11 @@ export async function setSellerListingVisibility(
       await createNotification(
         {
           userId: seller.id,
-          title: nextStatus === ListingStatus.HIDDEN ? "Listing đã được ẩn" : "Listing đã gửi duyệt lại",
+          title: nextStatus === ListingStatus.HIDDEN ? "Tin bán đã được ẩn" : "Tin bán đang chờ kiểm tra lại",
           message:
             nextStatus === ListingStatus.HIDDEN
               ? `Tin bán "${listing.title}" đã được ẩn khỏi marketplace.`
-              : `Tin bán "${listing.title}" đang chờ admin duyệt lại.`,
+              : `Tin bán "${listing.title}" đang chờ kiểm tra ngoại lệ trước khi hiển thị lại.`,
           type: NotificationType.MARKETPLACE,
           href: `/seller/listings/${listing.id}/edit`,
         },
@@ -1400,17 +1422,17 @@ export async function setSellerListingVisibility(
 
     return {
       success: true,
-      message: nextStatus === ListingStatus.HIDDEN ? "Đã ẩn listing." : "Đã gửi listing duyệt lại.",
+      message: nextStatus === ListingStatus.HIDDEN ? "Đã ẩn tin bán sách." : "Đã gửi tin bán sách vào hàng chờ kiểm tra lại.",
     };
   } catch (error: unknown) {
-    return handleSellerError(error, "Không thể cập nhật hiển thị listing.");
+    return handleSellerError(error, "Không thể cập nhật hiển thị tin bán sách.");
   }
 }
 
 export async function getSellerOrdersData(filters: { q?: string; status?: string } = {}): Promise<SellerOrdersData> {
   const gate = await getSellerGateData();
 
-  if (gate.status !== "SELLER" || !gate.user) {
+  if (!gate.canSell || !gate.user) {
     return {
       gate,
       orders: [],
@@ -1434,7 +1456,7 @@ export async function getSellerOrdersData(filters: { q?: string; status?: string
 export async function getSellerOrderDetailData(orderId: string): Promise<SellerOrderDetailData> {
   const gate = await getSellerGateData();
 
-  if (gate.status !== "SELLER" || !gate.user) {
+  if (!gate.canSell || !gate.user) {
     return {
       gate,
       order: null,
@@ -1466,6 +1488,7 @@ export async function getSellerOrderDetailData(orderId: string): Promise<SellerO
         include: {
           book: {
             select: {
+              id: true,
               title: true,
             },
           },
@@ -1579,7 +1602,7 @@ export async function updateSellerOrderStatus(
     if (!order) {
       return {
         success: false,
-        message: "Không tìm thấy đơn hàng thuộc listing của bạn.",
+        message: "Không tìm thấy đơn hàng thuộc tin bán sách của bạn.",
         reason: "NOT_FOUND",
       };
     }
@@ -1662,6 +1685,21 @@ export async function updateSellerOrderStatus(
       );
     });
 
+    // Research tracking: chỉ ghi khi đơn hàng hoàn tất/thanh toán thành công (COMPLETED hoặc PAID), không tính CANCELLED / REFUNDED
+    if (nextStatus === OrderStatus.COMPLETED || nextStatus === OrderStatus.PAID) {
+      for (const item of order.items) {
+        if (item.bookId) {
+          await logResearchInteraction({
+            eventType: "PURCHASE",
+            bookId: item.bookId,
+            sourcePage: "seller_order_complete",
+            eventValue: item.totalPrice ? Number(item.totalPrice) : null,
+            idempotencyKey: `purchase:${order.buyer.id}:${order.id}:${item.id}:${nextStatus}`,
+          });
+        }
+      }
+    }
+
     revalidatePath("/seller");
     revalidatePath("/seller/orders");
     revalidatePath(`/seller/orders/${order.id}`);
@@ -1680,7 +1718,7 @@ export async function updateSellerOrderStatus(
 export async function getSellerRevenueData(): Promise<SellerRevenueData> {
   const gate = await getSellerGateData();
 
-  if (gate.status !== "SELLER" || !gate.user) {
+  if (!gate.canSell || !gate.user) {
     return {
       gate,
       totalCompletedRevenue: 0,

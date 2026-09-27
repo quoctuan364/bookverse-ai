@@ -1,8 +1,19 @@
 import Link from "next/link";
-import { BookOpen, Crown, Search, Sparkles } from "lucide-react";
+import {
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  Crown,
+  Search,
+  Sparkles,
+} from "lucide-react";
 import { SubscriptionStatus } from "@prisma/client";
 import { getReadingLibrary } from "@/actions/membership.actions";
 import { BookCover } from "@/components/shared/BookCover";
+import {
+  buildCatalogPaginationItems,
+  type CatalogPaginationItem,
+} from "@/lib/catalog-pagination";
 import { getCurrentUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
 
@@ -23,6 +34,10 @@ function buildPageUrl(query: string, category: string, page: number) {
   if (page > 1) params.set("page", String(page));
   const suffix = params.toString();
   return suffix ? `/read?${suffix}` : "/read";
+}
+
+function paginationKey(item: CatalogPaginationItem): string {
+  return typeof item === "number" ? `page-${item}` : item;
 }
 
 export default async function ReadingLibraryPage({
@@ -49,22 +64,32 @@ export default async function ReadingLibraryPage({
       })
     : null;
   const totalPages = Math.max(1, Math.ceil(data.total / data.pageSize));
+  const mobilePaginationItems = buildCatalogPaginationItems(
+    data.page,
+    totalPages,
+    true,
+  );
+  const desktopPaginationItems = buildCatalogPaginationItems(
+    data.page,
+    totalPages,
+  );
+  const hasActiveFilter = Boolean(data.query || data.category);
 
   return (
     <main className="bv-page">
       <section className="bv-hero">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:px-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:px-8">
           <div>
-            <p className="inline-flex items-center gap-2 text-sm font-black uppercase tracking-[0.16em] text-[#F2C14E]">
+            <p className="inline-flex items-center gap-2 text-sm font-black uppercase tracking-[0.16em] text-bv-gold">
               <BookOpen className="h-4 w-4" aria-hidden="true" />
-              Kho đọc trực tuyến
+              Kho sách điện tử trực tuyến
             </p>
             <h1 className="bv-editorial mt-3 max-w-3xl text-4xl font-bold leading-tight sm:text-6xl">
-              Mọi cuốn sách đều có thể bắt đầu đọc
+              Đọc sách trực tuyến mọi lúc, mọi nơi
             </h1>
-            <p className="mt-4 max-w-2xl text-base leading-7 text-[#EAF5F1]">
-              Đọc thử miễn phí tối đa 10% mỗi cuốn. Một gói hội viên đang hoạt động
-              sẽ mở toàn bộ nội dung hiện có trong kho BookVerse.
+            <p className="mt-4 max-w-2xl text-base leading-7 text-bv-mint-soft">
+              Trải nghiệm không gian đọc sách số mượt mà trên mọi thiết bị. Đọc thử miễn phí 10%
+              hoặc đăng ký Hội viên để mở khóa trọn vẹn kho tác phẩm tuyển chọn.
             </p>
           </div>
 
@@ -73,11 +98,11 @@ export default async function ReadingLibraryPage({
               <>
                 <span className="inline-flex items-center gap-2 rounded-full bg-emerald-300/15 px-3 py-1 text-sm font-black text-emerald-100">
                   <Crown className="h-4 w-4" aria-hidden="true" />
-                  Hội viên đang hoạt động
+                  Hội viên BookVerse VIP
                 </span>
                 <h2 className="mt-4 text-xl font-black">{activeMembership.plan.name}</h2>
-                <p className="mt-2 text-sm leading-6 text-[#EAF5F1]">
-                  Bạn đang được đọc toàn bộ kho đến{" "}
+                <p className="mt-2 text-sm leading-6 text-bv-mint-soft">
+                  Bạn đang có đặc quyền đọc không giới hạn toàn bộ kho sách đến{" "}
                   {new Intl.DateTimeFormat("vi-VN", { dateStyle: "medium" }).format(
                     activeMembership.endsAt,
                   )}
@@ -86,16 +111,16 @@ export default async function ReadingLibraryPage({
               </>
             ) : (
               <>
-                <Crown className="h-7 w-7 text-[#F2C14E]" aria-hidden="true" />
-                <h2 className="mt-3 text-xl font-black">Muốn đọc toàn bộ?</h2>
-                <p className="mt-2 text-sm leading-6 text-[#EAF5F1]">
-                  Chọn một gói để mở mọi sách và tự động nhận sách mới trong thời hạn.
+                <Crown className="h-7 w-7 text-bv-gold" aria-hidden="true" />
+                <h2 className="mt-3 text-xl font-black">Đọc không giới hạn</h2>
+                <p className="mt-2 text-sm leading-6 text-bv-mint-soft">
+                  Đăng ký gói Hội viên để mở khóa toàn bộ kho sách điện tử và nhiều quyền lợi hấp dẫn.
                 </p>
                 <Link
-                  className="mt-4 inline-flex min-h-11 cursor-pointer items-center justify-center rounded-lg bg-[#F2C14E] px-4 py-2 font-black text-[#17202A] transition hover:bg-[#F7D875] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                  className="mt-4 inline-flex min-h-11 cursor-pointer items-center justify-center rounded-lg bg-bv-gold px-4 py-2 font-black text-bv-heading transition hover:bg-[#F7D875] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                   href="/membership"
                 >
-                  Xem gói hội viên
+                  Khám phá gói hội viên
                 </Link>
               </>
             )}
@@ -106,16 +131,16 @@ export default async function ReadingLibraryPage({
       <section className="mx-auto max-w-7xl px-4 py-9 sm:px-6 lg:px-8">
         <form
           action="/read"
-          className="grid gap-3 rounded-2xl border border-[#1D2433]/10 bg-white p-4 shadow-sm sm:grid-cols-[minmax(0,1fr)_240px_auto]"
+          className="grid gap-3 rounded-2xl border border-bv-ink/10 bg-white p-4 shadow-sm sm:grid-cols-[minmax(0,1fr)_240px_auto]"
         >
           <label className="relative">
             <span className="sr-only">Tìm sách hoặc tác giả</span>
             <Search
-              className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#66706B]"
+              className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-bv-text-muted"
               aria-hidden="true"
             />
             <input
-              className="h-12 w-full rounded-lg border border-[#1D2433]/15 bg-[#FAF8F2] pl-12 pr-4 text-base outline-none transition focus-visible:ring-2 focus-visible:ring-[#176B62]"
+              className="h-12 w-full rounded-lg border border-bv-ink/15 bg-[#FAF8F2] pl-12 pr-4 text-base outline-none transition focus-visible:ring-2 focus-visible:ring-bv-primary"
               defaultValue={data.query}
               name="q"
               placeholder="Tìm theo tên sách hoặc tác giả..."
@@ -125,7 +150,7 @@ export default async function ReadingLibraryPage({
           <label>
             <span className="sr-only">Lọc theo thể loại</span>
             <select
-              className="h-12 w-full cursor-pointer rounded-lg border border-[#1D2433]/15 bg-[#FAF8F2] px-3 text-base outline-none transition focus-visible:ring-2 focus-visible:ring-[#176B62]"
+              className="h-12 w-full cursor-pointer rounded-lg border border-bv-ink/15 bg-[#FAF8F2] px-3 text-base outline-none transition focus-visible:ring-2 focus-visible:ring-bv-primary"
               defaultValue={data.category}
               name="category"
             >
@@ -138,7 +163,7 @@ export default async function ReadingLibraryPage({
             </select>
           </label>
           <button
-            className="min-h-12 cursor-pointer rounded-lg bg-[#176B62] px-6 font-black text-white transition hover:bg-[#104C47] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#176B62] focus-visible:ring-offset-2"
+            className="min-h-12 cursor-pointer rounded-lg bg-bv-primary px-6 font-black text-white transition hover:bg-bv-primary-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bv-primary focus-visible:ring-offset-2"
             type="submit"
           >
             Tìm sách
@@ -147,19 +172,21 @@ export default async function ReadingLibraryPage({
 
         <div className="mt-7 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-sm font-black uppercase tracking-[0.14em] text-[#C65D43]">
-              {data.total} kết quả
+            <p className="text-sm font-black uppercase tracking-[0.14em] text-bv-accent">
+              {hasActiveFilter
+                ? "Kết quả tìm kiếm"
+                : "Tủ sách tuyển chọn"}
             </p>
-            <h2 className="mt-1 text-3xl font-black text-[#17202A]">
-              Chọn sách để bắt đầu
+            <h2 className="mt-1 text-3xl font-black text-bv-heading">
+              Khám phá các tựa sách nổi bật
             </h2>
           </div>
           <Link
-            className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-3 font-bold text-[#176B62] transition hover:bg-[#E6F3F0]"
+            className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-3 font-bold text-bv-primary transition hover:bg-bv-mint"
             href="/membership/benefits"
           >
             <Sparkles className="h-4 w-4" aria-hidden="true" />
-            Xem quyền lợi đọc
+            Quyền lợi hội viên
           </Link>
         </div>
 
@@ -168,7 +195,7 @@ export default async function ReadingLibraryPage({
             {data.books.map((book) => (
               <article className="group min-w-0" key={book.id}>
                 <Link
-                  className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#176B62] focus-visible:ring-offset-2"
+                  className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bv-primary focus-visible:ring-offset-2"
                   href={`/read/${book.id}`}
                 >
                   <BookCover
@@ -181,16 +208,16 @@ export default async function ReadingLibraryPage({
                     src={book.coverPath}
                     title={book.title}
                   />
-                  <h3 className="mt-3 line-clamp-2 min-h-12 font-black leading-6 text-[#17202A]">
+                  <h3 className="mt-3 line-clamp-2 min-h-12 font-black leading-6 text-bv-heading">
                     {book.title}
                   </h3>
                 </Link>
-                <p className="mt-1 truncate text-sm text-[#66706B]">{book.authorName}</p>
-                <p className="mt-1 text-xs font-bold text-[#176B62]">
-                  {book.pages ? `${book.pages} trang` : "Nội dung trực tuyến"} · Đọc thử 10%
+                <p className="mt-1 truncate text-sm text-bv-text-muted">{book.authorName}</p>
+                <p className="mt-1 truncate text-xs font-bold text-bv-primary">
+                  {book.pages ? `${book.pages} trang` : "sách điện tử"} · {activeMembership ? "Đọc toàn bộ" : "Đọc thử miễn phí"}
                 </p>
                 <Link
-                  className="mt-3 inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#176B62] px-3 py-2 text-sm font-black text-white transition hover:bg-[#104C47] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#176B62] focus-visible:ring-offset-2"
+                  className="mt-3 inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-bv-primary px-3 py-2 text-sm font-black text-white transition hover:bg-bv-primary-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bv-primary focus-visible:ring-offset-2"
                   href={`/read/${book.id}`}
                 >
                   <BookOpen className="h-4 w-4" aria-hidden="true" />
@@ -200,37 +227,98 @@ export default async function ReadingLibraryPage({
             ))}
           </div>
         ) : (
-          <div className="mt-6 rounded-2xl border border-dashed border-[#176B62]/30 bg-white p-10 text-center">
-            <Search className="mx-auto h-9 w-9 text-[#176B62]" aria-hidden="true" />
-            <h2 className="mt-3 text-xl font-black text-[#17202A]">Không tìm thấy sách</h2>
-            <p className="mt-2 text-[#66706B]">Thử từ khóa khác hoặc bỏ bộ lọc thể loại.</p>
-            <Link className="mt-4 inline-flex min-h-11 items-center font-black text-[#176B62]" href="/read">
+          <div className="mt-6 rounded-2xl border border-dashed border-bv-primary/30 bg-white p-10 text-center">
+            <Search className="mx-auto h-9 w-9 text-bv-primary" aria-hidden="true" />
+            <h2 className="mt-3 text-xl font-black text-bv-heading">Không tìm thấy sách</h2>
+            <p className="mt-2 text-bv-text-muted">Thử từ khóa khác hoặc bỏ bộ lọc thể loại.</p>
+            <Link className="mt-4 inline-flex min-h-11 items-center font-black text-bv-primary" href="/read">
               Xem toàn bộ kho
             </Link>
           </div>
         )}
 
         {totalPages > 1 ? (
-          <nav aria-label="Phân trang kho đọc" className="mt-10 flex items-center justify-center gap-3">
+          <nav
+            aria-label="Phân trang kho đọc"
+            className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row sm:flex-wrap"
+          >
             {data.page > 1 ? (
               <Link
-                className="inline-flex min-h-11 items-center rounded-lg border bg-white px-4 py-2 font-bold transition hover:bg-[#F7F4ED]"
+                aria-label={`Về trang ${data.page - 1}`}
+                className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-bv-border bg-bv-ivory px-4 text-sm font-bold text-bv-heading transition hover:border-bv-primary/40 hover:bg-bv-mint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bv-primary"
                 href={buildPageUrl(data.query, data.category, data.page - 1)}
               >
-                Trang trước
+                <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                <span>Trang trước</span>
               </Link>
-            ) : null}
-            <span className="px-3 text-sm font-bold text-[#66706B]">
-              Trang {data.page}/{totalPages}
-            </span>
+            ) : (
+              <span
+                aria-disabled="true"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border border-bv-border bg-bv-muted px-4 text-sm font-bold text-bv-text-muted opacity-60"
+              >
+                <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                <span>Trang trước</span>
+              </span>
+            )}
+
+            {[mobilePaginationItems, desktopPaginationItems].map((items, index) => (
+              <div
+                aria-label="Danh sách số trang"
+                className={`${index === 0 ? "flex sm:hidden" : "hidden sm:flex"} flex-wrap items-center justify-center gap-2`}
+                key={index === 0 ? "mobile" : "desktop"}
+              >
+                {items.map((item) =>
+                  typeof item === "number" ? (
+                    item === data.page ? (
+                      <span
+                        aria-current="page"
+                        aria-label={`Trang ${item}, trang hiện tại`}
+                        className="inline-flex h-11 min-w-11 items-center justify-center rounded-lg bg-bv-primary px-3 text-sm font-black text-white shadow-sm"
+                        key={paginationKey(item)}
+                      >
+                        {item}
+                      </span>
+                    ) : (
+                      <Link
+                        aria-label={`Đến trang ${item}`}
+                        className="inline-flex h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg border border-bv-border bg-white px-3 text-sm font-bold text-bv-heading transition hover:border-bv-primary/40 hover:bg-bv-mint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bv-primary"
+                        href={buildPageUrl(data.query, data.category, item)}
+                        key={paginationKey(item)}
+                      >
+                        {item}
+                      </Link>
+                    )
+                  ) : (
+                    <span
+                      aria-hidden="true"
+                      className="inline-flex h-11 min-w-6 items-center justify-center text-sm font-bold text-bv-text-muted"
+                      key={paginationKey(item)}
+                    >
+                      …
+                    </span>
+                  ),
+                )}
+              </div>
+            ))}
+
             {data.page < totalPages ? (
               <Link
-                className="inline-flex min-h-11 items-center rounded-lg border bg-white px-4 py-2 font-bold transition hover:bg-[#F7F4ED]"
+                aria-label={`Đến trang ${data.page + 1}`}
+                className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center gap-2 rounded-lg bg-bv-focus px-4 text-sm font-bold text-white transition hover:bg-bv-primary-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bv-primary focus-visible:ring-offset-2"
                 href={buildPageUrl(data.query, data.category, data.page + 1)}
               >
-                Trang sau
+                <span>Tiếp theo</span>
+                <ChevronRight className="h-4 w-4" aria-hidden="true" />
               </Link>
-            ) : null}
+            ) : (
+              <span
+                aria-disabled="true"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg bg-bv-muted px-4 text-sm font-bold text-bv-text-muted opacity-60"
+              >
+                <span>Tiếp theo</span>
+                <ChevronRight className="h-4 w-4" aria-hidden="true" />
+              </span>
+            )}
           </nav>
         ) : null}
       </section>

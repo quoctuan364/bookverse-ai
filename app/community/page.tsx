@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { Flag, MessageCircle, PenLine, ThumbsUp, UserCircle } from "lucide-react";
-import { getAllPosts } from "@/actions/community.actions";
+import { Bookmark, Flag, MessageCircle, PenLine, Search, Star, ThumbsUp, UserCircle } from "lucide-react";
+import { getAllPosts, getCommunityBookOptions, type CommunityPostType } from "@/actions/community.actions";
 import { BookCover } from "@/components/shared/BookCover";
 
 export const dynamic = "force-dynamic";
@@ -19,23 +19,39 @@ function getInitial(name: string): string {
   return name.trim().charAt(0).toUpperCase() || "U";
 }
 
-export default async function CommunityPage() {
-  const posts = await getAllPosts();
+interface CommunityPageProps {
+  searchParams?: Promise<{ q?: string; type?: string; category?: string; spoiler?: string }>;
+}
+
+const postTypeLabels: Record<CommunityPostType, string> = {
+  DISCUSSION: "Thảo luận",
+  QUESTION: "Hỏi đáp",
+  REVIEW: "Đánh giá",
+};
+
+export default async function CommunityPage({ searchParams }: CommunityPageProps) {
+  const params = await searchParams;
+  const type = params?.type === "QUESTION" || params?.type === "REVIEW" || params?.type === "DISCUSSION" ? params.type : "ALL";
+  const [posts, bookOptions] = await Promise.all([
+    getAllPosts({ query: params?.q, type, categoryId: params?.category, spoiler: params?.spoiler === "1" }),
+    getCommunityBookOptions(),
+  ]);
+  const categories = [...new Map(bookOptions.map((book) => [book.categoryId, book.category])).entries()].sort((a, b) => a[1].localeCompare(b[1], "vi"));
 
   return (
     <main className="bv-page">
       <section className="bv-hero">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-10 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-8">
           <div>
-            <p className="text-sm font-black uppercase tracking-[0.16em] text-[#F2C14E]">BookVerse Community</p>
+            <p className="text-sm font-black uppercase tracking-[0.16em] text-bv-gold">Cộng đồng BookVerse</p>
             <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-5xl">Forum đọc sách</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-[#EAF5F1]">
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-bv-mint-soft">
               Nơi độc giả chia sẻ cảm nhận, đặt câu hỏi và thảo luận về sách đang đọc.
             </p>
           </div>
 
           <Link
-            className="inline-flex h-11 w-fit items-center justify-center gap-2 rounded-lg bg-[#FFFDF8] px-4 py-2 text-sm font-bold text-[#0F3F3C] shadow-[0_12px_30px_rgba(0,0,0,0.14)] transition hover:bg-[#F2C14E]/95"
+            className="inline-flex h-11 w-fit items-center justify-center gap-2 rounded-lg bg-bv-ivory px-4 py-2 text-sm font-bold text-[#0F3F3C] shadow-[0_12px_30px_rgba(0,0,0,0.14)] transition hover:bg-bv-gold/95"
             href="/community/new"
           >
             <PenLine className="h-4 w-4" aria-hidden="true" />
@@ -45,8 +61,17 @@ export default async function CommunityPage() {
       </section>
 
       <section className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+        <form action="/community" className="mb-6 rounded-2xl border border-bv-primary/15 bg-white p-4 shadow-[0_12px_30px_rgba(37,49,56,0.08)] sm:p-5">
+          <div className="grid gap-3 md:grid-cols-[1fr_180px_220px_auto]">
+            <label className="relative"><span className="sr-only">Tìm bài cộng đồng</span><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-bv-primary" aria-hidden="true" /><input className="h-11 w-full rounded-xl border border-bv-border bg-white pl-10 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-bv-primary" defaultValue={params?.q ?? ""} name="q" placeholder="Tìm bài viết hoặc tên sách..." /></label>
+            <select aria-label="Lọc theo loại bài viết" className="h-11 rounded-xl border border-bv-border bg-white px-3 text-sm font-bold" defaultValue={type} name="type"><option value="ALL">Mọi loại bài</option><option value="DISCUSSION">Thảo luận</option><option value="QUESTION">Hỏi đáp</option><option value="REVIEW">Đánh giá sách</option></select>
+            <select aria-label="Lọc theo thể loại sách" className="h-11 rounded-xl border border-bv-border bg-white px-3 text-sm font-bold" defaultValue={params?.category ?? ""} name="category"><option value="">Mọi thể loại</option>{categories.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select>
+            <button className="min-h-11 rounded-xl bg-bv-primary px-5 text-sm font-black text-white hover:bg-bv-primary-dark" type="submit">Lọc bài</button>
+          </div>
+          <label className="mt-3 inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm font-bold text-bv-text-muted"><input className="h-5 w-5 accent-bv-primary" defaultChecked={params?.spoiler === "1"} name="spoiler" type="checkbox" value="1" /> Chỉ bài có cảnh báo spoiler</label>
+        </form>
         {posts.length === 0 ? (
-          <div className="bv-card rounded-lg p-8 text-center text-sm text-[#66706B]">
+          <div className="rounded-2xl border border-dashed border-bv-ink/15 bg-white p-8 text-center text-sm text-bv-text-muted">
             Chưa có bài viết nào trong cộng đồng.
           </div>
         ) : (
@@ -54,58 +79,69 @@ export default async function CommunityPage() {
             {posts.map((post) => (
               <Link
                 aria-label={`Mở bài viết ${post.title}`}
-                className="block rounded-lg border border-[#17191F]/10 bg-[#FFFDF8] p-5 shadow-[0_12px_34px_rgba(39,44,51,0.08)] transition hover:-translate-y-1 hover:border-[#0F766E]/30 hover:shadow-[0_22px_46px_rgba(39,44,51,0.12)]"
+                className="block rounded-2xl border border-bv-ink/10 bg-white p-6 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-bv-primary/30 hover:shadow-md"
                 href={`/community/${post.id}`}
                 key={post.id}
               >
                 <div className="flex gap-4">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#0F766E] text-sm font-black text-[#FFFDF8] shadow-[0_10px_24px_rgba(15,118,110,0.22)]">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-bv-primary text-sm font-black text-white shadow-xs">
                     {post.author.name ? getInitial(post.author.name) : <UserCircle className="h-5 w-5" />}
                   </div>
 
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <p className="font-black text-[#17202A]">{post.author.name}</p>
-                      <time className="text-sm text-[#66706B]" dateTime={post.createdAt.toISOString()}>
+                      <p className="font-black text-bv-heading">{post.author.name}</p>
+                      <time className="text-sm text-bv-text-muted" dateTime={post.createdAt.toISOString()}>
                         {formatDate(post.createdAt)}
                       </time>
                     </div>
 
-                    <h2 className="mt-3 text-xl font-black leading-snug text-[#17202A]">
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-bv-mint px-3 py-1 text-xs font-black text-bv-primary">{postTypeLabels[post.type]}</span>
+                      {post.hasSpoiler ? <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-800">Có spoiler</span> : null}
+                      {post.rating ? <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-xs font-black text-amber-800"><Star className="h-3.5 w-3.5 fill-bv-gold text-bv-gold" aria-hidden="true" />{post.rating}/5</span> : null}
+                    </div>
+
+                    <h2 className="mt-3 text-xl font-black leading-snug text-bv-heading">
                       {post.title}
                     </h2>
-                    <p className="mt-2 line-clamp-3 leading-7 text-[#42524D]">{post.content}</p>
+                    <p className="mt-2 line-clamp-3 leading-7 text-bv-text-muted">{post.content}</p>
 
                     {post.book ? (
-                      <div className="mt-4 flex max-w-md gap-3 rounded-xl bg-[#F7F4ED] p-3">
+                      <div className="mt-4 flex max-w-xl gap-4 rounded-xl border border-bv-ink/10 bg-bv-surface p-3.5">
                         <BookCover
                           alt={`Bìa sách ${post.book.title}`}
                           author={post.book.author}
                           bookId={post.book.id}
                           category={post.book.category}
-                          className="h-20 w-[54px] shrink-0 rounded-md"
+                          className="h-28 w-[76px] shrink-0 rounded-lg shadow-[0_6px_14px_rgba(23,25,31,0.08)]"
                           src={post.book.coverImage}
                           title={post.book.title}
                         />
                         <span className="min-w-0 self-center">
-                          <span className="block text-xs font-bold uppercase tracking-wide text-[#66706B]">Sách đang thảo luận</span>
-                          <span className="mt-1 line-clamp-2 block text-sm font-black text-[#17202A]">{post.book.title}</span>
+                          <span className="block text-xs font-bold uppercase tracking-wide text-bv-text-muted">Sách đang thảo luận</span>
+                          <span className="mt-1 line-clamp-2 block font-black leading-snug text-bv-heading">{post.book.title}</span>
+                          <span className="mt-1.5 line-clamp-1 block text-sm text-bv-text-muted">{post.book.author}</span>
                         </span>
                       </div>
                     ) : null}
 
-                    <div className="mt-4 flex items-center gap-5 text-sm text-gray-500">
+                    <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-bv-text-muted sm:flex sm:flex-wrap sm:items-center sm:gap-5">
                       <span className="inline-flex items-center gap-2">
-                        <ThumbsUp className="h-4 w-4 text-[#0F766E]" aria-hidden="true" />
-                        {post.reactionCount} Like
+                        <ThumbsUp className="h-4 w-4 text-bv-primary" aria-hidden="true" />
+                        {post.reactionCount} Thích
                       </span>
                       <span className="inline-flex items-center gap-2">
-                        <MessageCircle className="h-4 w-4 text-[#0F766E]" aria-hidden="true" />
-                        {post.commentCount} Comment
+                        <MessageCircle className="h-4 w-4 text-bv-primary" aria-hidden="true" />
+                        {post.commentCount} Bình luận
                       </span>
                       <span className="inline-flex items-center gap-2">
-                        <Flag className="h-4 w-4 text-[#C9784A]" aria-hidden="true" />
-                        {post.reportCount} Report
+                        <Flag className="h-4 w-4 text-bv-accent" aria-hidden="true" />
+                        {post.reportCount} Báo cáo
+                      </span>
+                      <span className="inline-flex items-center gap-2">
+                        <Bookmark className="h-4 w-4 text-bv-primary" aria-hidden="true" />
+                        {post.saveCount} Lưu
                       </span>
                     </div>
                   </div>

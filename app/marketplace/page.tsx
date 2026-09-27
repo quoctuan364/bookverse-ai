@@ -1,6 +1,7 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CheckCircle2, Filter, Plus, Search, ShieldCheck, ShoppingCart, Star } from "lucide-react";
+import { CheckCircle2, MessageCircle, Plus, ShieldCheck, ShoppingCart, Star } from "lucide-react";
 import {
   addListingToCart,
   createDemoOrder,
@@ -8,11 +9,16 @@ import {
 } from "@/actions/marketplace.actions";
 import { Badge } from "@/components/ui/badge";
 import { BookCover } from "@/components/shared/BookCover";
+import { MarketplaceFilters } from "@/components/marketplace/MarketplaceFilters";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { normalizeCatalogLanguageFilter } from "@/lib/book-language";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Chợ sách | BookVerse",
+  description: "Tìm sách cũ, xem tình trạng và chọn mua từ những người bán trong cộng đồng BookVerse.",
+};
 
 interface MarketplacePageProps {
   searchParams?: Promise<{
@@ -31,7 +37,7 @@ const conditionOptions = [
   { value: "GOOD", label: "Tốt" },
   { value: "FAIR", label: "Đã dùng" },
   { value: "POOR", label: "Cũ" },
-  { value: "DIGITAL", label: "Ebook" },
+  { value: "DIGITAL", label: "sách điện tử" },
 ];
 
 function formatPrice(price: number): string {
@@ -55,7 +61,7 @@ function getConditionLabel(condition: string): string {
     case "POOR":
       return "Cũ";
     case "DIGITAL":
-      return "Ebook";
+      return "sách điện tử";
     default:
       return condition;
   }
@@ -115,7 +121,7 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
   const query = params?.q ?? "";
   const condition = params?.condition ?? "";
   const language = normalizeCatalogLanguageFilter(params?.language) ?? "";
-  const { listings, totalListings, visibleListings } = await getMarketplacePageData({
+  const { listings } = await getMarketplacePageData({
     query,
     condition,
     language,
@@ -124,24 +130,25 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
   return (
     <main className="bv-page">
       <section className="bv-hero">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-10 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-8">
+        <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-10 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-8">
           <div>
-            <p className="text-sm font-black uppercase tracking-[0.16em] text-[#F2C14E]">
+            <p className="text-sm font-black uppercase tracking-[0.16em] text-bv-gold">
               Gian hàng sách BookVerse
             </p>
             <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-5xl">Mua bán và trao đổi sách</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-[#EAF5F1]">
-              Chọn sách thật từ catalog BookVerse, xem tình trạng, thêm vào giỏ hoặc mua ngay.
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-bv-mint-soft">
+              Tìm cuốn sách bạn cần, xem tình trạng thực tế rồi thêm vào giỏ hoặc mua ngay.
             </p>
           </div>
 
-          <Link
-            className="inline-flex h-11 w-fit items-center justify-center gap-2 rounded-lg bg-[#FFFDF8] px-4 py-2 text-sm font-bold text-[#0F3F3C] shadow-[0_12px_30px_rgba(0,0,0,0.14)] transition hover:bg-[#F2C14E]/95"
-            href="/seller/listings/new"
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Đăng bán sách
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            <Link className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-white/25 px-4 py-2 text-sm font-bold text-white transition hover:bg-white/10" href="/marketplace/messages">
+              <MessageCircle className="h-4 w-4" aria-hidden="true" /> Tin nhắn
+            </Link>
+            <Link className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-bv-ivory px-4 py-2 text-sm font-bold text-[#0F3F3C] shadow-[0_12px_30px_rgba(0,0,0,0.14)] transition hover:bg-bv-gold/95" href="/seller/listings/new">
+              <Plus className="h-4 w-4" aria-hidden="true" /> Đăng bán sách
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -158,98 +165,49 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
           </div>
         ) : null}
 
-        <form className="bv-panel grid gap-3 rounded-lg p-4 md:grid-cols-[1fr_180px_180px_auto]">
-          <div className="relative">
-            <Search
-              aria-hidden="true"
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#66706B]"
-            />
-            <Input
-              aria-label="Tìm trong chợ sách cũ"
-              className="h-11 pl-10"
-              defaultValue={query}
-              name="q"
-              placeholder="Tìm tên sách, người bán, mô tả..."
-              type="search"
-            />
-          </div>
-
-          <label className="sr-only" htmlFor="condition">
-            Tình trạng sách
-          </label>
-          <select
-            className="h-11 rounded-lg border border-[#D8D0C2] bg-[#FFFDF8] px-3 text-sm font-medium text-[#17202A] outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E]/30"
-            defaultValue={condition}
-            id="condition"
-            name="condition"
-          >
-            {conditionOptions.map((option) => (
-              <option key={option.value || "all"} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-
-          <label className="sr-only" htmlFor="language">
-            Ngôn ngữ sách
-          </label>
-          <select
-            className="h-11 rounded-lg border border-[#D8D0C2] bg-[#FFFDF8] px-3 text-sm font-medium text-[#17202A] outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E]/30"
-            defaultValue={language}
-            id="language"
-            name="language"
-          >
-            <option value="">Tất cả ngôn ngữ</option>
-            <option value="vi">Tiếng Việt</option>
-            <option value="en">Tiếng Anh</option>
-          </select>
-
-          <Button className="h-11 gap-2" type="submit">
-            <Filter className="h-4 w-4" aria-hidden="true" />
-            Lọc tin bán
-          </Button>
-        </form>
+        <MarketplaceFilters
+          condition={condition}
+          conditionOptions={conditionOptions}
+          language={language}
+          query={query}
+        />
 
         <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm font-medium text-[#66706B]">
-            Hiển thị <span className="font-black text-[#17202A]">{visibleListings}</span> /{" "}
-            <span className="font-black text-[#17202A]">
-              {totalListings.toLocaleString("vi-VN")}
-            </span>{" "}
-            tin bán đang mở.
+          <p className="text-sm font-medium text-bv-text-muted">
+            Tin bán phù hợp với bộ lọc hiện tại.
           </p>
-          <Link className="inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-black text-[#0F766E] transition hover:bg-[#EAF2EF] hover:underline" href="/marketplace">
+          <Link className="inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-black text-bv-focus transition hover:bg-bv-muted hover:underline" href="/marketplace">
             Xóa bộ lọc
           </Link>
         </div>
 
         {listings.length === 0 ? (
-          <div className="bv-card mt-6 rounded-lg p-8 text-center text-sm text-[#66706B]">
+          <div className="mt-6 rounded-2xl border border-dashed border-bv-ink/15 bg-white p-8 text-center text-sm text-bv-text-muted">
             Chưa có sách phù hợp. Hãy thử từ khóa hoặc tình trạng khác.
           </div>
         ) : (
           <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
             {listings.map((listing) => (
               <article
-                className="overflow-hidden rounded-lg border border-[#17191F]/10 bg-[#FFFDF8] shadow-[0_12px_34px_rgba(39,44,51,0.08)] transition hover:-translate-y-1 hover:border-[#0F766E]/30 hover:shadow-[0_22px_46px_rgba(39,44,51,0.12)]"
+                className="flex h-full flex-col overflow-hidden rounded-2xl border border-bv-ink/10 bg-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-bv-primary/30 hover:shadow-md"
                 key={listing.id}
               >
-                <div className="flex gap-4 p-4">
-                  <div className="aspect-[2/3] w-28 shrink-0 self-start overflow-hidden rounded-lg bg-[#EDE3D5] shadow-[0_12px_26px_rgba(39,44,51,0.12)]">
+                <div className="flex flex-1 gap-4 p-4">
+                  <div className="aspect-[2/3] w-28 shrink-0 self-start overflow-hidden rounded-xl bg-bv-surface shadow-[0_6px_16px_rgba(39,44,51,0.08)]">
                     <BookCover
                       alt={`Bìa sách ${listing.book?.title ?? listing.title}`}
                       author={listing.book?.author}
                       bookId={listing.book?.id ?? listing.id}
                       category={listing.book?.category}
                       className="h-full w-full object-cover"
-                      src={listing.book?.coverImage}
+                      src={listing.images[0] ?? listing.book?.coverImage}
                       title={listing.book?.title ?? listing.title}
                     />
                   </div>
 
-                  <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 flex-1 flex-col">
                     <div className="mb-2 flex flex-wrap gap-2">
-                      <Badge className="bg-[#0F766E] text-[#FFFDF8]">
+                      <Badge className="bg-bv-primary text-white">
                         {getConditionLabel(listing.condition)}
                       </Badge>
                       <Badge
@@ -262,72 +220,85 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
                         {getStatusLabel(listing.status)}
                       </Badge>
                       {listing.sellerQualityScore.isHighQuality ? (
-                        <Badge className="gap-1 bg-[#F2C14E] text-[#17202A]">
+                        <Badge className="gap-1 bg-bv-gold text-bv-heading">
                           <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
                           Chất lượng cao theo quy tắc
                         </Badge>
                       ) : null}
                     </div>
 
-                    <h2 className="line-clamp-2 text-lg font-black text-[#17202A]">
+                    <h2 className="line-clamp-2 text-lg font-black text-bv-heading">
                       {listing.title}
                     </h2>
-                    <p className="mt-1 text-sm font-medium text-[#66706B]">
-                      Người bán: <span className="font-medium">{listing.seller.name}</span>
+                    <p className="mt-1 text-sm font-medium text-bv-text-muted">
+                      Người bán: <span className="font-semibold text-bv-heading">{listing.seller.name}</span>
                     </p>
-                    <div className="mt-2 grid grid-cols-3 gap-2 rounded-lg border border-[#17191F]/10 bg-[#F7F4ED] p-3 text-xs">
+                    <div className="mt-2 grid grid-cols-3 gap-2 rounded-xl border border-bv-ink/10 bg-bv-surface p-2.5 text-xs">
                       <div>
-                        <p className="text-[#66706B]">Điểm chất lượng</p>
-                        <p className="mt-1 inline-flex items-center gap-1 font-black text-[#8A5C00]">
-                          <Star className="h-3.5 w-3.5 fill-[#F2C14E] text-[#F2C14E]" aria-hidden="true" />
+                        <p className="text-bv-text-muted">Điểm chất lượng</p>
+                        <p className="mt-1 inline-flex items-center gap-1 font-black text-amber-700">
+                          <Star className="h-3.5 w-3.5 fill-bv-gold text-bv-gold" aria-hidden="true" />
                           {listing.sellerQualityScore.score}/100
                         </p>
                       </div>
                       <div>
-                        <p className="text-[#66706B]">Đơn tốt</p>
-                        <p className="mt-1 font-black text-[#17202A]">
+                        <p className="text-bv-text-muted">Đơn tốt</p>
+                        <p className="mt-1 font-black text-bv-heading">
                           {listing.sellerQualityScore.completedOrders}
                         </p>
                       </div>
                       <div>
-                        <p className="text-[#66706B]">Đơn hủy</p>
-                        <p className="mt-1 font-black text-[#17202A]">
+                        <p className="text-bv-text-muted">Đơn hủy</p>
+                        <p className="mt-1 font-black text-bv-heading">
                           {listing.sellerQualityScore.cancelledOrders}
                         </p>
                       </div>
                     </div>
                     {listing.book ? (
-                      <p className="mt-1 text-sm font-medium text-[#66706B]">
+                      <p className="mt-1.5 text-xs font-medium text-bv-text-muted">
                         Sách gốc: {listing.book.title} - {listing.book.category}
                       </p>
                     ) : null}
-                    <p className="mt-2 line-clamp-2 text-sm leading-6 text-[#42524D]">
+                    <p className="mt-2 line-clamp-2 text-sm leading-6 text-bv-text-muted">
                       {listing.description}
                     </p>
-                    <p className="mt-3 text-lg font-black text-[#E76F51]">{formatPrice(listing.price)}</p>
+                    <p className="mt-auto pt-3 text-lg font-black text-bv-accent">{formatPrice(listing.price)}</p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 border-t border-[#17191F]/10 bg-[#F7F4ED] p-4 text-sm">
+                {listing.images.length > 1 ? (
+                  <div className="flex gap-2 overflow-x-auto border-t border-bv-ink/5 px-4 py-3" aria-label="Ảnh tình trạng sách">
+                    {listing.images.slice(1).map((image, index) => (
+                      <div className="h-16 w-12 shrink-0 overflow-hidden rounded-lg border border-bv-ink/10 bg-bv-muted" key={`${image}-${index}`}>
+                        <BookCover className="h-full w-full object-cover" src={image} title={`${listing.title} - ảnh ${index + 2}`} bookId={`${listing.id}-${index}`} />
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                <div className="grid grid-cols-3 gap-2 border-t border-bv-ink/5 bg-bv-surface/60 p-3 text-sm">
                   <div>
-                    <p className="font-black text-[#17202A]">{listing.views}</p>
-                    <p className="text-[#66706B]">Lượt xem</p>
+                    <p className="font-black text-bv-heading">{listing.views}</p>
+                    <p className="text-xs text-bv-text-muted">Lượt xem</p>
                   </div>
                   <div>
-                    <p className="font-black text-[#17202A]">{listing.cartAdds}</p>
-                    <p className="text-[#66706B]">Vào giỏ</p>
+                    <p className="font-black text-bv-heading">{listing.cartAdds}</p>
+                    <p className="text-xs text-bv-text-muted">Vào giỏ</p>
                   </div>
                   <div>
-                    <p className="font-black text-[#17202A]">{listing.purchases}</p>
-                    <p className="text-[#66706B]">Mua</p>
+                    <p className="font-black text-bv-heading">{listing.purchases}</p>
+                    <p className="text-xs text-bv-text-muted">Đã mua</p>
                   </div>
                 </div>
 
-                <div className="grid gap-2 p-4 sm:grid-cols-2">
-                  <form action={addToCartAction}>
+                <div className="grid items-stretch gap-2 p-3 sm:grid-cols-3">
+                  <Link className="inline-flex min-h-11 h-full items-center justify-center gap-2 rounded-xl border border-bv-primary/25 px-3 py-2 text-center text-sm font-bold text-bv-primary transition hover:bg-bv-primary/5" href={`/marketplace/messages/new?listingId=${listing.id}`}>
+                    <MessageCircle className="h-4 w-4" aria-hidden="true" /> Nhắn tin
+                  </Link>
+                  <form className="h-full" action={addToCartAction}>
                     <input name="listingId" type="hidden" value={listing.id} />
                     <Button
-                      className="w-full gap-2"
+                      className="h-full min-h-11 w-full gap-2 rounded-xl"
                       disabled={listing.status !== "APPROVED"}
                       type="submit"
                       variant="outline"
@@ -337,10 +308,10 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
                     </Button>
                   </form>
 
-                  <form action={buyNowAction}>
+                  <form className="h-full" action={buyNowAction}>
                     <input name="listingId" type="hidden" value={listing.id} />
                     <Button
-                      className="w-full gap-2"
+                      className="h-full min-h-11 w-full gap-2 rounded-xl"
                       disabled={listing.status !== "APPROVED"}
                       type="submit"
                     >

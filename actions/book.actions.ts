@@ -2,8 +2,11 @@
 
 import { ListingStatus } from "@prisma/client";
 import { normalizeBookCoverUrl } from "@/lib/book-cover";
+import { getVietnameseBookTitle } from "@/lib/book-display-title";
+import { normalizeBookPrice } from "@/lib/book-display-price";
 import { getCurrentUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
+import { publicBookQualityWhere } from "@/lib/public-book-policy";
 import { loadSellerQualityScores } from "@/lib/seller-quality-data";
 
 type DecimalLike = {
@@ -84,6 +87,7 @@ export async function getFeaturedBooks(): Promise<FeaturedBook[]> {
   try {
     // Danh sách ổn định giúp cùng source cho cùng kết quả và loại Math.random khỏi runtime production.
     const books = await prisma.book.findMany({
+      where: publicBookQualityWhere(),
       orderBy: [{ rating: "desc" }, { id: "asc" }],
       take: 5,
       include: {
@@ -99,10 +103,10 @@ export async function getFeaturedBooks(): Promise<FeaturedBook[]> {
 
     return books.map((book) => ({
       id: book.id,
-      title: book.title,
+      title: getVietnameseBookTitle(book.id, book.title),
       author: book.authorName,
       coverImage: normalizeBookCoverUrl(book.coverPath),
-      price: decimalToNumber(book.price),
+      price: normalizeBookPrice(book.price),
       category: book.category,
     }));
   } catch (error: unknown) {
@@ -117,6 +121,7 @@ export async function getCuratedBooks(): Promise<CuratedBook[]> {
     const userId = currentUser && !currentUser.isLocked ? currentUser.id : null;
     const books = await prisma.book.findMany({
       where: {
+        ...publicBookQualityWhere(),
         sourceMetadata: {
           is: {
             sourceProvider: "OPEN_LIBRARY",
@@ -155,10 +160,10 @@ export async function getCuratedBooks(): Promise<CuratedBook[]> {
 
     return books.map((book) => ({
       id: book.id,
-      title: book.title,
+      title: getVietnameseBookTitle(book.id, book.title),
       author: book.authorName,
       coverImage: normalizeBookCoverUrl(book.coverPath),
-      price: decimalToNumber(book.price),
+      price: normalizeBookPrice(book.price),
       catalogSource: "CURATED_REAL",
       metadataBadge: "Sách tuyển chọn",
       priceLabel: "Giá BookVerse",
@@ -240,10 +245,13 @@ export async function getMarketplaceListings(): Promise<MarketplaceListing[]> {
       })(),
       book: {
         id: listing.book?.id ?? listing.id,
-        title: listing.book?.title ?? listing.title,
+        title: getVietnameseBookTitle(
+          listing.book?.id ?? listing.id,
+          listing.book?.title ?? listing.title,
+        ),
         author: listing.book?.authorName ?? "Không rõ tác giả",
         coverImage: normalizeBookCoverUrl(listing.book?.coverPath ?? null),
-        price: decimalToNumber(listing.book?.price ?? listing.price),
+        price: normalizeBookPrice(listing.book?.price ?? listing.price),
       },
     }));
   } catch (error: unknown) {

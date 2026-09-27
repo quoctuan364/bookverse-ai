@@ -11,12 +11,15 @@ import {
   UserRole,
 } from "@prisma/client";
 import { normalizeBookCoverUrl } from "@/lib/book-cover";
+import { getVietnameseBookTitle } from "@/lib/book-display-title";
 import { normalizeCatalogLanguageFilter } from "@/lib/book-language";
+import { evaluateListingForAutoApproval } from "@/lib/listing-auto-moderation";
 import { createNotifications } from "@/lib/notifications";
-import { PermissionError, requireAuthenticatedUser, requireSellerUser } from "@/lib/permissions";
+import { PermissionError, requireAuthenticatedUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
 import { publicBookQualityWhere } from "@/lib/public-book-policy";
 import { loadSellerQualityScores } from "@/lib/seller-quality-data";
+import { logResearchInteraction } from "@/actions/tracking.actions";
 
 type DecimalLike = {
   toNumber: () => number;
@@ -40,6 +43,7 @@ export interface MarketplaceListingItem {
   purchases: number;
   stock: number;
   targetAudience: string | null;
+  images: string[];
   seller: {
     id: string;
     name: string;
@@ -158,6 +162,17 @@ function buildMarketplaceWhere(filters: MarketplacePageFilters = {}): Prisma.Lis
   const where: Prisma.ListingWhereInput = {
     status: ListingStatus.APPROVED,
     stock: { gt: 0 },
+    // Chợ sách chỉ hiển thị tin C2C của thành viên. Loại gian hàng catalog
+    // và tài khoản sinh dữ liệu hàng loạt khỏi trải nghiệm công khai.
+    NOT: {
+      seller: {
+        is: {
+          email: {
+            endsWith: "@bookverse.local",
+          },
+        },
+      },
+    },
     book: {
       is: {
         ...publicBookQualityWhere(),
@@ -244,6 +259,11 @@ export async function getMarketplacePageData(
         orderBy: [{ createdAt: "desc" }, { id: "asc" }],
         take: 40,
         include: {
+          images: {
+            orderBy: { sortOrder: "asc" },
+            take: 6,
+            select: { url: true },
+          },
           seller: {
             select: {
               id: true,
@@ -295,6 +315,7 @@ export async function getMarketplacePageData(
         purchases: listing.purchases,
         stock: listing.stock,
         targetAudience: listing.targetAudience,
+        images: listing.images.map((image) => normalizeBookCoverUrl(image.url)).filter((url): url is string => Boolean(url)),
         seller: listing.seller,
         sellerQualityScore: (() => {
           const quality = sellerQualityScores.get(listing.seller.id);
@@ -314,17 +335,17 @@ export async function getMarketplacePageData(
         })(),
         book: listing.book
           ? {
-              id: listing.book.id,
-              title: listing.book.title,
-              author: listing.book.authorName,
-              coverImage: normalizeBookCoverUrl(listing.book.coverPath),
-              category: listing.book.category.name,
-            }
+            id: listing.book.id,
+            title: getVietnameseBookTitle(listing.book.id, listing.book.title),
+            author: listing.book.authorName,
+            coverImage: normalizeBookCoverUrl(listing.book.coverPath),
+            category: listing.book.category.name,
+          }
           : null,
       })),
       bookOptions: bookOptions.map((book) => ({
         id: book.id,
-        title: book.title,
+        title: getVietnameseBookTitle(book.id, book.title),
         author: book.authorName,
       })),
       totalListings,
@@ -344,8 +365,9 @@ export async function getMarketplacePageData(
 
 export async function createListing(data: CreateListingInput): Promise<ActionResult> {
   try {
-    const seller = await requireSellerUser();
-    const sellerId = seller.id;
+    // Mọi thành viên đã đăng nhập đều có quyền đọc, mua và đăng bán.
+    const currentUser = await requireAuthenticatedUser();
+    const sellerId = currentUser.id;
     const title = data.title.trim();
     const description = data.description.trim();
     const targetAudience = data.targetAudience?.trim() || null;
@@ -361,7 +383,22 @@ export async function createListing(data: CreateListingInput): Promise<ActionRes
       };
     }
 
+    // Kiểm tra chất lượng minh bạch để tin đủ dữ liệu được đăng ngay (P2P).
+    const autoModeration = evaluateListingForAutoApproval({
+      title,
+      description,
+      price,
+      hasCatalogBook: Boolean(bookId),
+      imageCount: 0,
+    });
+    const passesAutoApprove = autoModeration.approved;
+
+    const listingStatus = passesAutoApprove
+      ? ListingStatus.APPROVED
+      : ListingStatus.PENDING_REVIEW;
+
     await prisma.$transaction(async (tx) => {
+
       const listing = await tx.listing.create({
         data: {
           id: buildListingId(),
@@ -371,39 +408,50 @@ export async function createListing(data: CreateListingInput): Promise<ActionRes
           description,
           price,
           condition,
-          status: ListingStatus.PENDING_REVIEW,
+          status: listingStatus,
+          moderationNote: passesAutoApprove
+            ? `Tự động duyệt theo quy tắc chất lượng (${autoModeration.score}/100).`
+            : autoModeration.reasons.join(" "),
+          reviewedAt: passesAutoApprove ? new Date() : null,
           targetAudience,
           hasCover: Boolean(bookId),
         },
       });
-      const moderators = await tx.user.findMany({
-        where: {
-          role: {
-            in: [UserRole.ADMIN, UserRole.MODERATOR],
-          },
-          isLocked: false,
-        },
-        select: {
-          id: true,
-        },
-        take: 20,
-      });
 
-      await createNotifications(
-        moderators.map((moderator) => ({
-          userId: moderator.id,
-          title: "Listing mới chờ duyệt",
-          message: `Seller vừa gửi tin bán "${listing.title}".`,
-          type: NotificationType.MARKETPLACE,
-          href: "/admin#marketplace",
-        })),
-        tx,
-      );
+      if (!passesAutoApprove) {
+        // Chỉ thông báo admin khi không tự duyệt được
+        const moderators = await tx.user.findMany({
+          where: {
+            role: { in: [UserRole.ADMIN, UserRole.MODERATOR] },
+            isLocked: false,
+          },
+          select: { id: true },
+          take: 20,
+        });
+        await createNotifications(
+          moderators.map((moderator) => ({
+            userId: moderator.id,
+            title: "Tin bán sách cần kiểm duyệt thủ công",
+            message: `Tin bán "${listing.title}" chưa đủ điều kiện tự duyệt.`,
+            type: NotificationType.MARKETPLACE,
+            href: "/admin#marketplace",
+          })),
+          tx,
+        );
+      }
     });
+
+    if (passesAutoApprove) {
+      return {
+        success: true,
+        message: "Tin bán đã được đăng thành công và hiển thị ngay trên chợ sách!",
+      };
+    }
 
     return {
       success: true,
-      message: "Đã gửi listing. Admin cần duyệt trước khi hiển thị chính thức.",
+      message:
+        `Tin bán đã lưu nhưng cần bổ sung để được tự duyệt: ${autoModeration.reasons.join(" ")}`,
     };
   } catch (error: unknown) {
     if (error instanceof PermissionError) {
@@ -418,7 +466,7 @@ export async function createListing(data: CreateListingInput): Promise<ActionRes
     console.error(`[createListing] ${message}`);
     return {
       success: false,
-      message: "Không thể tạo listing. Vui lòng thử lại.",
+      message: "Không thể tạo tin bán sách. Vui lòng thử lại.",
       reason: "DATABASE_ERROR",
     };
   }
@@ -447,7 +495,7 @@ export async function addListingToCart(listingId: string): Promise<ActionResult>
     if (!listing || !listing.bookId) {
       return {
         success: false,
-        message: "Không tìm thấy listing hợp lệ.",
+        message: "Không tìm thấy tin bán sách hợp lệ.",
         reason: "NOT_FOUND",
       };
     }
@@ -455,7 +503,7 @@ export async function addListingToCart(listingId: string): Promise<ActionResult>
     if (listing.status !== ListingStatus.APPROVED) {
       return {
         success: false,
-        message: "Listing này chưa được duyệt nên chưa thể thêm vào giỏ.",
+        message: "tin bán sách này chưa được duyệt nên chưa thể thêm vào giỏ.",
         reason: "VALIDATION_ERROR",
       };
     }
@@ -463,7 +511,7 @@ export async function addListingToCart(listingId: string): Promise<ActionResult>
     if (listing.stock <= 0) {
       return {
         success: false,
-        message: "Listing này đã hết hàng.",
+        message: "tin bán sách này đã hết hàng.",
         reason: "VALIDATION_ERROR",
       };
     }
@@ -471,7 +519,7 @@ export async function addListingToCart(listingId: string): Promise<ActionResult>
     if (listing.sellerId === userId) {
       return {
         success: false,
-        message: "Bạn không thể mua listing do chính mình đăng.",
+        message: "Bạn không thể mua tin bán sách do chính mình đăng.",
         reason: "VALIDATION_ERROR",
       };
     }
@@ -482,7 +530,7 @@ export async function addListingToCart(listingId: string): Promise<ActionResult>
     if (!Number.isFinite(price) || price <= 0) {
       return {
         success: false,
-        message: "Giá listing không hợp lệ.",
+        message: "Giá tin bán sách không hợp lệ.",
         reason: "VALIDATION_ERROR",
       };
     }
@@ -514,7 +562,7 @@ export async function addListingToCart(listingId: string): Promise<ActionResult>
     if (currentListingQuantity + 1 > listing.stock) {
       return {
         success: false,
-        message: `Listing chỉ còn ${listing.stock} sản phẩm.`,
+        message: `tin bán sách chỉ còn ${listing.stock} sản phẩm.`,
         reason: "VALIDATION_ERROR",
       };
     }
@@ -522,12 +570,12 @@ export async function addListingToCart(listingId: string): Promise<ActionResult>
     if (currentSellerIds.size > 0 && !currentSellerIds.has(listing.sellerId)) {
       return {
         success: false,
-        message: "Giỏ hàng đang có item của seller khác. Demo Phase 4 chỉ checkout một seller mỗi đơn.",
+        message: "Giỏ hàng đang có item của seller khác. Demo Phase 4 chỉ thanh toán một seller mỗi đơn.",
         reason: "VALIDATION_ERROR",
       };
     }
 
-    await prisma.$transaction(async (tx) => {
+    const cartItem = await prisma.$transaction(async (tx) => {
       let cartOrder = currentCart ? { id: currentCart.id } : null;
 
       if (!cartOrder) {
@@ -555,9 +603,10 @@ export async function addListingToCart(listingId: string): Promise<ActionResult>
         },
       });
 
+      let savedItem;
       if (existingItem) {
         const nextQuantity = existingItem.quantity + 1;
-        await tx.orderItem.update({
+        savedItem = await tx.orderItem.update({
           where: {
             id: existingItem.id,
           },
@@ -568,7 +617,7 @@ export async function addListingToCart(listingId: string): Promise<ActionResult>
           },
         });
       } else {
-        await tx.orderItem.create({
+        savedItem = await tx.orderItem.create({
           data: {
             orderId: cartOrder.id,
             bookId: listingBookId,
@@ -630,6 +679,16 @@ export async function addListingToCart(listingId: string): Promise<ActionResult>
           },
         },
       });
+
+      return savedItem;
+    });
+
+    // Research tracking (chỉ ghi khi user đã consent, await sau khi transaction chính đã commit)
+    await logResearchInteraction({
+      eventType: "ADD_TO_CART",
+      bookId: listingBookId,
+      sourcePage: "marketplace",
+      idempotencyKey: `cart:${cartItem.id}:${cartItem.quantity}`,
     });
 
     return {
@@ -664,6 +723,6 @@ export async function createDemoOrder(listingId: string): Promise<ActionResult> 
 
   return {
     success: true,
-    message: "Đã đưa sách vào giỏ hàng. Hãy chọn địa chỉ giao hàng để hoàn tất checkout.",
+    message: "Đã đưa sách vào giỏ hàng. Hãy chọn địa chỉ giao hàng để hoàn tất thanh toán.",
   };
 }

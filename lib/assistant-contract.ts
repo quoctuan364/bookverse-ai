@@ -29,6 +29,12 @@ export interface AssistantValidatedBook {
   description: string | null;
   score: number;
   href: string;
+  price?: number | null;
+  pages?: number | null;
+  publishYear?: number | null;
+  language?: string | null;
+  category?: string | null;
+  rating?: number | null;
 }
 
 export interface AssistantSuccessResponse {
@@ -77,6 +83,9 @@ const ASSISTANT_FAILURE_CODES: AssistantFailureCode[] = [
 export interface AssistantRequest {
   message: string;
   sessionId?: string;
+  contextBookIds?: string[];
+  focusedBookId?: string;
+  contextQuery?: string;
 }
 
 export type AssistantRequestParseResult =
@@ -149,6 +158,16 @@ export function parseAssistantRequestPayload(value: unknown): AssistantRequestPa
       error: createAssistantError("INVALID_REQUEST", "sessionId không hợp lệ."),
     };
   }
+  const contextBookIds = value.contextBookIds;
+  if (value.focusedBookId !== undefined && (typeof value.focusedBookId !== "string" || !/^[a-zA-Z0-9_-]{1,191}$/.test(value.focusedBookId))) {
+    return { ok: false, error: createAssistantError("INVALID_REQUEST", "Cuốn sách được chọn không hợp lệ.") };
+  }
+  if (value.contextQuery !== undefined && (typeof value.contextQuery !== "string" || value.contextQuery.trim().length > MAX_ASSISTANT_MESSAGE_LENGTH)) {
+    return { ok: false, error: createAssistantError("INVALID_REQUEST", "Câu hỏi ngữ cảnh không hợp lệ.") };
+  }
+  if (contextBookIds !== undefined && (!Array.isArray(contextBookIds) || contextBookIds.length > 5 || contextBookIds.some((id) => typeof id !== "string" || !/^[a-zA-Z0-9_-]{1,191}$/.test(id)))) {
+    return { ok: false, error: createAssistantError("INVALID_REQUEST", "Danh sách sách đang trao đổi không hợp lệ.") };
+  }
   const sessionId = typeof value.sessionId === "string" ? value.sessionId.trim() : "";
   if (sessionId.length > MAX_ASSISTANT_SESSION_ID_LENGTH) {
     return {
@@ -162,6 +181,9 @@ export function parseAssistantRequestPayload(value: unknown): AssistantRequestPa
     value: {
       message,
       ...(sessionId ? { sessionId } : {}),
+      ...(contextBookIds !== undefined ? { contextBookIds: [...new Set(contextBookIds as string[])] } : {}),
+      ...(typeof value.focusedBookId === "string" ? { focusedBookId: value.focusedBookId } : {}),
+      ...(typeof value.contextQuery === "string" && value.contextQuery.trim() ? { contextQuery: value.contextQuery.trim() } : {}),
     },
   };
 }
@@ -226,6 +248,10 @@ export function parseAssistantFeedbackPayload(value: unknown): AssistantFeedback
 
 function isValidatedBook(value: unknown): value is AssistantValidatedBook {
   if (!isObject(value)) return false;
+  const nullableFiniteNumber = (field: unknown) =>
+    field === undefined || field === null || (typeof field === "number" && Number.isFinite(field));
+  const nullableString = (field: unknown) =>
+    field === undefined || field === null || typeof field === "string";
   return (
     isNonEmptyString(value.id) &&
     isNonEmptyString(value.title) &&
@@ -233,7 +259,13 @@ function isValidatedBook(value: unknown): value is AssistantValidatedBook {
     (typeof value.description === "string" || value.description === null) &&
     typeof value.score === "number" &&
     Number.isFinite(value.score) &&
-    value.href === `/book/${value.id}`
+    value.href === `/book/${value.id}` &&
+    nullableFiniteNumber(value.price) &&
+    nullableFiniteNumber(value.pages) &&
+    nullableFiniteNumber(value.publishYear) &&
+    nullableFiniteNumber(value.rating) &&
+    nullableString(value.language) &&
+    nullableString(value.category)
   );
 }
 

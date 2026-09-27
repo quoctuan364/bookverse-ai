@@ -1,5 +1,53 @@
 # BookVerse AI
 
+## Triển khai nhanh lên Render
+
+Project có sẵn [`render.yaml`](render.yaml) để tạo đồng thời ba tài nguyên tại
+Singapore: web Next.js, dịch vụ gợi ý FastAPI và PostgreSQL 16. Render tự tạo
+secret, chạy migration rồi seed dữ liệu mẫu từ `data/demo`; quy trình này không
+sao chép hoặc thay đổi database gốc trên máy.
+
+1. Đẩy source lên một repository GitHub riêng tư.
+2. Trong Render, chọn **New > Blueprint** và kết nối repository đó.
+3. Xác nhận tạo các tài nguyên được khai báo trong `render.yaml`.
+4. Chờ cả web và AI service chuyển sang trạng thái `Live`, sau đó mở
+   `https://bookverse-ai-quoctuan364.onrender.com`.
+
+Gói miễn phí chỉ phù hợp demo: dịch vụ có thể ngủ khi không hoạt động và
+PostgreSQL miễn phí hết hạn sau 30 ngày. Chức năng gửi email đặt lại mật khẩu
+đang tắt an toàn cho đến khi cấu hình một webhook email HTTPS thật.
+
+## Cập nhật trải nghiệm trước báo cáo (22/09/2026)
+
+### Sửa hội thoại chatbot (23/09/2026)
+
+Chatbot giữ sách đang trao đổi ngay cả khi khách chưa đăng nhập. Có thể hỏi lần lượt: “Gợi ý sách AI cho người mới”, “Cuốn này thế nào?”, “Cuốn thứ hai”, “Tác giả là ai?”. Nếu có nhiều sách, trợ lý yêu cầu chọn rõ; nút hỏi về sách dùng đúng mã sách để không nhầm các cuốn trùng tên. Khi chuyển sang hỏi hội viên hoặc đơn hàng, không gắn nhầm sách từ lượt trước. Tìm sách hỗ trợ tiếng Việt có dấu/không dấu và tên hiển thị tiếng Việt.
+
+Mặc định Nova ưu tiên sách có ngôn ngữ tiếng Việt và luôn dùng tên sách tiếng Việt đã biên tập sẵn. Nếu chủ đề chưa đủ sách Việt, kết quả được bù từ sách có tên Việt hóa nhưng không đưa mô tả ngoại ngữ ra câu trả lời. Chỉ khi người dùng yêu cầu rõ “sách tiếng Anh” mới hiển thị tên gốc và lọc sách tiếng Anh. Chế độ tra cứu nội bộ cũng trả lời được chào hỏi, cảm ơn, giới thiệu khả năng và một số câu trò chuyện thông dụng.
+
+Phiên khách không được dùng mã phiên để đọc lịch sử của người khác. Các mã sách gửi kèm đều được tra lại trong danh mục công khai. Lưu hội thoại sử dụng thao tác ghi lồng nhau nguyên tử thay cho giao dịch tương tác bị hết thời gian chờ khi máy chủ phát triển tải lại mã. Không tự tạo nội dung khi sách thiếu giới thiệu; chức năng AI bên ngoài vẫn cần cấu hình nhà cung cấp hợp lệ.
+
+- Dùng tiếng Việt dễ hiểu cho nhãn sách điện tử, danh mục sách, đánh dấu trang, đoạn tô sáng, phản hồi và thanh toán thử nghiệm.
+- Trang đăng nhập có tài khoản dùng thử; chặn đường dẫn chuyển hướng ra ngoài và vòng lặp quay về đăng nhập. Mật khẩu được giữ nguyên như khi đăng ký.
+- Trợ lý có nút **Hỏi về cuốn sách này**; ưu tiên tra đúng tên sách đã chọn và không tự nhận xét chất lượng khi thiếu giới thiệu. Khi chưa cấu hình nhà cung cấp AI, câu trả lời chỉ tra cứu dữ liệu BookVerse, không thay thế khả năng phân tích của mô hình AI.
+- Bộ nhớ đệm chạy phát triển nằm trong `.next-dev`, tách khỏi `.next` của bản đóng gói để tránh mất giao diện khi build.
+- Kiểm tra dữ liệu thật trước buổi báo cáo bằng `npm run report:check`. Kiểm thử tự động dùng cơ sở dữ liệu riêng, không nhập đè dữ liệu gốc.
+
+## Chạy bản báo cáo trên máy hiện tại
+
+Dùng database gốc trong `.env` (`bookverse_ai`, cổng 5432). Catalog công khai hiện có 3.014 sách; mỗi trang hiển thị tối đa 24 sách. Không dùng `demo:start` cho buổi báo cáo vì đó là cấu hình database mẫu riêng.
+
+```powershell
+cd D:\Doantotnghiep
+npm run report:check
+npm run report:build
+npm run report:start -- -Production
+```
+
+Mở http://127.0.0.1:3000/catalog. Nếu chưa sửa code kể từ lần build thành công, chỉ cần lệnh `report:start -- -Production`. Dừng web trước khi build lại. Script khởi động kiểm tra dữ liệu, kho đọc, tin bán, gói hội viên và AI; không tự nhập hoặc ghi đè dữ liệu. Docker Desktop cần hoạt động.
+
+Bản báo cáo dùng `.next-report`, kiểm thử dùng `.next-e2e` để tránh ảnh hưởng bộ nhớ đệm của nhau. Nội dung đọc minh họa cần được trình bày đúng phạm vi trong đồ án; không coi đó là toàn văn sách gốc.
+
 ## Trải nghiệm giao diện thích ứng
 
 BookVerse dùng một hệ điều hướng thống nhất cho toàn bộ website:
@@ -86,6 +134,25 @@ npm run test:e2e:smoke
 npm run test:e2e:isolated
 ```
 
+Để lấy bằng chứng hiệu năng trên bản production demo, mở hai terminal sau khi đã
+chạy `npm run demo:bootstrap`:
+
+```powershell
+# Terminal 1
+npm run build
+npm run demo:start:production
+
+# Terminal 2
+$env:PERF_BASE_URL="http://127.0.0.1:3300"
+npm run performance:smoke
+```
+
+Bài đo mặc định gửi 30 request cho mỗi đường dẫn `/`, `/catalog` và
+`/api/marketplace` với concurrency 5. Quality gate yêu cầu p95 không quá 3 giây
+và tỷ lệ lỗi không quá 2%. Artifact JSON mới được lưu trong
+`outputs/performance/`; đây là smoke load test phục vụ demo, không phải benchmark
+quy mô production.
+
 Kịch bản demo đề xuất:
 
 1. Mở trang chủ và vào kho `/read`.
@@ -103,6 +170,25 @@ BookVerse hỗ trợ kho đọc chung cho toàn bộ đầu sách đang hoạt �
 - Người dùng đã mua riêng Ebook được giữ quyền đọc cuốn đó.
 - Chỉ cần một kỳ hội viên còn hạn để đọc toàn bộ kho, kể cả sách được bổ sung
   sau ngày đăng ký.
+
+Toàn bộ catalog local có nội dung BookVerse V2 gồm 8 chương × 4 trang. Nội dung
+được sinh deterministic theo tiêu đề, tác giả và thể loại; Reader chỉ ưu tiên V2
+khi một cuốn đủ trọn bộ 32 trang. Script chỉ thêm chunk mới, không xóa hoặc ghi
+đè nội dung cũ:
+
+```powershell
+# Kiểm tra sách còn thiếu nội dung V2
+npm run content:all:audit
+
+# Chỉ thực thi sau khi kiểm tra đúng tên database được in ở dry-run
+npx tsx scripts/ensure_all_book_content.ts --execute --confirm-database=bookverse_ai
+```
+
+Catalog hiện có nhiều đầu sách hiện đại chỉ mang metadata tham khảo nên không tự
+tải toàn văn từ Internet. Khi bổ sung Ebook ngoài, chỉ ingest bản public domain
+hoặc open-license có nguồn rõ; bản dịch cũng phải là bản mở. Project Gutenberg,
+GITenberg và Standard Ebooks là các nguồn ứng viên, nhưng phải đối chiếu đúng
+đầu sách trước khi import.
 
 Người chưa có quyền chỉ nhận tối đa 10% nội dung từ server. Giao diện không tải
 trước phần bị khóa. Thanh toán hội viên hỗ trợ `WALLET_DEMO` và
@@ -177,7 +263,7 @@ Các trang quản trị và hỗ trợ:
 - `/admin/membership-plans`: tạo, sửa và bật/tắt gói; kho sách được áp dụng tự động.
 - `/admin/subscriptions`: tìm thuê bao, xem doanh thu demo, đổi trạng thái và tạo
   thông báo sắp hết hạn; giao dịch `PAID_DEMO` có thể được hoàn với lý do bắt buộc.
-- `/admin/integrations`: kiểm tra mức sẵn sàng của PostgreSQL, Google OAuth,
+- `/admin/integrations`: kiểm tra mức sẵn sàng của PostgreSQL,
   email đặt lại mật khẩu, LLM, AI Service và domain HTTPS mà không lộ secret.
 - `/membership/faq`: giải thích đọc thử, gia hạn, hủy và quyền Ebook mua riêng.
 - `/orders`: danh sách, lọc trạng thái và phân trang đơn hàng của người mua.
@@ -307,6 +393,9 @@ cd D:\Doantotnghiep
 
 ### Cách khuyến nghị: bootstrap demo một lệnh
 
+Nếu cài trên máy mới, làm theo checklist có bước xác minh và xử lý lỗi tại
+[`docs/INSTALL_CLEAN_MACHINE.md`](docs/INSTALL_CLEAN_MACHINE.md).
+
 Yêu cầu Docker Desktop đang chạy, Node.js 20+ và PowerShell 7. Lệnh sau tạo
 `.env.demo` mới nếu chưa có, khởi động PostgreSQL cô lập, chạy migration, seed
 catalog, sinh nội dung đọc minh họa, tạo gói hội viên và kiểm tra readiness:
@@ -389,6 +478,51 @@ và `BookChunk` từ file HTML đã có; không xóa hoặc ghi đè file Ebook 
 Với clean clone không có bộ HTML lớn, dùng `content:demo:seed` ở trên. Pipeline
 membership hiện đọc `BookChunk` đã sinh và không còn phụ thuộc `public/ebooks/html`.
 
+### Tài khoản kiểm thử (Demo Accounts)
+
+Hệ thống cung cấp sẵn các tài khoản demo đã được seed mật khẩu mặc định `123456`:
+
+Ba tài khoản độc giả bên dưới là tài khoản chức năng đăng nhập được trong database
+local, có hồ sơ sở thích khác nhau để kiểm thử cá nhân hóa. Đây là dữ liệu demo có
+ghi nhãn, không được trình bày như dữ liệu của người thật.
+
+| Vai trò | Email đăng nhập | Mật khẩu | Quyền hạn & Mô tả |
+|---|---|---|---|
+| **Độc giả (Buyer)** | `reader.bookverse.demo@gmail.com` | `123456` | Đọc sách online, đăng ký gói hội viên, bookmark/highlight, quản lý giỏ hàng và đơn hàng cá nhân. |
+| **Độc giả công nghệ** | `reader.tech.bookverse.demo@gmail.com` | `123456` | Chỉ chọn Trí tuệ nhân tạo; minh họa 1 sở thích vẫn cá nhân hóa được. |
+| **Độc giả văn học** | `reader.literature.bookverse.demo@gmail.com` | `123456` | Văn học nước ngoài và Trinh thám; mục tiêu 45 phút/ngày. |
+| **Độc giả kinh doanh** | `reader.business.bookverse.demo@gmail.com` | `123456` | Kinh doanh, Tài chính cá nhân, Marketing, Quản trị; mục tiêu 25 phút/ngày. |
+| **Người bán (Seller)** | `seller.bookverse.demo@gmail.com` | `123456` | Quản lý gian hàng, đăng tin sách cũ, cập nhật trạng thái đơn hàng và theo dõi doanh thu người bán. |
+| **Quản trị viên (Admin)** | `admin.bookverse.demo@gmail.com` | `123456` | Vận hành tập trung tại `/admin` và xem dữ liệu thật/biểu đồ tại `/admin/statistics`; các trang quản trị cũ được chuyển về hai màn hình này để dễ demo. |
+| **Kiểm duyệt viên (Moderator)** | `moderator.bookverse.demo@gmail.com` | `123456` | Kiểm duyệt nội dung bài đăng cộng đồng, báo cáo vi phạm và nội dung sách. |
+
+Tạo hoặc cập nhật an toàn ba độc giả demo bằng `upsert`:
+
+```powershell
+npm run demo:seed-readers
+```
+
+Onboarding chỉ yêu cầu chọn từ **1 đến 5 thể loại**. Một thể loại đã đủ để tạo
+kệ gợi ý ban đầu; lượt xem, đọc và mua thật sẽ dần có trọng số cao hơn.
+
+### Hướng dẫn kiểm thử chức năng Đăng ký gói & Đọc sách Online:
+
+1. **Khách chưa đăng nhập**:
+   - Truy cập `/read` hoặc `/read/RB00001`.
+   - Backend chỉ trả về tối đa 10% số phần nội dung (tối thiểu 1 phần cho sách ngắn).
+   - Tại vị trí khóa hiển thị thông báo: *“Bạn đã đọc hết nội dung xem thử (10%). Hãy đăng ký gói để tiếp tục đọc.”* kèm nút *“Xem các gói đọc sách”*.
+2. **Đăng nhập và đăng ký gói**:
+   - Đăng nhập bằng tài khoản độc giả hoặc tài khoản mới tạo.
+   - Truy cập `/membership` -> Chọn gói mong muốn -> Chuyển đến `/membership/checkout` -> Xác nhận phương thức Sandbox.
+   - Trang `/membership/payment/[paymentId]` cho phép bấm **“Mô phỏng thành công”** (kích hoạt gói ngay lập tức) hoặc **“Mô phỏng thất bại”** (không kích hoạt gói).
+3. **Đọc toàn bộ sách**:
+   - Sau khi thanh toán thành công, mở lại `/read/[bookId]`, backend kiểm tra gói `ACTIVE` và trả toàn bộ 100% nội dung sách.
+   - Vào `/profile/membership` để theo dõi trạng thái gói hiện tại, ngày bắt đầu và ngày hết hạn.
+4. **Quản lý gói phía Quản trị viên**:
+   - Đăng nhập bằng `admin.bookverse.demo@gmail.com`.
+   - Vào `/admin` để xem tài khoản, sở thích khai báo, kho sách, ngoại lệ chợ sách và báo cáo cộng đồng.
+   - Vào `/admin/statistics` để xem riêng hành vi thật có consent và số liệu catalog hiện có.
+
 Tạo ba gói hội viên và tài khoản hội viên demo còn hạn:
 
 ```powershell
@@ -419,32 +553,6 @@ URL web:
 ```text
 http://127.0.0.1:3000
 ```
-
-### Bật đăng nhập Google
-
-BookVerse hỗ trợ Google OAuth qua Auth.js. Khi chưa có khóa OAuth, trang đăng nhập vẫn hoạt động bằng email/mật khẩu và nút Google hiển thị trạng thái chưa cấu hình.
-
-1. Mở Google Cloud Console, tạo OAuth Client ID loại **Web application**.
-2. Thêm Authorized redirect URI cho môi trường local:
-
-```text
-http://localhost:3000/api/auth/callback/google
-```
-
-3. Với production, thêm URI theo đúng domain HTTPS:
-
-```text
-https://ten-mien-cua-ban/api/auth/callback/google
-```
-
-4. Điền hai biến sau vào file `.env` local, không commit giá trị thật:
-
-```dotenv
-AUTH_GOOGLE_ID="client-id-tu-google"
-AUTH_GOOGLE_SECRET="client-secret-tu-google"
-```
-
-5. Rebuild hoặc khởi động lại service web. Tài khoản Google chỉ được chấp nhận khi email đã được Google xác minh. Lần đăng nhập đầu, hệ thống tạo tài khoản BookVerse role `BUYER`; nếu email đã tồn tại thì dùng đúng tài khoản nội bộ đó. Tài khoản bị khóa vẫn bị từ chối.
 
 ## Chạy AI service
 
@@ -517,6 +625,9 @@ final_v2 và blinded relevance nằm tại:
 - `docs/BLINDED_RELEVANCE_STUDY.md`
 
 ## UAT/SUS người dùng thật
+
+Checklist phần việc cần người tham gia và hồ sơ quyền dữ liệu nằm tại
+[`docs/RESEARCH_NEXT_ACTIONS.md`](docs/RESEARCH_NEXT_ACTIONS.md).
 
 Bộ UAT nằm tại `docs/UAT_PLAN.md` và `docs/UAT_RESPONSE_TEMPLATE.csv`. Mỗi người
 thực hiện sáu task trên một loại thiết bị (`desktop` hoặc `mobile`), có cờ đồng
@@ -1060,7 +1171,20 @@ python -m compileall -q ai_service
 docker compose config --quiet
 npm run test:production-env
 npm run test:production-mock-policy
+npm run test:python:integration:evidence
+npm run test:e2e:isolated
+npm run demo:defense:full
 ```
+
+`test:e2e:isolated` tạo riêng `bookverse_e2e_test`, apply migration, seed
+`TEST_FIXTURE`, chạy smoke + telemetry + Axe trên desktop/mobile rồi xóa database
+trong `finally`. Lượt full gate lịch sử ngày 02/08/2026 đạt toàn bộ unit
+TypeScript tại checkpoint đó, 44/44 Python khi bật integration và 46/46 E2E.
+
+Lượt kiểm tra source hiện hành hoàn tất ngày 22/09/2026 đạt lint, typecheck,
+production build, **277/277 unit TypeScript**, **82 passed, 1 skipped** Python
+và **96/96 E2E** trong một lượt trên desktop/mobile. E2E dùng database
+`bookverse_e2e_test` cô lập và xóa database thành công sau khi chạy.
 
 Lệnh `data:import` và `catalog:real:import` phải dùng biến `DATABASE_URL` của `bookverse_ai_test` cùng allowlist phù hợp; không chạy import để kiểm thử trên database demo. `catalog:real:validate` không ghi database, còn `catalog:real:dry-run` chỉ đọc và lập kế hoạch.
 

@@ -1,8 +1,11 @@
 "use server";
 
+import { unstable_cache } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { normalizeBookCoverUrl } from "@/lib/book-cover";
+import { getVietnameseBookTitle } from "@/lib/book-display-title";
+import { publicExperienceBookWhere } from "@/lib/public-book-policy";
 
 export type DiscoveryMood = "FOCUS" | "RELAX" | "INSPIRE" | "ADVENTURE";
 export type DiscoveryLength = "SHORT" | "MEDIUM" | "LONG";
@@ -38,10 +41,10 @@ function publishYearFilter(era: DiscoveryEra): Prisma.IntNullableFilter | undefi
   return undefined;
 }
 
-export async function getDiscoveryFilterOptions() {
+async function loadDiscoveryFilterOptions() {
   const categories = await prisma.category.findMany({
     where: {
-      books: { some: { status: "ACTIVE", deletedAt: null } },
+      books: { some: publicExperienceBookWhere() },
     },
     orderBy: { name: "asc" },
     select: { id: true, name: true },
@@ -51,7 +54,13 @@ export async function getDiscoveryFilterOptions() {
   return { categories };
 }
 
-export async function getDiscoveryBooks(
+export const getDiscoveryFilterOptions = unstable_cache(
+  loadDiscoveryFilterOptions,
+  ["discovery-filter-options"],
+  { revalidate: 3600, tags: ["discovery"] }
+);
+
+async function loadDiscoveryBooks(
   mood: DiscoveryMood,
   length: DiscoveryLength,
   filters: {
@@ -65,8 +74,7 @@ export async function getDiscoveryBooks(
   const era = filters.era ?? "ALL";
   const books = await prisma.book.findMany({
     where: {
-      status: "ACTIVE",
-      deletedAt: null,
+      ...publicExperienceBookWhere(),
       pages: pageFilter(length),
       languageCode: languageFilter(language),
       publishYear: publishYearFilter(era),
@@ -93,7 +101,7 @@ export async function getDiscoveryBooks(
 
   return books.map((book) => ({
     id: book.id,
-    title: book.title,
+    title: getVietnameseBookTitle(book.id, book.title),
     author: book.authorName,
     coverImage: normalizeBookCoverUrl(book.coverPath),
     pages: book.pages,
@@ -102,4 +110,29 @@ export async function getDiscoveryBooks(
     rating: book.rating ? Number(book.rating) : null,
     category: book.category.name,
   }));
+}
+
+export async function getDiscoveryBooks(
+  mood: DiscoveryMood,
+  length: DiscoveryLength,
+  filters: {
+    language?: DiscoveryLanguage;
+    era?: DiscoveryEra;
+    categoryId?: string;
+  } = {},
+) {
+  const cacheKey = [
+    "discovery-books",
+    mood,
+    length,
+    filters.language ?? "ALL",
+    filters.era ?? "ALL",
+    filters.categoryId ?? "ALL",
+  ];
+
+  return unstable_cache(
+    () => loadDiscoveryBooks(mood, length, filters),
+    cacheKey,
+    { revalidate: 300, tags: ["discovery"] }
+  )();
 }

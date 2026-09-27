@@ -3,9 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { InteractionType, OrderStatus, TargetType } from "@prisma/client";
 import { normalizeBookCoverUrl } from "@/lib/book-cover";
+import { getVietnameseBookTitle } from "@/lib/book-display-title";
 import { TAXONOMY_VERSION } from "@/lib/interaction-taxonomy";
 import prisma from "@/lib/prisma";
 import { PermissionError, requireAuthenticatedUser } from "@/lib/permissions";
+import { logResearchInteraction } from "@/actions/tracking.actions";
 
 type DecimalLike = {
   toNumber: () => number;
@@ -88,7 +90,7 @@ function decimalToNumber(value: DecimalLike | number | string): number {
 function serializeBook(book: { id: string; title: string; authorName: string; coverPath: string | null }) {
   return {
     bookId: book.id,
-    title: book.title,
+    title: getVietnameseBookTitle(book.id, book.title),
     author: book.authorName,
     coverImage: normalizeBookCoverUrl(book.coverPath),
   };
@@ -336,12 +338,12 @@ export async function toggleFavoriteBook(bookId: string): Promise<FavoriteAction
 
       return {
         success: true,
-        message: `Đã bỏ yêu thích "${book.title}".`,
+        message: `Đã bỏ yêu thích "${getVietnameseBookTitle(book.id, book.title)}".`,
         isFavorite: false,
       };
     }
 
-    await prisma.$transaction([
+    const [favorite] = await prisma.$transaction([
       prisma.favoriteBook.create({
         data: {
           userId: user.id,
@@ -375,12 +377,20 @@ export async function toggleFavoriteBook(bookId: string): Promise<FavoriteAction
       }),
     ]);
 
+    // Research tracking (chỉ ghi khi user đã consent, await sau khi transaction chính đã commit)
+    await logResearchInteraction({
+      eventType: "FAVORITE",
+      bookId: cleanBookId,
+      sourcePage: "library",
+      idempotencyKey: `favorite:${favorite.id}`,
+    });
+
     revalidatePath("/library");
     revalidatePath(`/book/${cleanBookId}`);
 
     return {
       success: true,
-      message: `Đã thêm "${book.title}" vào yêu thích.`,
+      message: `Đã thêm "${getVietnameseBookTitle(book.id, book.title)}" vào yêu thích.`,
       isFavorite: true,
     };
   } catch (error: unknown) {

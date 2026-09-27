@@ -63,18 +63,18 @@ export default async function SellerListingsPage({ searchParams }: SellerListing
     <main className="bv-page bv-seller">
       <SellerHero
         action={
-          data.gate.status === "SELLER" ? (
+          data.gate.canSell ? (
             <Link className={primaryButton} href="/seller/listings/new">
               <Plus className="h-4 w-4" aria-hidden="true" />
-              Tạo listing
+              Đăng bán sách
             </Link>
           ) : null
         }
-        description="Tạo, sửa, ẩn hoặc gửi duyệt lại listing. Mọi truy vấn chỉ trả về listing thuộc seller hiện tại."
-        title="Quản lý listing"
+        description="Đăng sách cũ và tự quản lý tin. Tin đủ thông tin được kiểm tra tự động và hiển thị ngay."
+        title="Tin đăng của tôi"
       />
 
-      {data.gate.status !== "SELLER" ? (
+      {!data.gate.canSell ? (
         <SellerGatePanel gate={data.gate} />
       ) : (
         <section className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:px-8">
@@ -82,22 +82,22 @@ export default async function SellerListingsPage({ searchParams }: SellerListing
           <SellerAlert message={params?.message} tone="success" />
           <SellerAlert message={params?.error} tone="error" />
 
-          <form className="bv-card grid gap-3 rounded-lg p-4 md:grid-cols-[1fr_220px_auto]" method="get">
+          <form className="bv-card grid gap-3 rounded-2xl p-4 shadow-sm md:grid-cols-[1fr_220px_auto]" method="get">
             <div className="relative">
               <Search
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500"
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-bv-text-muted"
                 aria-hidden="true"
               />
               <Input
-                aria-label="Tìm listing của tôi"
-                className="h-11 pl-10"
+                aria-label="Tìm tin bán sách của tôi"
+                className="h-12 pl-10"
                 defaultValue={data.filters.q}
                 name="q"
                 placeholder="Tìm tiêu đề, sách, mô tả..."
                 type="search"
               />
             </div>
-            <select aria-label="Lọc listing theo trạng thái" className={selectClass} defaultValue={data.filters.status} name="status">
+            <select aria-label="Lọc tin bán sách theo trạng thái" className={selectClass} defaultValue={data.filters.status} name="status">
               <option value="ALL">Tất cả trạng thái</option>
               {Object.values(ListingStatus).map((status) => (
                 <option key={status} value={status}>
@@ -113,9 +113,9 @@ export default async function SellerListingsPage({ searchParams }: SellerListing
 
           <div className="grid gap-4">
             {data.listings.map((listing) => (
-              <article className="bv-card rounded-lg p-5" key={listing.id}>
+              <article className="bv-card rounded-2xl p-5 shadow-sm" key={listing.id}>
                 <div className="grid gap-4 lg:grid-cols-[120px_1fr_auto]">
-                  <div className="aspect-[2/3] w-full overflow-hidden rounded-lg bg-white/[0.06] lg:w-[120px]">
+                  <div className="aspect-[2/3] w-full overflow-hidden rounded-xl bg-bv-surface lg:w-[120px]">
                     <BookCover
                       alt={listing.title}
                       author={listing.book?.author}
@@ -128,30 +128,30 @@ export default async function SellerListingsPage({ searchParams }: SellerListing
 
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="line-clamp-1 text-xl font-black text-white">{listing.title}</h2>
+                      <h2 className="line-clamp-1 text-xl font-black text-bv-heading">{listing.title}</h2>
                       <StatusBadge label={listingStatusLabel(listing.status)} value={listing.status} />
                       <StatusBadge label={conditionLabel(listing.condition)} value={listing.condition} />
                     </div>
-                    <p className="mt-2 text-sm text-zinc-400">
-                      {formatPrice(listing.price)} - {listing.book?.title ?? "Không liên kết catalog"} - Cập nhật{" "}
+                    <p className="mt-2 text-sm font-semibold text-bv-text-muted">
+                      <span className="font-bold text-bv-primary">{formatPrice(listing.price)}</span> · {listing.book?.title ?? "Không liên kết danh mục sách"} · Cập nhật{" "}
                       {formatDate(listing.updatedAt)}
                     </p>
-                    <p className="mt-3 line-clamp-2 text-sm leading-6 text-zinc-300">{listing.description}</p>
+                    <p className="mt-3 line-clamp-2 text-sm leading-6 text-bv-heading/80">{listing.description}</p>
                     {listing.rejectionReason ? (
-                      <p className="mt-3 rounded-lg border border-red-400/20 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                      <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                         Lý do từ chối: {listing.rejectionReason}
                       </p>
                     ) : null}
                     {listing.moderationNote ? (
-                      <p className="mt-2 rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-sm text-zinc-300">
+                      <p className="mt-2 rounded-xl border border-bv-ink/10 bg-bv-surface px-3 py-2 text-sm text-bv-heading">
                         Ghi chú duyệt: {listing.moderationNote}
                       </p>
                     ) : null}
-                    <div className="mt-4 grid gap-2 text-xs text-zinc-400 sm:grid-cols-4">
+                    <div className="mt-4 grid gap-2 text-xs font-medium text-bv-text-muted sm:grid-cols-4">
                       <span>Lượt xem: {listing.views.toLocaleString("vi-VN")}</span>
                       <span>Vào giỏ: {listing.cartAdds.toLocaleString("vi-VN")}</span>
                       <span>Mua: {listing.purchases.toLocaleString("vi-VN")}</span>
-                      <span>Order item: {listing.orderCount.toLocaleString("vi-VN")}</span>
+                      <span>Đơn hàng: {listing.orderCount.toLocaleString("vi-VN")}</span>
                     </div>
                   </div>
 
@@ -168,12 +168,12 @@ export default async function SellerListingsPage({ searchParams }: SellerListing
                         value={listing.status === ListingStatus.HIDDEN ? "SHOW" : "HIDE"}
                       />
                       {listing.status === ListingStatus.HIDDEN ? (
-                        <ConfirmSubmitButton className={secondaryButton} confirmMessage="Gửi listing này duyệt lại?">
+                        <ConfirmSubmitButton className={secondaryButton} confirmMessage="Gửi tin này qua kiểm tra tự động để hiển thị lại?">
                           <Eye className="h-4 w-4" aria-hidden="true" />
                           Hiện lại
                         </ConfirmSubmitButton>
                       ) : (
-                        <ConfirmSubmitButton className={dangerButton} confirmMessage="Ẩn listing này khỏi marketplace?">
+                        <ConfirmSubmitButton className={dangerButton} confirmMessage="Ẩn tin bán sách này khỏi marketplace?">
                           <EyeOff className="h-4 w-4" aria-hidden="true" />
                           Ẩn
                         </ConfirmSubmitButton>
@@ -186,11 +186,11 @@ export default async function SellerListingsPage({ searchParams }: SellerListing
           </div>
 
           {data.listings.length === 0 ? (
-            <div className="bv-card rounded-lg p-8 text-center">
-              <p className="text-sm text-zinc-400">Chưa có listing phù hợp với bộ lọc.</p>
+            <div className="bv-card rounded-2xl p-8 text-center shadow-sm">
+              <p className="text-sm font-semibold text-bv-text-muted">Chưa có tin bán sách phù hợp với bộ lọc.</p>
               <Link className={`${primaryButton} mt-4`} href="/seller/listings/new">
                 <Plus className="h-4 w-4" aria-hidden="true" />
-                Tạo listing đầu tiên
+                Tạo tin bán sách đầu tiên
               </Link>
             </div>
           ) : null}

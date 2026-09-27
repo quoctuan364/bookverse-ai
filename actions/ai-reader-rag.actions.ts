@@ -1,7 +1,10 @@
 "use server";
 
+import { selectPreferredBookChunks } from "@/lib/book-content-version";
+import { getBookReadingAccess } from "@/lib/membership-access";
 import { getCurrentUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
+import { decideReadingAccess } from "@/lib/reading-access-policy";
 import {
   areReaderRagCitationsGrounded,
   buildLocalGroundedReaderAnswer,
@@ -141,7 +144,11 @@ export async function askReaderRag(
   const cleanQuery = userQuery.replace(/\s+/gu, " ").trim();
   const safeCurrentChapter = Math.max(1, Math.floor(currentChapterNumber || 1));
 
-  if (!/^RB\d{5}$/u.test(cleanBookId) || cleanQuery.length < 2 || cleanQuery.length > 2_500) {
+  if (
+    !/^(?:B\d{4}|RB\d{5})$/u.test(cleanBookId) ||
+    cleanQuery.length < 2 ||
+    cleanQuery.length > 2_500
+  ) {
     return {
       success: false,
       answer: READER_RAG_NOT_FOUND,
@@ -155,26 +162,26 @@ export async function askReaderRag(
 
   try {
     const currentUser = await getCurrentUser();
-    const entitlement =
-      currentUser && !currentUser.isLocked
-        ? await prisma.readingEntitlement.findUnique({
-            where: {
-              userId_bookId: {
-                userId: currentUser.id,
-                bookId: cleanBookId,
-              },
-            },
-            select: { id: true },
-          })
-        : null;
-    const access = entitlement ? "FULL" : "PREVIEW";
-    const firstChapter = await prisma.bookChunk.findFirst({
+    const userId =
+      currentUser && !currentUser.isLocked ? currentUser.id : null;
+    const readingAccess = await getBookReadingAccess(userId, cleanBookId);
+    const access = readingAccess.hasAccess ? "FULL" : "PREVIEW";
+    const storedChunks = await prisma.bookChunk.findMany({
       where: { bookId: cleanBookId },
       orderBy: [{ chapterNumber: "asc" }, { chunkIndex: "asc" }],
-      select: { chapterNumber: true },
+      select: {
+        id: true,
+        chapterNumber: true,
+        chapterTitle: true,
+        pageNumber: true,
+        chunkIndex: true,
+        content: true,
+      },
     });
+    const preferredChunks = selectPreferredBookChunks(storedChunks);
+    const firstChapterNumber = preferredChunks[0]?.chapterNumber;
 
-    if (!firstChapter) {
+    if (!firstChapterNumber) {
       return {
         success: true,
         answer: READER_RAG_NOT_FOUND,
@@ -185,21 +192,12 @@ export async function askReaderRag(
       };
     }
 
-    // Không cho RAG làm lộ chương bị paywall khóa.
-    const availableChunks = await prisma.bookChunk.findMany({
-      where: {
-        bookId: cleanBookId,
-        ...(entitlement ? {} : { chapterNumber: firstChapter.chapterNumber }),
-      },
-      orderBy: [{ chapterNumber: "asc" }, { chunkIndex: "asc" }],
-      select: {
-        chapterNumber: true,
-        chapterTitle: true,
-        pageNumber: true,
-        chunkIndex: true,
-        content: true,
-      },
+    // Không cho RAG làm lộ các phần bị paywall khóa (giới hạn tối đa 10% cho bản đọc thử).
+    const accessDecision = decideReadingAccess({
+      totalPages: preferredChunks.length,
+      hasEntitlement: readingAccess.hasAccess,
     });
+    const availableChunks = preferredChunks.slice(0, accessDecision.visiblePages);
     const relevantChunks = rankReaderRagChunks(
       availableChunks,
       cleanQuery,
@@ -263,4 +261,3 @@ export async function askReaderRag(
     };
   }
 }
-

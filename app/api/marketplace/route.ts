@@ -1,7 +1,10 @@
 import { ListingCondition, ListingStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { normalizeBookCoverUrl } from "@/lib/book-cover";
+import { getVietnameseBookTitle } from "@/lib/book-display-title";
+import { observeApiRoute, writeServerLog } from "@/lib/observability";
 import prisma from "@/lib/prisma";
+import { publicBookQualityWhere } from "@/lib/public-book-policy";
 import { loadSellerQualityScores } from "@/lib/seller-quality-data";
 
 type DecimalLike = {
@@ -34,7 +37,7 @@ function parseCondition(value: string | null): ListingCondition | null {
   return null;
 }
 
-export async function GET(request: Request) {
+async function handleGet(request: Request): Promise<Response> {
   try {
     const requestUrl = new URL(request.url);
     const rawCondition = requestUrl.searchParams.get("condition");
@@ -58,7 +61,7 @@ export async function GET(request: Request) {
         status: ListingStatus.APPROVED,
         condition: condition ?? undefined,
         book: {
-          isNot: null,
+          is: publicBookQualityWhere(),
         },
       },
       orderBy: {
@@ -103,7 +106,7 @@ export async function GET(request: Request) {
           book: listing.book
             ? {
                 id: listing.book.id,
-                title: listing.book.title,
+                title: getVietnameseBookTitle(listing.book.id, listing.book.title),
                 author: listing.book.authorName,
                 cover_url: normalizeBookCoverUrl(listing.book.coverPath),
                 price: decimalToNumber(listing.book.price),
@@ -141,7 +144,7 @@ export async function GET(request: Request) {
     );
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Lỗi không xác định.";
-    console.error(`[api/marketplace] ${message}`);
+    writeServerLog("error", "api.marketplace.failed", { error: message });
 
     return NextResponse.json(
       {
@@ -154,4 +157,8 @@ export async function GET(request: Request) {
       },
     );
   }
+}
+
+export async function GET(request: Request): Promise<Response> {
+  return observeApiRoute(request, "api.marketplace", () => handleGet(request));
 }

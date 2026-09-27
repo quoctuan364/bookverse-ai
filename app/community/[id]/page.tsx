@@ -1,8 +1,9 @@
 import { notFound, redirect } from "next/navigation";
-import { Flag, MessageCircle, ThumbsUp, UserCircle } from "lucide-react";
+import { Bookmark, Flag, MessageCircle, Reply, Star, ThumbsUp, UserCircle } from "lucide-react";
 import { ReactionType } from "@prisma/client";
 import { createComment, getPostById, reactToPost } from "@/actions/community.actions";
 import { BookCover } from "@/components/shared/BookCover";
+import { BookShareButton } from "@/components/shared/BookShareButton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +40,7 @@ async function submitComment(formData: FormData) {
   const result = await createComment({
     postId,
     content: String(formData.get("content") ?? ""),
+    parentId: String(formData.get("parentId") ?? "") || null,
   });
 
   if (!result.success) {
@@ -57,7 +59,7 @@ async function submitReaction(formData: FormData) {
 
   const postId = String(formData.get("postId") ?? "");
   const reaction = String(formData.get("reaction") ?? "LIKE");
-  const type = reaction === "REPORT" ? ReactionType.REPORT : ReactionType.LIKE;
+  const type = reaction === "REPORT" ? ReactionType.REPORT : reaction === "SAVE" ? ReactionType.SAVE : ReactionType.LIKE;
   const result = await reactToPost(postId, type);
 
   if (!result.success) {
@@ -100,21 +102,27 @@ export default async function CommunityPostDetailPage({
 
         <article className="bv-card rounded-lg p-5 sm:p-7">
           <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[#0F766E] text-sm font-black text-[#FFFDF8] shadow-[0_10px_24px_rgba(15,118,110,0.22)]">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-bv-focus text-sm font-black text-bv-ivory shadow-[0_10px_24px_rgba(15,118,110,0.22)]">
               {post.author.name ? getInitial(post.author.name) : <UserCircle className="h-5 w-5" />}
             </div>
 
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <p className="font-black text-[#17202A]">{post.author.name}</p>
-                <time className="text-sm text-[#66706B]" dateTime={post.createdAt.toISOString()}>
+                <p className="font-black text-bv-heading">{post.author.name}</p>
+                <time className="text-sm text-bv-text-muted" dateTime={post.createdAt.toISOString()}>
                   {formatDate(post.createdAt)}
                 </time>
               </div>
 
+              <div className="mt-3 flex flex-wrap gap-2">
+                <span className="rounded-full bg-bv-mint px-3 py-1 text-xs font-black text-bv-primary">{post.type === "REVIEW" ? "Đánh giá" : post.type === "QUESTION" ? "Hỏi đáp" : "Thảo luận"}</span>
+                {post.hasSpoiler ? <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-800">Có spoiler</span> : null}
+                {post.rating ? <span className="inline-flex items-center gap-1 rounded-full bg-[#FFF4D6] px-3 py-1 text-xs font-black text-[#8A5C00]"><Star className="h-3.5 w-3.5 fill-bv-gold text-bv-gold" aria-hidden="true" />{post.rating}/5</span> : null}
+              </div>
+
               {post.book ? (
                 <a
-                  className="mt-4 flex max-w-md gap-3 rounded-xl border border-[#17191F]/10 bg-[#F7F4ED] p-3 transition hover:border-[#0F766E]/35"
+                  className="mt-4 flex max-w-xl gap-4 rounded-xl border border-[#17191F]/10 bg-bv-surface p-3.5 transition hover:border-bv-focus/35"
                   href={`/book/${post.book.id}`}
                 >
                   <BookCover
@@ -122,24 +130,24 @@ export default async function CommunityPostDetailPage({
                     author={post.book.author}
                     bookId={post.book.id}
                     category={post.book.category}
-                    className="h-24 w-16 shrink-0 rounded-md"
+                    className="h-32 w-[86px] shrink-0 rounded-lg shadow-[0_8px_20px_rgba(23,25,31,0.14)]"
                     src={post.book.coverImage}
                     title={post.book.title}
                   />
                   <span className="min-w-0 self-center">
-                    <span className="block text-xs font-bold uppercase tracking-wide text-[#66706B]">Gắn với sách</span>
-                    <span className="mt-1 line-clamp-2 block font-black text-[#17202A]">{post.book.title}</span>
-                    <span className="mt-1 block truncate text-sm text-[#66706B]">{post.book.author}</span>
+                    <span className="block text-xs font-bold uppercase tracking-wide text-bv-text-muted">Gắn với sách</span>
+                    <span className="mt-1 line-clamp-2 block font-black text-bv-heading">{post.book.title}</span>
+                    <span className="mt-1 block truncate text-sm text-bv-text-muted">{post.book.author}</span>
                   </span>
                 </a>
               ) : null}
 
-              <h1 className="mt-4 text-2xl font-black leading-tight text-[#17202A] sm:text-3xl">
+              <h1 className="mt-4 text-2xl font-black leading-tight text-bv-heading sm:text-3xl">
                 {post.title}
               </h1>
-              <p className="mt-4 whitespace-pre-line text-base leading-8 text-[#42524D]">
-                {post.content}
-              </p>
+              {post.hasSpoiler ? (
+                <details className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-[#42524D]"><summary className="cursor-pointer font-black text-amber-900">Hiện nội dung có spoiler</summary><p className="mt-3 whitespace-pre-line text-base leading-8">{post.content}</p></details>
+              ) : <p className="mt-4 whitespace-pre-line text-base leading-8 text-[#42524D]">{post.content}</p>}
             </div>
           </div>
 
@@ -155,6 +163,17 @@ export default async function CommunityPostDetailPage({
 
             <form action={submitReaction}>
               <input name="postId" type="hidden" value={post.id} />
+              <input name="reaction" type="hidden" value="SAVE" />
+              <Button className="gap-2" type="submit" variant="outline">
+                <Bookmark className={`h-4 w-4 ${post.isSaved ? "fill-bv-focus text-bv-focus" : ""}`} aria-hidden="true" />
+                {post.isSaved ? "Đã lưu" : "Lưu bài"} ({post.saveCount})
+              </Button>
+            </form>
+
+            <BookShareButton title={post.title} />
+
+            <form action={submitReaction}>
+              <input name="postId" type="hidden" value={post.id} />
               <input name="reaction" type="hidden" value="REPORT" />
               <Button className="gap-2 border-[#C9784A] text-[#8A4B2D]" type="submit" variant="outline">
                 <Flag className="h-4 w-4" aria-hidden="true" />
@@ -166,9 +185,9 @@ export default async function CommunityPostDetailPage({
 
         <section className="bv-card mt-6 rounded-lg p-5 sm:p-6">
           <div className="mb-5 flex items-center gap-2">
-            <MessageCircle className="h-5 w-5 text-[#0F766E]" aria-hidden="true" />
-            <h2 className="text-xl font-black text-[#17202A]">
-              Bình luận ({post.comments.length})
+            <MessageCircle className="h-5 w-5 text-bv-focus" aria-hidden="true" />
+            <h2 className="text-xl font-black text-bv-heading">
+              Bình luận ({post.commentCount})
             </h2>
           </div>
 
@@ -176,7 +195,7 @@ export default async function CommunityPostDetailPage({
             <input name="postId" type="hidden" value={post.id} />
             <textarea
               className={cn(
-                "min-h-28 w-full resize-y rounded-lg border border-[#D8D0C2] bg-[#FFFDF8] px-3 py-3 text-sm leading-6 text-[#17202A] outline-none transition placeholder:text-[#7C8581] focus-visible:ring-2 focus-visible:ring-[#0F766E]/30",
+                "min-h-28 w-full resize-y rounded-lg border border-bv-border bg-bv-ivory px-3 py-3 text-sm leading-6 text-bv-heading outline-none transition placeholder:text-[#7C8581] focus-visible:ring-2 focus-visible:ring-bv-focus/30",
               )}
               name="content"
               placeholder="Viết bình luận của bạn..."
@@ -190,7 +209,7 @@ export default async function CommunityPostDetailPage({
           </form>
 
           {post.comments.length === 0 ? (
-            <p className="rounded-lg bg-[#F7F4ED] px-4 py-3 text-sm text-[#66706B]">
+            <p className="rounded-lg bg-bv-surface px-4 py-3 text-sm text-bv-text-muted">
               Chưa có bình luận nào.
             </p>
           ) : (
@@ -198,11 +217,11 @@ export default async function CommunityPostDetailPage({
               {post.comments.map((comment) => (
                 <div className="border-t border-[#17191F]/10 pt-4" key={comment.id}>
                   <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#0F766E] text-xs font-black text-[#FFFDF8]">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-bv-focus text-xs font-black text-bv-ivory">
                       {getInitial(comment.author.name)}
                     </div>
                     <div>
-                      <p className="font-black text-[#17202A]">{comment.author.name}</p>
+                      <p className="font-black text-bv-heading">{comment.author.name}</p>
                       <time className="text-xs text-gray-500" dateTime={comment.createdAt.toISOString()}>
                         {formatDate(comment.createdAt)}
                       </time>
@@ -211,6 +230,25 @@ export default async function CommunityPostDetailPage({
                   <p className="mt-3 whitespace-pre-line text-sm leading-7 text-[#334B4F]">
                     {comment.content}
                   </p>
+                  <details className="mt-2">
+                    <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-black text-bv-primary"><Reply className="h-4 w-4" aria-hidden="true" /> Trả lời</summary>
+                    <form action={submitComment} className="mt-2 rounded-xl bg-bv-surface p-3">
+                      <input name="postId" type="hidden" value={post.id} />
+                      <input name="parentId" type="hidden" value={comment.id} />
+                      <textarea className="min-h-20 w-full rounded-lg border border-bv-border bg-white p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-bv-primary" name="content" placeholder={`Trả lời ${comment.author.name}...`} required />
+                      <div className="mt-2 flex justify-end"><Button size="sm" type="submit">Gửi trả lời</Button></div>
+                    </form>
+                  </details>
+                  {comment.replies.length > 0 ? (
+                    <div className="ml-5 mt-3 space-y-3 border-l-2 border-bv-primary/15 pl-4">
+                      {comment.replies.map((reply) => (
+                        <div className="rounded-xl bg-bv-surface p-3" key={reply.id}>
+                          <div className="flex items-center justify-between gap-3"><p className="text-sm font-black text-bv-heading">{reply.author.name}</p><time className="text-xs text-bv-text-muted" dateTime={reply.createdAt.toISOString()}>{formatDate(reply.createdAt)}</time></div>
+                          <p className="mt-2 whitespace-pre-line text-sm leading-6 text-[#334B4F]">{reply.content}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>

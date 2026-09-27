@@ -1,10 +1,12 @@
+import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { CalendarClock, MapPin, PackageCheck, ReceiptText, Truck } from "lucide-react";
+import { CalendarClock, MapPin, MessageSquare, PackageCheck, ReceiptText, Star, Truck } from "lucide-react";
 import { cancelPendingOrder, getOrderDetailData } from "@/actions/order.actions";
 import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
 import { BookCover } from "@/components/shared/BookCover";
 import { getCurrentUser } from "@/lib/permissions";
+import { createDemoPaymentQr } from "@/lib/demo-payment-qr";
 
 export const dynamic = "force-dynamic";
 
@@ -132,20 +134,24 @@ export default async function OrderDetailPage({ params, searchParams }: OrderDet
     order.shipping.district,
     order.shipping.province,
   ].filter(Boolean);
+  const orderQrCode =
+    order.paymentMethod === "BANK_TRANSFER_DEMO" && order.status === "PENDING"
+      ? await createDemoPaymentQr(order.id, Number(order.totalAmount))
+      : null;
 
   return (
     <main className="bv-page">
       <section className="bv-hero">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-10 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-8">
           <div>
-            <p className="text-sm font-black uppercase tracking-[0.16em] text-[#F2C14E]">Order Detail</p>
+            <p className="text-sm font-black uppercase tracking-[0.16em] text-bv-gold">Chi tiết đơn hàng</p>
             <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-5xl">{order.id}</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-[#EAF5F1]">
-              Timeline, item và địa chỉ giao hàng snapshot của đơn đã checkout.
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-bv-mint-soft">
+              Timeline, item và địa chỉ giao hàng snapshot của đơn đã thanh toán.
             </p>
           </div>
           <Link
-            className="inline-flex h-11 w-fit items-center justify-center gap-2 rounded-lg bg-[#FFFDF8] px-4 py-2 text-sm font-bold text-[#0F3F3C] shadow-[0_12px_30px_rgba(0,0,0,0.14)] transition hover:bg-[#F2C14E]/95"
+            className="inline-flex h-11 w-fit items-center justify-center gap-2 rounded-lg bg-bv-ivory px-4 py-2 text-sm font-bold text-[#0F3F3C] shadow-[0_12px_30px_rgba(0,0,0,0.14)] transition hover:bg-bv-gold/95"
             href="/profile"
           >
             <ReceiptText className="h-4 w-4" aria-hidden="true" />
@@ -168,15 +174,15 @@ export default async function OrderDetailPage({ params, searchParams }: OrderDet
             </div>
           ) : null}
 
-          <section className="rounded-2xl border border-white/10 bg-slate-950/72 p-5 shadow-[0_24px_90px_rgba(0,0,0,0.34)] backdrop-blur-2xl">
-            <h2 className="inline-flex items-center gap-2 text-xl font-black text-white">
-              <PackageCheck className="h-5 w-5 text-[#F2C14E]" aria-hidden="true" />
+          <section className="rounded-3xl border border-bv-ink/10 bg-white p-6 shadow-sm">
+            <h2 className="inline-flex items-center gap-2 text-xl font-black text-bv-ink">
+              <PackageCheck className="h-5 w-5 text-bv-primary" aria-hidden="true" />
               Sản phẩm
             </h2>
             <div className="mt-5 grid gap-4">
               {order.items.map((item) => (
-                <article className="flex flex-col gap-4 rounded-xl border border-white/10 bg-white/[0.05] p-4 sm:flex-row" key={item.id}>
-                  <Link className="aspect-[2/3] w-24 shrink-0 overflow-hidden rounded-lg bg-[#EDE3D5]" href={`/book/${item.book.id}`}>
+                <article className="flex flex-col gap-4 rounded-2xl border border-bv-ink/8 bg-bv-ivory/50 p-4 sm:flex-row" key={item.id}>
+                  <Link className="aspect-[2/3] w-24 shrink-0 overflow-hidden rounded-xl bg-[#EDE3D5]" href={`/book/${item.book.id}`}>
                     <BookCover
                       alt={`Bìa sách ${item.book.title}`}
                       author={item.book.author}
@@ -187,40 +193,50 @@ export default async function OrderDetailPage({ params, searchParams }: OrderDet
                     />
                   </Link>
                   <div className="min-w-0 flex-1">
-                    <Link className="line-clamp-2 text-lg font-black text-white hover:underline" href={`/book/${item.book.id}`}>
+                    <Link className="line-clamp-2 text-base font-black text-bv-ink transition hover:text-bv-primary" href={`/book/${item.book.id}`}>
                       {item.book.title}
                     </Link>
-                    <p className="mt-1 text-sm text-zinc-400">{item.book.author}</p>
-                    <p className="mt-1 text-sm text-zinc-400">Người bán: {item.seller?.name ?? "BookVerse"}</p>
-                    <p className="mt-3 text-sm text-zinc-400">
+                    <p className="mt-1 text-sm text-bv-text-subtle">{item.book.author}</p>
+                    <p className="mt-1 text-xs text-bv-text-muted">Người bán: {item.seller?.name ?? "BookVerse"}</p>
+                    <p className="mt-2 text-sm font-semibold text-bv-text">
                       {item.quantity} x {formatPrice(item.unitPrice)}
                     </p>
                   </div>
-                  <p className="text-lg font-black text-[#F2C14E]">{formatPrice(item.totalPrice)}</p>
+                  <div className="flex shrink-0 flex-col items-end justify-between gap-3 sm:text-right">
+                    <p className="text-lg font-black text-bv-primary">{formatPrice(item.totalPrice)}</p>
+                    <Link
+                      className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-1.5 text-xs font-black text-amber-900 shadow-xs transition hover:bg-amber-100 hover:shadow-sm active:scale-95"
+                      href={`/book/${item.book.id}#reviews-section`}
+                      title="Viết nhận xét & chấm sao cho cuốn sách này"
+                    >
+                      <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-500" aria-hidden="true" />
+                      <span>Đánh giá sách</span>
+                    </Link>
+                  </div>
                 </article>
               ))}
             </div>
           </section>
 
-          <section className="rounded-2xl border border-white/10 bg-slate-950/72 p-5 shadow-[0_24px_90px_rgba(0,0,0,0.34)] backdrop-blur-2xl">
-            <h2 className="inline-flex items-center gap-2 text-xl font-black text-white">
-              <Truck className="h-5 w-5 text-[#F2C14E]" aria-hidden="true" />
-              Timeline
+          <section className="rounded-3xl border border-bv-ink/10 bg-white p-6 shadow-sm">
+            <h2 className="inline-flex items-center gap-2 text-xl font-black text-bv-ink">
+              <Truck className="h-5 w-5 text-bv-primary" aria-hidden="true" />
+              Tiến trình đơn hàng
             </h2>
             <div className="mt-5 grid gap-3">
               {order.timeline.map((event) => (
-                <div className="rounded-xl border border-white/10 bg-white/[0.05] p-4" key={event.id}>
+                <div className="rounded-2xl border border-bv-ink/8 bg-bv-ivory/40 p-4" key={event.id}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <StatusBadge status={event.status} />
-                    <span className="text-xs text-zinc-500">{formatDate(event.createdAt)}</span>
+                    <span className="text-xs text-bv-text-muted">{formatDate(event.createdAt)}</span>
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-zinc-300">{event.note ?? "Cập nhật trạng thái đơn hàng."}</p>
-                  <p className="mt-1 text-xs text-zinc-500">Actor: {event.actorName ?? "Hệ thống"}</p>
+                  <p className="mt-2 text-sm font-medium text-bv-text">{event.note ?? "Cập nhật trạng thái đơn hàng."}</p>
+                  <p className="mt-1 text-xs text-bv-text-subtle">Người cập nhật: {event.actorName ?? "Hệ thống"}</p>
                 </div>
               ))}
               {order.timeline.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-white/12 bg-white/[0.04] p-5 text-sm text-zinc-400">
-                  Chưa có timeline.
+                <p className="rounded-2xl border border-dashed border-bv-ink/12 bg-bv-ivory/20 p-5 text-sm text-bv-text-subtle">
+                  Chưa có tiến trình.
                 </p>
               ) : null}
             </div>
@@ -228,36 +244,62 @@ export default async function OrderDetailPage({ params, searchParams }: OrderDet
         </div>
 
         <aside className="grid h-fit gap-5">
-          <section className="rounded-2xl border border-white/10 bg-slate-950/72 p-5 shadow-[0_24px_90px_rgba(0,0,0,0.34)] backdrop-blur-2xl">
-            <h2 className="text-xl font-black text-white">Tóm tắt</h2>
+          <section className="rounded-3xl border border-bv-ink/10 bg-white p-6 shadow-sm">
+            <h2 className="text-xl font-black text-bv-ink">Tóm tắt đơn hàng</h2>
             <dl className="mt-5 grid gap-3 text-sm">
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-zinc-400">Trạng thái</dt>
+                <dt className="text-bv-text-muted">Trạng thái</dt>
                 <dd>
                   <StatusBadge status={order.status} />
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-zinc-400">Thanh toán</dt>
-                <dd className="font-black text-white">{paymentLabel(order.paymentMethod)}</dd>
+                <dt className="text-bv-text-muted">Thanh toán</dt>
+                <dd className="font-bold text-bv-ink">{paymentLabel(order.paymentMethod)}</dd>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-zinc-400">Ngày tạo</dt>
-                <dd className="font-black text-white">{formatDate(order.createdAt)}</dd>
+                <dt className="text-bv-text-muted">Ngày tạo</dt>
+                <dd className="font-bold text-bv-ink">{formatDate(order.createdAt)}</dd>
               </div>
-              <div className="border-t border-white/10 pt-3">
+              <div className="border-t border-bv-ink/8 pt-3">
                 <div className="flex items-center justify-between gap-3">
-                  <dt className="text-zinc-400">{order.isSellerScoped ? "Doanh thu phần của bạn" : "Tổng tiền"}</dt>
-                  <dd className="text-xl font-black text-[#F2C14E]">{formatPrice(order.totalAmount)}</dd>
+                  <dt className="text-bv-text-muted">{order.isSellerScoped ? "Doanh thu phần của bạn" : "Tổng tiền"}</dt>
+                  <dd className="text-xl font-black text-bv-primary">{formatPrice(order.totalAmount)}</dd>
                 </div>
               </div>
             </dl>
+
+            {order.paymentMethod === "BANK_TRANSFER_DEMO" && order.status === "PENDING" ? (
+              <div className="mt-5 rounded-2xl border border-bv-gold/30 bg-[#FFFDF5] p-4">
+                <p className="text-xs font-black uppercase tracking-wider text-bv-accent">Mã QR thanh toán mô phỏng</p>
+                <div className="mt-3 flex gap-3 items-center">
+                  <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-bv-ink/8 bg-white p-1.5 shadow-sm">
+                    {orderQrCode ? (
+                      <Image
+                        alt="Mã QR demo chứa thông tin đơn hàng, không dùng để chuyển tiền"
+                        className="h-full w-full object-contain"
+                        height={96}
+                        priority
+                        src={orderQrCode}
+                        width={96}
+                      />
+                    ) : null}
+                  </div>
+                  <div className="min-w-0 flex-1 text-xs space-y-1 text-bv-text">
+                    <p className="font-bold text-[#8A5C00]">Chỉ để trình diễn, không kết nối ngân hàng.</p>
+                    <p className="text-bv-text-subtle">Quét mã chỉ xem mã đơn và số tiền; không chuyển tiền.</p>
+                    <p><span className="text-bv-text-muted">Mã đơn:</span> <strong className="font-mono text-bv-ink">{order.id.slice(-8).toUpperCase()}</strong></p>
+                    <p><span className="text-bv-text-muted">Số tiền:</span> <strong className="text-bv-primary">{formatPrice(Number(order.totalAmount))}</strong></p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             {order.canCancel ? (
               <form action={cancelOrderAction} className="mt-5">
                 <input name="orderId" type="hidden" value={order.id} />
                 <ConfirmSubmitButton
-                  className="inline-flex h-11 w-full items-center justify-center rounded-lg border border-red-400/30 bg-red-500/10 px-4 text-sm font-black text-red-200 transition hover:bg-red-500/20"
+                  className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-red-200 bg-red-50 px-4 text-sm font-black text-red-700 transition hover:bg-red-100"
                   confirmMessage="Bạn chắc chắn muốn hủy đơn PENDING này?"
                 >
                   Hủy đơn
@@ -266,26 +308,26 @@ export default async function OrderDetailPage({ params, searchParams }: OrderDet
             ) : null}
           </section>
 
-          <section className="rounded-2xl border border-white/10 bg-slate-950/72 p-5 shadow-[0_24px_90px_rgba(0,0,0,0.34)] backdrop-blur-2xl">
-            <h2 className="inline-flex items-center gap-2 text-xl font-black text-white">
-              <MapPin className="h-5 w-5 text-[#F2C14E]" aria-hidden="true" />
+          <section className="rounded-3xl border border-bv-ink/10 bg-white p-6 shadow-sm">
+            <h2 className="inline-flex items-center gap-2 text-xl font-black text-bv-ink">
+              <MapPin className="h-5 w-5 text-bv-primary" aria-hidden="true" />
               Địa chỉ giao hàng
             </h2>
-            <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.05] p-4 text-sm leading-6 text-zinc-300">
-              <p className="font-black text-white">{order.shipping.fullName ?? "Chưa có tên người nhận"}</p>
-              <p>{order.shipping.phone ?? "Chưa có số điện thoại"}</p>
-              <p>{shippingParts.join(", ") || "Chưa có địa chỉ snapshot"}</p>
-              {order.shipping.note ? <p className="mt-2 text-xs text-zinc-500">{order.shipping.note}</p> : null}
+            <div className="mt-4 rounded-2xl border border-bv-ink/8 bg-bv-ivory/40 p-4 text-sm leading-6 text-bv-text">
+              <p className="font-black text-bv-ink">{order.shipping.fullName ?? "Chưa có tên người nhận"}</p>
+              <p className="text-bv-text-subtle">{order.shipping.phone ?? "Chưa có số điện thoại"}</p>
+              <p className="mt-1">{shippingParts.join(", ") || "Chưa có địa chỉ snapshot"}</p>
+              {order.shipping.note ? <p className="mt-2 text-xs text-bv-text-muted border-t border-bv-ink/8 pt-2">Ghi chú: {order.shipping.note}</p> : null}
             </div>
           </section>
 
-          <section className="rounded-2xl border border-white/10 bg-slate-950/72 p-5 shadow-[0_24px_90px_rgba(0,0,0,0.34)] backdrop-blur-2xl">
-            <h2 className="inline-flex items-center gap-2 text-xl font-black text-white">
-              <CalendarClock className="h-5 w-5 text-[#F2C14E]" aria-hidden="true" />
-              Buyer
+          <section className="rounded-3xl border border-bv-ink/10 bg-white p-6 shadow-sm">
+            <h2 className="inline-flex items-center gap-2 text-xl font-black text-bv-ink">
+              <CalendarClock className="h-5 w-5 text-bv-primary" aria-hidden="true" />
+              Người mua
             </h2>
-            <p className="mt-4 font-black text-white">{order.buyer.name}</p>
-            <p className="mt-1 text-sm text-zinc-400">{order.buyer.email ?? order.buyer.id}</p>
+            <p className="mt-4 font-black text-bv-ink">{order.buyer.name}</p>
+            <p className="mt-1 text-sm text-bv-text-muted">{order.buyer.email ?? order.buyer.id}</p>
           </section>
         </aside>
       </section>

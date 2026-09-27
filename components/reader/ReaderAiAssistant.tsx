@@ -6,7 +6,7 @@ import {
   askReaderRag,
   type ReaderRagActionResult,
 } from "@/actions/ai-reader-rag.actions";
-import { READER_RAG_NOT_FOUND } from "@/lib/reader-rag";
+import { createClientId } from "@/lib/client-id";
 
 export type ReaderSelectionAiMode = "EXPLAIN" | "SUMMARIZE" | "QUIZ";
 
@@ -51,7 +51,7 @@ function buildSelectionPrompt(request: ReaderSelectionAiRequest): {
   }
 
   return {
-    label: "AI giải thích đoạn đã chọn",
+    label: "Giải thích đoạn đã chọn",
     query: `Giải thích đoạn này bằng ngôn ngữ ngắn gọn, dễ hiểu. Đoạn được chọn: "${selectedText}"`,
   };
 }
@@ -80,7 +80,7 @@ function renderAnswerWithCitationBadges(
     return (
       <button
         aria-label={`Đi tới ${part.replace(/[[\]]/gu, "")}${citation?.chapterTitle ? `, ${citation.chapterTitle}` : ""}`}
-        className="mx-1 inline-flex min-h-11 cursor-pointer items-center gap-1 rounded-full border border-[#D6A84F]/45 bg-[#D6A84F]/15 px-2.5 py-1 align-middle text-xs font-black text-[#F7D98A] transition hover:bg-[#D6A84F]/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F2C14E]"
+        className="mx-1 inline-flex min-h-11 cursor-pointer items-center gap-1 rounded-full border border-[#D6A84F]/45 bg-[#D6A84F]/15 px-2.5 py-1 align-middle text-xs font-black text-[#F7D98A] transition hover:bg-[#D6A84F]/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bv-gold"
         key={`${message.id}-citation-${index}`}
         onClick={() => onCitationNavigate(chapterNumber, pageNumber)}
         title={citation?.chapterTitle ?? `Chương ${chapterNumber}`}
@@ -110,7 +110,7 @@ export function ReaderAiAssistant({
       const cleanQuery = ragQuery.replace(/\s+/gu, " ").trim();
       if (cleanQuery.length < 2 || isLoading) return;
 
-      const requestId = crypto.randomUUID();
+      const requestId = createClientId("reader");
       setMessages((items) => [
         ...items,
         {
@@ -135,13 +135,13 @@ export function ReaderAiAssistant({
         ]);
 
         if (!result.success) {
-          setError(result.error ?? "Trợ lý AI chưa thể trả lời câu hỏi.");
+          setError(result.error ?? "Nova chưa thể trả lời câu hỏi.");
         }
       } catch (caughtError: unknown) {
         const message =
           caughtError instanceof Error
             ? caughtError.message
-            : "Không thể kết nối Trợ lý AI Đọc Sách.";
+            : "Không thể kết nối Nova đọc sách.";
         setError(message);
       } finally {
         setIsLoading(false);
@@ -174,12 +174,12 @@ export function ReaderAiAssistant({
   return (
     <section aria-labelledby="reader-ai-title" className="min-w-0">
       <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#0F766E]/30 text-[#7DD3C7]">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-bv-focus/30 text-[#7DD3C7]">
           <Bot className="h-5 w-5" aria-hidden="true" />
         </span>
         <div>
           <h2 className="text-base font-black text-zinc-50" id="reader-ai-title">
-            Trợ lý AI Đọc Sách
+            Nova đọc sách
           </h2>
           <p className="mt-1 text-xs leading-5 text-zinc-400">
             Chỉ trả lời từ nội dung được phép đọc và luôn kiểm tra nguồn trích dẫn.
@@ -201,7 +201,7 @@ export function ReaderAiAssistant({
                 "Tạo câu hỏi ôn tập cho chương này.",
               ].map((suggestion) => (
                 <button
-                  className="min-h-11 cursor-pointer rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-left text-xs font-bold transition hover:bg-white/[0.09] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F2C14E]"
+                  className="min-h-11 cursor-pointer rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-left text-xs font-bold transition hover:bg-white/[0.09] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bv-gold"
                   key={suggestion}
                   onClick={() => void sendQuery(suggestion)}
                   type="button"
@@ -217,7 +217,7 @@ export function ReaderAiAssistant({
           <article
             className={
               message.role === "USER"
-                ? "ml-6 rounded-xl bg-[#0F766E] px-3 py-2.5 text-sm leading-6 text-white"
+                ? "ml-6 rounded-xl bg-bv-focus px-3 py-2.5 text-sm leading-6 text-white"
                 : "mr-2 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-3 text-sm leading-7 text-zinc-200"
             }
             key={message.id}
@@ -225,7 +225,7 @@ export function ReaderAiAssistant({
             {message.role === "ASSISTANT" ? (
               <p className="mb-2 flex items-center gap-1.5 text-xs font-black text-[#7DD3C7]">
                 <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-                Nội dung do AI hỗ trợ
+                Nội dung do Nova hỗ trợ
               </p>
             ) : null}
             <p className="whitespace-pre-line">
@@ -237,9 +237,9 @@ export function ReaderAiAssistant({
               <p className="mt-2 flex items-center gap-1.5 border-t border-white/10 pt-2 text-[11px] text-zinc-400">
                 <BookOpenCheck className="h-3.5 w-3.5" aria-hidden="true" />
                 {message.result.provider === "local"
-                  ? "Local grounded RAG"
-                  : message.result.provider}{" "}
-                · {message.result.retrievedChunkCount} đoạn nguồn ·{" "}
+                  ? "Trích từ nội dung sách"
+                  : "Nova hỗ trợ đọc sách"}{" "}
+                · Dựa trên {message.result.retrievedChunkCount} đoạn trong sách ·{" "}
                 {message.result.access === "FULL" ? "Toàn văn" : "Bản đọc thử"}
               </p>
             ) : null}
@@ -249,7 +249,7 @@ export function ReaderAiAssistant({
         {isLoading ? (
           <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-3 py-3 text-sm text-zinc-300">
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            Đang truy xuất đoạn liên quan và kiểm tra citation…
+            Đang tìm nội dung liên quan trong sách…
           </div>
         ) : null}
       </div>
@@ -274,7 +274,7 @@ export function ReaderAiAssistant({
           value={query}
         />
         <button
-          className="flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#D6A84F] px-4 text-sm font-black text-slate-950 transition hover:bg-[#F2C14E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-55"
+          className="flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#D6A84F] px-4 text-sm font-black text-slate-950 transition hover:bg-bv-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-55"
           disabled={isLoading || query.trim().length < 2}
           type="submit"
         >
@@ -286,10 +286,6 @@ export function ReaderAiAssistant({
           Gửi câu hỏi
         </button>
       </form>
-
-      <p className="sr-only">
-        Khi không tìm thấy dữ liệu, trợ lý trả lời: {READER_RAG_NOT_FOUND}
-      </p>
     </section>
   );
 }

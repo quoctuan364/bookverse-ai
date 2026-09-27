@@ -8,27 +8,45 @@ export interface AiDiscoveryPrompt {
 export const AI_DISCOVERY_PROMPTS: AiDiscoveryPrompt[] = [
   {
     id: "learn-ai",
-    label: "Học AI từ số 0",
-    description: "Dễ tiếp cận, ưu tiên sách nền tảng.",
+    label: "Nhập môn trí tuệ nhân tạo",
+    description: "Kiến thức cơ bản dành cho người mới.",
     query: "Tôi muốn học AI từ số 0, hãy gợi ý sách dễ tiếp cận cho người mới.",
   },
   {
     id: "vietnamese-relax",
-    label: "Đọc nhẹ cuối tuần",
-    description: "Sách tiếng Việt, nhịp đọc thư giãn.",
+    label: "Sách dễ đọc",
+    description: "Sách tiếng Việt có nội dung gần gũi.",
     query: "Gợi ý cho tôi sách tiếng Việt nhẹ nhàng để đọc thư giãn cuối tuần.",
   },
   {
     id: "business-budget",
-    label: "Kinh doanh dưới 200K",
-    description: "Thực tế và phù hợp ngân sách.",
+    label: "Kinh doanh dưới 200.000đ",
+    description: "Nội dung thực tế, giá dưới 200.000đ.",
     query: "Tìm sách kinh doanh thực tế, dễ áp dụng và có giá dưới 200.000 đồng.",
   },
   {
     id: "mystery",
-    label: "Một cuốn thật cuốn",
-    description: "Trinh thám hoặc câu chuyện nhiều bất ngờ.",
+    label: "Truyện trinh thám",
+    description: "Các vụ án và câu chuyện bất ngờ.",
     query: "Tôi muốn một cuốn trinh thám hoặc tiểu thuyết nhiều bất ngờ, khó đặt xuống.",
+  },
+  {
+    id: "most-read",
+    label: "Đọc nhiều nhất",
+    description: "Nhiều người đang đọc.",
+    query: "Những cuốn sách tiếng Việt nào đang được nhiều người đọc nhất?",
+  },
+  {
+    id: "top-rated",
+    label: "Được đánh giá cao",
+    description: "Nhận nhiều đánh giá tốt từ người đọc.",
+    query: "Những cuốn sách tiếng Việt nào đang được đánh giá cao nhất?",
+  },
+  {
+    id: "best-selling",
+    label: "Bán chạy",
+    description: "Có nhiều đơn hàng đã hoàn tất.",
+    query: "Những cuốn sách tiếng Việt nào đang bán chạy nhất trên BookVerse?",
   },
 ];
 

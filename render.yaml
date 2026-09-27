@@ -1,0 +1,85 @@
+services:
+  - type: web
+    name: bookverse-ai-quoctuan364
+    runtime: node
+    region: singapore
+    plan: free
+    buildCommand: npm ci --include=dev && npx prisma generate && npm run build
+    preDeployCommand: npx prisma migrate deploy
+    startCommand: npm run start:production
+    initialDeployHook: npm run db:seed
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bookverse-ai-database
+          property: connectionString
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: AUTH_TRUST_HOST
+        value: "true"
+      - key: NEXT_PUBLIC_APP_URL
+        value: https://bookverse-ai-quoctuan364.onrender.com
+      - key: AI_SERVICE_URL
+        value: https://bookverse-ai-engine-quoctuan364.onrender.com
+      - key: BOOKVERSE_AI_SERVICE_TOKEN
+        fromService:
+          type: web
+          name: bookverse-ai-engine-quoctuan364
+          envVarKey: BOOKVERSE_AI_SERVICE_TOKEN
+      - key: BOOKVERSE_AI_ALLOWED_ORIGINS
+        value: https://bookverse-ai-quoctuan364.onrender.com
+      - key: BOOKVERSE_CHAT_MOCK_ENABLED
+        value: "false"
+      - key: BOOKVERSE_LLM_PROVIDER
+        value: local
+      - key: BOOKVERSE_SHOW_DEMO_ACCOUNTS
+        value: "true"
+      - key: BOOKVERSE_SHOW_RESET_LINK
+        value: "false"
+      - key: BOOKVERSE_PASSWORD_RESET_WEBHOOK_URL
+        value: https://bookverse-ai-quoctuan364.onrender.com/api/password-reset-disabled
+      - key: BOOKVERSE_PASSWORD_RESET_WEBHOOK_TOKEN
+        generateValue: true
+      - key: INTERACTION_EXPORT_SALT
+        generateValue: true
+
+  - type: web
+    name: bookverse-ai-engine-quoctuan364
+    runtime: docker
+    region: singapore
+    plan: free
+    dockerfilePath: ./ai_service/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "8000"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bookverse-ai-database
+          property: connectionString
+      - key: BOOKVERSE_AI_SERVICE_TOKEN
+        generateValue: true
+      - key: BOOKVERSE_AI_ALLOWED_ORIGINS
+        value: https://bookverse-ai-quoctuan364.onrender.com
+      - key: HYBRID_DYNAMIC_ALPHA
+        value: "false"
+
+databases:
+  - name: bookverse-ai-database
+    databaseName: bookverse_ai
+    user: bookverse_app
+    region: singapore
+    plan: free
+    postgresMajorVersion: "16"

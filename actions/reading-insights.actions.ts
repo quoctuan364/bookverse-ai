@@ -3,6 +3,7 @@
 import prisma from "@/lib/prisma";
 import { requireAuthenticatedUser } from "@/lib/permissions";
 import { normalizeBookCoverUrl } from "@/lib/book-cover";
+import { getVietnameseBookTitle } from "@/lib/book-display-title";
 import { calculateReadingStreaks } from "@/lib/reading-insights-policy";
 import { aggregateCalendarDays } from "@/lib/reading-calendar-policy";
 
@@ -320,15 +321,15 @@ export async function getReadingInsights(): Promise<ReadingInsightsData> {
       achievement("five-books", "Người khám phá", "Bắt đầu đọc 5 cuốn sách.", progress.length, 5),
       achievement("finish-book", "Về đích", "Hoàn thành ít nhất một cuốn.", booksCompleted, 1),
       achievement("streak-7", "Bền bỉ 7 ngày", "Đọc sách 7 ngày liên tiếp.", streaks.longest, 7),
-      achievement("highlight-10", "Đọc có chiều sâu", "Tạo 10 highlight.", highlightCount, 10),
-      achievement("bookmark-10", "Người sưu tầm", "Lưu 10 bookmark.", bookmarkCount, 10),
+      achievement("highlight-10", "Đọc có chiều sâu", "Tạo 10 đoạn tô sáng.", highlightCount, 10),
+      achievement("bookmark-10", "Người sưu tầm", "Lưu 10 đánh dấu trang.", bookmarkCount, 10),
       achievement("favorite-10", "Tủ sách cá nhân", "Yêu thích 10 cuốn sách.", favoriteCount, 10),
       achievement("minutes-600", "Mười giờ tri thức", "Tích lũy 600 phút đọc.", totalMinutes, 600),
     ],
     favoriteCategories,
     recentBooks: progress.slice(0, 6).map((item) => ({
       id: item.book.id,
-      title: item.book.title,
+      title: getVietnameseBookTitle(item.book.id, item.book.title),
       author: item.book.authorName,
       coverImage: normalizeBookCoverUrl(item.book.coverPath),
       progressPercent: item.progressPercent,

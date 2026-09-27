@@ -1,4 +1,5 @@
 import realCoverSourceManifest from "@/config/real-cover-sources.json";
+import localCoverPaths from "@/config/local-cover-paths.json";
 import { isUsableCoverDimensions } from "@/lib/cover-policy";
 
 export type BookCoverSourceKind = "EMPTY" | "LOCAL" | "REMOTE" | "INVALID";
@@ -12,27 +13,6 @@ export type BookCoverAuditStatus =
   | "LOAD_FAILED"
   | "HTTP_404"
   | "NOT_VERIFIED";
-
-export type DemoCoverArt =
-  | "technology"
-  | "business"
-  | "literature"
-  | "history"
-  | "health"
-  | "language"
-  | "science"
-  | "travel";
-
-export const DEMO_COVER_ART: readonly DemoCoverArt[] = [
-  "technology",
-  "business",
-  "literature",
-  "history",
-  "health",
-  "language",
-  "science",
-  "travel",
-] as const;
 
 function hasUnsafePathSegment(value: string): boolean {
   return value.split("/").some((segment) => segment === ".." || segment === ".");
@@ -95,6 +75,59 @@ export function getRealCatalogNormalizedCoverPath(bookId: string): string | null
     : null;
 }
 
+// Bộ bìa JPG do người dùng cung cấp. Tên file giữ ISBN để dễ đối chiếu
+// đúng sách khi demo và không ghi đè lên bộ ảnh cũ trong public/covers.
+const userDemoCoverFiles: Record<string, string> = {
+  B001: "b001-9780134610993.jpg",
+  B002: "b002-9783319296579.jpg",
+  B003: "b003-9781492056355.jpg",
+  B004: "b004-9781492051725.jpg",
+  B005: "b005-9781449373320.jpg",
+  B006: "b006-9781098104030.jpg",
+  B007: "b007-9780307887894.jpg",
+  B008: "b008-9781451686586.jpg",
+  B009: "b009-9780465050659.jpg",
+  B010: "b010-9780735211292.jpg",
+  B011: "b011-9780857197689.jpg",
+  B012: "b012-9780374533557.jpg",
+  B013: "b013-9780061122415.jpg",
+  B014: "b014-9781400062751.jpg",
+  B015: "b015-9780804139298.jpg",
+  B016: "b016-9781098125974.jpg",
+  B017: "b017-9781119002253.jpg",
+  B018: "b018-9780321884497.jpg",
+  B019: "b019-9780099505693.jpg",
+  B020: "b020-9780132350884.jpg",
+};
+
+/** Ưu tiên bộ bìa mới mà người dùng cung cấp cho 20 sách demo. */
+export function getUserDemoCoverPath(bookId: string): string | null {
+  const fileName = userDemoCoverFiles[bookId.toUpperCase()];
+  return fileName ? `/covers-user/curated-real/${fileName}` : null;
+}
+
+/**
+ * Bxxxx và RBxxxxx thuộc hai dataset khác nhau. Không suy bìa sách từ phần
+ * số trùng nhau vì sẽ gắn bìa của một đầu sách khác vào dữ liệu cũ.
+ */
+function normalizeUserCatalogCoverId(bookId: string): string | null {
+  const normalized = bookId.trim().toUpperCase();
+  if (/^RB\d{5}$/.test(normalized)) return normalized;
+
+  return null;
+}
+
+/** Bìa catalog mới; ảnh lỗi sẽ tự chuyển sang bản chuẩn hóa rồi URL từ database. */
+export function getUserRealCatalogCoverPath(bookId: string): string | null {
+  const coverId = normalizeUserCatalogCoverId(bookId);
+  return coverId ? (localCoverPaths as Record<string, string>)[coverId] ?? null : null;
+}
+
+export function getUserRealCatalogNormalizedCoverPath(bookId: string): string | null {
+  const coverId = normalizeUserCatalogCoverId(bookId);
+  return coverId ? `/covers-user/real-catalog-local-normalized/${coverId}.jpg` : null;
+}
+
 /**
  * Bìa BookVerse edition được thiết kế lại riêng cho từng đầu sách.
  * Nếu file chưa tồn tại, component sẽ tự chuyển sang artwork BookVerse theo thể loại.
@@ -104,9 +137,8 @@ export function getBookVerseEditionCoverPath(bookId: string): string | null {
 }
 
 /**
- * Chỉ loại các nguồn placeholder từ xa hoặc PNG thử nghiệm cũ.
- * Bộ SVG `covers/flat` và `covers/3d` là asset gốc đi kèm dataset 2.200 sách,
- * nên phải được giữ và hiển thị đúng theo `cover_url`.
+ * Nhận diện toàn bộ bìa tổng hợp/minh họa để chúng không xuất hiện trên UI.
+ * File nguồn vẫn được giữ nguyên; policy này chỉ ngăn dùng chúng làm bìa thật.
  */
 export function isLegacySyntheticCover(value?: string | null): boolean {
   const normalized = normalizeBookCoverUrl(value)?.toLowerCase();
@@ -117,6 +149,10 @@ export function isLegacySyntheticCover(value?: string | null): boolean {
   return (
     /\/covers\/b\d{3}\.png(?:\?|$)/.test(normalized) ||
     /\/data\/demo\/covers\/b\d{3}\.png(?:\?|$)/.test(normalized) ||
+    normalized.includes("/covers/flat/") ||
+    normalized.includes("/covers/3d/") ||
+    normalized.includes("/covers/demo-art-v2/") ||
+    normalized.includes("/covers/bookverse-editions/") ||
     normalized.includes("picsum.photos")
   );
 }
@@ -148,16 +184,6 @@ export function isUsableBookCoverDimensions(width: number, height: number): bool
   return isUsableCoverDimensions(width, height);
 }
 
-/** FNV-1a 32-bit: cùng bookId luôn cho cùng layout/artwork trên mọi trang. */
-export function stableBookCoverSeed(bookId: string): number {
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < bookId.length; index += 1) {
-    hash ^= bookId.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return hash >>> 0;
-}
-
 export function sanitizeFallbackTitle(title: string): string {
   return title.replace(/\s*#\d{3,}\b/gu, "").replace(/\s{2,}/g, " ").trim() || "Sách chưa có tiêu đề";
 }
@@ -169,32 +195,6 @@ export function sanitizeFallbackAuthor(author?: string | null): string {
     .replace(/\s+\d{4,}(?=\s*,|\s*$)/gu, "")
     .replace(/\s{2,}/g, " ")
     .trim();
-}
-
-export function getDemoCoverArt(input: {
-  bookId: string;
-  title: string;
-  category?: string | null;
-}): DemoCoverArt {
-  // Artwork phải bất biến theo bookId. Category/title có thể được hydrate khác nhau giữa
-  // Home, Catalog và Detail; dùng chúng làm seed sẽ làm cùng một Book đổi bìa giữa các trang.
-  // Giữ input title/category để API tương thích, nhưng không dùng chúng để chọn artwork.
-  void input.title;
-  void input.category;
-  return DEMO_COVER_ART[stableBookCoverSeed(input.bookId) % DEMO_COVER_ART.length];
-}
-
-/** Asset minh họa nội bộ dùng khi sách chưa có bìa nhà xuất bản hợp lệ. */
-export function getDemoCoverArtPath(input: {
-  bookId: string;
-  title: string;
-  category?: string | null;
-}): string {
-  return `/covers/demo-art-v2/${getDemoCoverArt(input)}.webp`;
-}
-
-export function getDemoCoverLayout(bookId: string): number {
-  return stableBookCoverSeed(bookId) % 6;
 }
 
 export interface BookCoverLoadState {
@@ -257,7 +257,7 @@ export function bookCoverLoadReducer(
     return {
       ...state,
       settled: true,
-      status: state.normalizedSource?.includes("/covers/real-catalog-local-normalized/")
+      status: state.normalizedSource?.includes("/real-catalog-local-normalized/")
         ? "VALID_LOCAL_NORMALIZED"
         : state.normalizedSource?.startsWith("/")
           ? "LOCAL_VALID"

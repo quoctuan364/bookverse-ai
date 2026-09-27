@@ -423,7 +423,7 @@ function pageParagraphs(input: {
       `Bây giờ hãy chuyển từ phân tích sang thực hành: ${action}. Sản phẩm nhỏ này nên hoàn thành trong thời gian ngắn để người đọc nhận phản hồi sớm thay vì chỉ tích lũy thêm lý thuyết.`,
       `Khi thực hiện, hãy dùng ${concept} làm tiêu chí chính và ${secondConcept} làm tiêu chí kiểm tra chéo. Nếu hai tiêu chí dẫn tới lựa chọn khác nhau, ghi lại lý do thay vì vội ép chúng thành một đáp án.`,
       `Một kết quả hữu ích cần trả lời được ba câu hỏi: điều gì đã làm, dựa trên bằng chứng nào và giới hạn nằm ở đâu. Cách trình bày này phù hợp cả khi kết quả thành công lẫn khi thử nghiệm không như dự kiến.`,
-      `Bạn có thể dùng chức năng tìm kiếm trong Reader với từ khóa “bằng chứng”, “giới hạn” hoặc tên khái niệm. Việc quay lại các trang trước giúp kiểm tra tính nhất quán của lập luận trong toàn chương.`,
+      `Bạn có thể tìm trong nội dung sách với từ khóa “bằng chứng”, “giới hạn” hoặc tên khái niệm. Việc quay lại các trang trước giúp kiểm tra tính nhất quán của lập luận trong toàn chương.`,
     ];
   }
 
@@ -466,4 +466,3 @@ export function buildDemoBookPages(
     });
   });
 }
-

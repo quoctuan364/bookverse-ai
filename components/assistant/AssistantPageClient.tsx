@@ -10,18 +10,16 @@ import {
   useTransition,
 } from "react";
 import {
-  AlertTriangle,
   Bot,
-  BrainCircuit,
-  CheckCircle2,
+  ChevronRight,
   History,
-  LibraryBig,
   Loader2,
   MessageSquareText,
+  PanelLeft,
+  PanelLeftClose,
   Pencil,
   Plus,
   Save,
-  Search,
   Send,
   ShieldCheck,
   Sparkles,
@@ -36,13 +34,18 @@ import {
   renameMyAssistantSession,
   type AssistantHistorySession,
 } from "@/actions/assistant-history.actions";
+import type { AssistantBookSuggestion } from "@/actions/assistant.actions";
 import { BookCover } from "@/components/shared/BookCover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AI_DISCOVERY_PROMPTS } from "@/lib/ai-discovery-prompts";
 import { ASSISTANT_STORE_QUICK_QUESTIONS } from "@/lib/assistant-knowledge";
-import { MAX_ASSISTANT_MESSAGE_LENGTH, type AssistantSuccessResponse } from "@/lib/assistant-contract";
-import { requestAssistant, submitAssistantFeedback } from "@/lib/assistant-client";
+import {
+  MAX_ASSISTANT_MESSAGE_LENGTH,
+  type AssistantSuccessResponse,
+} from "@/lib/assistant-contract";
+import { requestAssistant, selectAssistantContextQuery, submitAssistantFeedback } from "@/lib/assistant-client";
+import { createClientId } from "@/lib/client-id";
 import { cn } from "@/lib/utils";
 
 interface UiMessage {
@@ -54,23 +57,21 @@ interface UiMessage {
   isError?: boolean;
 }
 
-const welcomeMessage: UiMessage = {
-  id: "assistant-welcome",
-  role: "assistant",
-  content:
-    "Xin chào! Mình có thể tìm sách và giải đáp về hội viên, thanh toán Sandbox, đọc Ebook, đơn hàng, chợ sách, tài khoản hoặc chính sách BookVerse. Khi bạn đăng nhập, mình chỉ tra cứu dữ liệu thuộc chính tài khoản của bạn.",
-};
-
 interface AssistantPageClientProps {
   initialQuery: string;
   history: AssistantHistorySession[];
+  runtimeMode: "external" | "local";
+  starterBooks: AssistantBookSuggestion[];
 }
 
 export function AssistantPageClient({
   initialQuery,
   history,
+  runtimeMode,
+  starterBooks,
 }: AssistantPageClientProps) {
-  const [messages, setMessages] = useState<UiMessage[]>([welcomeMessage]);
+  // Bắt đầu với mảng rỗng để hiển thị Empty State sạch sẽ chuẩn ChatGPT
+  const [messages, setMessages] = useState<UiMessage[]>([]);
   const [inputValue, setInputValue] = useState(initialQuery);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
@@ -80,13 +81,33 @@ export function AssistantPageClient({
   const [editingTitle, setEditingTitle] = useState("");
   const [historyMessage, setHistoryMessage] = useState<string | null>(null);
   const [isHistoryPending, startHistoryTransition] = useTransition();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
   const initialSentRef = useRef(false);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const scrollToBottom = useCallback(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({
+        top: scrollContainerRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    // Không tự cuộn trang ở empty state, đặc biệt trên mobile.
+    if (messages.length === 0 && !isSending) return;
+    scrollToBottom();
+  }, [messages, isSending, scrollToBottom]);
 
   function startNewConversation() {
-    setMessages([welcomeMessage]);
+    setMessages([]);
     setSessionId(null);
     setInputValue("");
     setFeedbackError(null);
+    setIsMobileSidebarOpen(false);
   }
 
   function openHistorySession(session: AssistantHistorySession) {
@@ -97,11 +118,12 @@ export function AssistantPageClient({
             role: message.role,
             content: message.content,
           }))
-        : [welcomeMessage],
+        : [],
     );
     setSessionId(session.id);
     setInputValue("");
     setFeedbackError(null);
+    setIsMobileSidebarOpen(false);
   }
 
   function beginRename(session: AssistantHistorySession) {
@@ -149,23 +171,27 @@ export function AssistantPageClient({
   }
 
   const sendMessage = useCallback(
-    async (rawMessage: string) => {
+    async (rawMessage: string, focusedBookId?: string) => {
       const message = rawMessage.trim();
       if (!message || isSending) return;
+
       setMessages((current) => [
         ...current,
-        { id: `user-${crypto.randomUUID()}`, role: "user", content: message },
+        { id: createClientId("user"), role: "user", content: message },
       ]);
       setInputValue("");
       setFeedbackError(null);
       setIsSending(true);
+
       try {
-        const response = await requestAssistant(message, sessionId);
+        const contextBooks = [...messages].reverse().find((item) => item.response)?.response?.validatedBooks ?? [];
+        const contextQuery = selectAssistantContextQuery(messages);
+        const response = await requestAssistant(message, sessionId, contextBooks.map((book) => book.id), focusedBookId, contextQuery);
         setSessionId(response.sessionId);
         setMessages((current) => [
           ...current,
           {
-            id: `assistant-${crypto.randomUUID()}`,
+            id: createClientId("assistant"),
             role: "assistant",
             content: response.answer,
             response,
@@ -179,7 +205,7 @@ export function AssistantPageClient({
         setMessages((current) => [
           ...current,
           {
-            id: `assistant-error-${crypto.randomUUID()}`,
+            id: createClientId("assistant-error"),
             role: "assistant",
             content: messageText,
             isError: true,
@@ -189,7 +215,7 @@ export function AssistantPageClient({
         setIsSending(false);
       }
     },
-    [isSending, sessionId],
+    [isSending, sessionId, messages],
   );
 
   useEffect(() => {
@@ -223,391 +249,536 @@ export function AssistantPageClient({
           item.id === message.id ? { ...item, feedback: undefined } : item,
         ),
       );
-      setFeedbackError(error instanceof Error ? error.message : "Không thể lưu feedback.");
+      setFeedbackError(error instanceof Error ? error.message : "Không thể lưu phản hồi.");
     }
   }
 
-  const latestResponse = [...messages]
-    .reverse()
-    .find((message) => message.response)?.response;
+  const isConversationEmpty = messages.length === 0;
 
   return (
-    <main className="bv-page">
-      <section className="bv-hero">
-        <div className="mx-auto grid w-full max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_0.9fr] lg:items-end lg:px-8 lg:py-14">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold">
-              <BrainCircuit className="h-4 w-4 text-[#F2C14E]" aria-hidden="true" />
-              AI Book Discovery
+    <div className="bv-assistant-page relative flex h-[calc(100dvh-72px)] w-full overflow-hidden bg-[#FAF8F2] text-bv-ink">
+      {/* Hidden heading for SEO & E2E smoke tests */}
+      <h2 className="sr-only">Hỏi trợ lý</h2>
+
+      {/* MOBILE SIDEBAR OVERLAY */}
+      {isMobileSidebarOpen ? (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs lg:hidden"
+          onClick={() => setIsMobileSidebarOpen(false)}
+        />
+      ) : null}
+
+      {/* SIDEBAR (CỘT TRÁI - 260px) */}
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-bv-ink/10 bg-[#F4EFE6] transition-transform duration-300 ease-in-out lg:static lg:w-[260px] lg:translate-x-0",
+          isSidebarOpen ? "lg:flex" : "lg:hidden",
+          isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+        )}
+      >
+        {/* Top Header Sidebar */}
+        <div className="flex items-center justify-between border-b border-bv-ink/10 px-4 py-3.5">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-bv-primary text-white shadow-xs">
+              <Bot className="h-4 w-4" />
             </div>
-            <h1 className="bv-editorial mt-4 max-w-3xl text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
-              Tìm đúng sách bằng một cuộc trò chuyện
-            </h1>
-            <p className="mt-4 max-w-3xl text-base leading-7 text-[#EAF5F1]">
-              Hỏi về sách, quyền hội viên, tiến độ đọc, đơn hàng hoặc cách sử dụng
-              nhà sách. Trợ lý đối chiếu kho tri thức và dữ liệu BookVerse trước khi trả lời.
-            </p>
+            <div>
+              <span className="text-sm font-black text-bv-heading">Nova</span>
+              <span className="block text-[10px] font-bold text-bv-accent">Trợ lý đọc sách</span>
+            </div>
           </div>
-
-          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-            {[
-              { icon: BrainCircuit, label: "1. Hiểu ý định", text: "Sách, hội viên, đơn hay hỗ trợ" },
-              { icon: LibraryBig, label: "2. Truy xuất dữ liệu", text: "Tri thức nhà sách + catalog RAG" },
-              { icon: ShieldCheck, label: "3. Trả lời có căn cứ", text: "Không đoán quyền, đơn hoặc sách" },
-            ].map((step) => {
-              const Icon = step.icon;
-              return (
-                <article
-                  className="rounded-xl border border-white/18 bg-white/10 p-4 shadow-[0_12px_30px_rgba(0,0,0,0.12)] backdrop-blur"
-                  key={step.label}
-                >
-                  <Icon className="h-5 w-5 text-[#F5D98B]" aria-hidden="true" />
-                  <h2 className="mt-3 text-sm font-black text-white">{step.label}</h2>
-                  <p className="mt-1 text-xs leading-5 text-[#D9EEEA]">{step.text}</p>
-                </article>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[360px_1fr] lg:px-8">
-        <aside className="bv-card h-fit rounded-lg p-5 lg:sticky lg:top-24">
-          <h2 className="text-xl font-black text-[#17202A]">Hỏi trợ lý</h2>
           <button
-            className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#176B62]/20 bg-white px-3 text-sm font-black text-[#176B62] transition hover:bg-[#EDF8F5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#176B62]"
-            onClick={startNewConversation}
+            aria-label="Đóng thanh bên"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-bv-text-muted hover:bg-black/5 lg:hidden"
+            onClick={() => setIsMobileSidebarOpen(false)}
             type="button"
           >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Cuộc trò chuyện mới
+            <X className="h-4 w-4" />
           </button>
-          <form className="mt-5 space-y-3" onSubmit={handleSubmit}>
-            <div className="relative">
-              <Search
-                aria-hidden="true"
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#66706B]"
-              />
-              <Input
-                aria-describedby="assistant-character-count"
-                aria-label="Câu hỏi cho trợ lý BookVerse"
-                className="pl-10"
-                disabled={isSending}
-                maxLength={MAX_ASSISTANT_MESSAGE_LENGTH}
-                onChange={(event) => setInputValue(event.target.value)}
-                placeholder="Ví dụ: Gói hội viên của tôi còn hạn không?"
-                type="search"
-                value={inputValue}
-              />
-            </div>
-            <p className="text-right text-xs text-[#66706B]" id="assistant-character-count">
-              {inputValue.length}/{MAX_ASSISTANT_MESSAGE_LENGTH}
-            </p>
-            <Button className="w-full gap-2" disabled={isSending || !inputValue.trim()} type="submit">
-              {isSending ? (
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              ) : (
-                <Send className="h-4 w-4" aria-hidden="true" />
-              )}
-              {isSending ? "Đang tư vấn..." : "Gửi câu hỏi"}
-            </Button>
-          </form>
+        </div>
 
-          {historyItems.length > 0 ? (
-            <div className="mt-6 border-t border-[#1D2433]/10 pt-5">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="inline-flex items-center gap-2 text-sm font-black text-[#17202A]">
-                  <History className="h-4 w-4 text-[#C65D43]" aria-hidden="true" />
-                  Lịch sử gần đây
-                </h3>
-                <span className="text-xs font-bold text-[#66706B]">
-                  {historyItems.length} phiên
-                </span>
-              </div>
-              {historyMessage ? (
-                <p className="mt-3 rounded-lg bg-[#EDF8F5] px-3 py-2 text-xs font-bold text-[#176B62]" role="status">
-                  {historyMessage}
-                </p>
-              ) : null}
-              <div className="mt-3 grid max-h-72 gap-2 overflow-y-auto pr-1">
-                {historyItems.map((session) => (
-                  <div
-                    className="rounded-xl border border-[#1D2433]/10 bg-[#F8F6F0] p-2"
-                    key={session.id}
-                  >
-                    {editingSessionId === session.id ? (
-                      <div className="grid gap-2">
-                        <label className="sr-only" htmlFor={`history-title-${session.id}`}>
-                          Tên cuộc trò chuyện
-                        </label>
-                        <input
-                          autoFocus
-                          className="h-11 min-w-0 rounded-lg border border-[#D8D0C2] bg-white px-3 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#176B62]"
-                          disabled={isHistoryPending}
-                          id={`history-title-${session.id}`}
-                          maxLength={80}
-                          minLength={3}
-                          onChange={(event) => setEditingTitle(event.target.value)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") saveHistoryTitle(session.id);
-                            if (event.key === "Escape") setEditingSessionId(null);
-                          }}
-                          value={editingTitle}
-                        />
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            aria-label="Lưu tên cuộc trò chuyện"
-                            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#176B62] px-3 text-xs font-black text-white transition hover:bg-[#104C47] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#176B62]"
-                            disabled={isHistoryPending}
-                            onClick={() => saveHistoryTitle(session.id)}
-                            type="button"
-                          >
-                            {isHistoryPending ? (
-                              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                            ) : (
-                              <Save className="h-4 w-4" aria-hidden="true" />
-                            )}
-                            Lưu
-                          </button>
-                          <button
-                            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#D8D0C2] bg-white px-3 text-xs font-black text-[#17202A] transition hover:bg-[#F1EDE4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#176B62]"
-                            disabled={isHistoryPending}
-                            onClick={() => setEditingSessionId(null)}
-                            type="button"
-                          >
-                            <X className="h-4 w-4" aria-hidden="true" />
-                            Hủy
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-[1fr_44px_44px] gap-1">
-                        <button
-                          aria-label={`Mở cuộc trò chuyện: ${session.title}`}
-                          className="min-h-11 min-w-0 rounded-lg px-2 py-1 text-left transition hover:bg-[#EAF5F1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#176B62]"
-                          onClick={() => openHistorySession(session)}
-                          type="button"
-                        >
-                          <span className="flex items-start gap-2">
-                            <MessageSquareText
-                              className="mt-0.5 h-4 w-4 shrink-0 text-[#176B62]"
-                              aria-hidden="true"
-                            />
-                            <span className="min-w-0">
-                              <span className="line-clamp-2 block text-sm font-black leading-5 text-[#17202A]">
-                                {session.title}
-                              </span>
-                              <span className="mt-1 block text-xs text-[#66706B]">
-                                {new Intl.DateTimeFormat("vi-VN", {
-                                  day: "2-digit",
-                                  month: "2-digit",
-                                  year: "numeric",
-                                }).format(new Date(session.updatedAt))}
-                              </span>
-                            </span>
-                          </span>
-                        </button>
-                        <button
-                          aria-label={`Đổi tên cuộc trò chuyện: ${session.title}`}
-                          className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-[#176B62] transition hover:bg-[#EAF5F1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#176B62]"
-                          disabled={isHistoryPending}
-                          onClick={() => beginRename(session)}
-                          title="Đổi tên"
-                          type="button"
-                        >
-                          <Pencil className="h-4 w-4" aria-hidden="true" />
-                        </button>
-                        <button
-                          aria-label={`Xóa cuộc trò chuyện: ${session.title}`}
-                          className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-red-700 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600"
-                          disabled={isHistoryPending}
-                          onClick={() => deleteHistorySession(session)}
-                          title="Xóa"
-                          type="button"
-                        >
-                          <Trash2 className="h-4 w-4" aria-hidden="true" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+        {/* New Chat Button */}
+        <div className="p-3">
+          <Button
+            className="w-full justify-start gap-2.5 rounded-xl border border-bv-primary/25 bg-white py-2.5 text-sm font-black text-bv-primary shadow-xs hover:border-bv-primary hover:bg-[#EBF6F3]"
+            onClick={startNewConversation}
+            type="button"
+            variant="outline"
+          >
+            <Plus className="h-4 w-4" />
+            Cuộc trò chuyện mới
+          </Button>
+        </div>
+
+        {/* History List */}
+        <div className="bv-scrollbar flex-1 overflow-y-auto px-3 py-1">
+          <div className="mb-2 flex items-center justify-between px-1">
+            <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-bv-text-muted">
+              <History className="h-3.5 w-3.5" />
+              Lịch sử hội thoại
+            </span>
+            <span className="text-[11px] font-bold text-bv-text-muted">
+              {historyItems.length}/8
+            </span>
+          </div>
+
+          {historyMessage ? (
+            <p className="mb-2 rounded-lg bg-[#EBF6F3] p-2 text-xs font-bold text-bv-primary" role="status">
+              {historyMessage}
+            </p>
           ) : null}
 
-          <div className="mt-6 border-t border-[#1D2433]/10 pt-5">
-            <h3 className="inline-flex items-center gap-2 text-sm font-black text-[#17202A]">
-              <Sparkles className="h-4 w-4 text-[#C65D43]" aria-hidden="true" />
-              Chọn nhanh một kiểu đọc
-            </h3>
-            <div className="mt-3 grid gap-2">
-              {ASSISTANT_STORE_QUICK_QUESTIONS.map((question) => (
+          {historyItems.length === 0 ? (
+            <div className="py-6 text-center text-xs text-bv-text-muted">
+              Chưa có phiên lưu trước đó
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {historyItems.map((session) => {
+                const isActive = sessionId === session.id;
+                const isEditing = editingSessionId === session.id;
+
+                if (isEditing) {
+                  return (
+                    <div
+                      className="rounded-xl border border-bv-primary/30 bg-white p-2"
+                      key={session.id}
+                    >
+                      <input
+                        autoFocus
+                        className="h-8 w-full rounded-md border border-bv-border bg-white px-2 text-xs font-bold text-bv-ink focus:outline-none focus:ring-1 focus:ring-bv-primary"
+                        disabled={isHistoryPending}
+                        maxLength={80}
+                        minLength={3}
+                        onChange={(e) => setEditingTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") saveHistoryTitle(session.id);
+                          if (e.key === "Escape") setEditingSessionId(null);
+                        }}
+                        value={editingTitle}
+                      />
+                      <div className="mt-2 flex justify-end gap-2">
+                        <button
+                          aria-label="Lưu tên cuộc trò chuyện"
+                          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md bg-bv-primary px-2 py-1 text-[11px] font-bold text-white hover:bg-bv-primary-dark"
+                          disabled={isHistoryPending}
+                          onClick={() => saveHistoryTitle(session.id)}
+                          type="button"
+                        >
+                          <Save className="h-3 w-3" />
+                        </button>
+                        <button
+                          aria-label="Hủy đổi tên cuộc trò chuyện"
+                          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-bv-border px-2 py-1 text-[11px] font-bold text-bv-text-muted hover:bg-black/5"
+                          disabled={isHistoryPending}
+                          onClick={() => setEditingSessionId(null)}
+                          type="button"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div
+                    className={cn(
+                      "group flex items-center justify-between rounded-xl px-2.5 py-2 text-xs transition duration-150",
+                      isActive
+                        ? "bg-white font-bold text-bv-primary shadow-xs border border-bv-primary/20"
+                        : "text-bv-ink hover:bg-black/5",
+                    )}
+                    key={session.id}
+                  >
+                    <button
+                      aria-label={`Mở cuộc trò chuyện: ${session.title}`}
+                      className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left"
+                      onClick={() => openHistorySession(session)}
+                      type="button"
+                    >
+                      <MessageSquareText className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                      <span className="truncate">{session.title}</span>
+                    </button>
+
+                    <div className="flex shrink-0 items-center gap-1 opacity-100 transition-opacity lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100">
+                      <button
+                        aria-label={`Đổi tên cuộc trò chuyện: ${session.title}`}
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-md text-bv-text-muted hover:bg-black/5 hover:text-bv-primary"
+                        disabled={isHistoryPending}
+                        onClick={() => beginRename(session)}
+                        title="Đổi tên"
+                        type="button"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                      <button
+                        aria-label={`Xóa cuộc trò chuyện: ${session.title}`}
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-md text-bv-text-muted hover:bg-red-50 hover:text-red-600"
+                        disabled={isHistoryPending}
+                        onClick={() => deleteHistorySession(session)}
+                        title="Xóa"
+                        type="button"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Quick prompt suggestions in sidebar */}
+          <div className="mt-5 border-t border-bv-ink/10 pt-4">
+            <span className="mb-2 flex items-center gap-1.5 px-1 text-xs font-bold uppercase tracking-wider text-bv-text-muted">
+              <Sparkles className="h-3.5 w-3.5 text-bv-gold" />
+              Chủ đề đọc nhanh
+            </span>
+            <div className="space-y-1">
+              {ASSISTANT_STORE_QUICK_QUESTIONS.slice(0, 3).map((question) => (
                 <button
-                  className="min-h-11 rounded-xl border border-[#176B62]/15 bg-[#EDF8F5] px-3 py-2 text-left transition duration-200 hover:border-[#176B62]/40 hover:bg-[#DFF2ED] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#176B62] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full truncate rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-bv-text-subtle transition hover:bg-black/5 hover:text-bv-primary"
                   disabled={isSending}
                   key={question.id}
                   onClick={() => void sendMessage(question.query)}
                   type="button"
                 >
-                  <span className="block text-sm font-black text-[#176B62]">{question.label}</span>
+                  • {question.label}
                 </button>
               ))}
             </div>
           </div>
+        </div>
 
-          <div className="mt-6 border-t border-[#1D2433]/10 pt-5">
-            <h3 className="inline-flex items-center gap-2 text-sm font-black text-[#17202A]">
-              <Sparkles className="h-4 w-4 text-[#C65D43]" aria-hidden="true" />
-              Gợi ý sách theo nhu cầu
-            </h3>
-            <div className="mt-3 grid gap-2">
-              {AI_DISCOVERY_PROMPTS.map((prompt) => (
-                <button
-                  className="min-h-11 rounded-xl border border-[#1D2433]/10 bg-[#F8F6F0] px-3 py-2 text-left transition duration-200 hover:border-[#176B62]/30 hover:bg-[#EAF5F1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#176B62] disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={isSending}
-                  key={prompt.id}
-                  onClick={() => void sendMessage(prompt.query)}
-                  type="button"
-                >
-                  <span className="block text-sm font-black text-[#1D2433]">{prompt.label}</span>
-                  <span className="mt-0.5 block text-xs leading-5 text-[#687083]">
-                    {prompt.description}
-                  </span>
-                </button>
-              ))}
+        {/* Runtime Mode Footer */}
+        <div className="border-t border-bv-ink/10 p-3 text-[11px] text-bv-text-muted">
+          <div className="flex items-center gap-2 rounded-lg bg-white/70 p-2 border border-bv-ink/5">
+            <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600" />
+            <span className="truncate">
+              {runtimeMode === "external" ? "Thông tin từ BookVerse" : "Tra cứu trong BookVerse"}
+            </span>
+          </div>
+        </div>
+      </aside>
+
+      {/* MAIN CHAT AREA (KHU VỰC CHÍNH) */}
+      <section className="flex flex-1 flex-col overflow-hidden bg-[#FAF8F2]">
+        {/* Top Control Bar */}
+        <header className="flex h-12 shrink-0 items-center justify-between border-b border-bv-ink/10 bg-white/80 px-4 backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            <button
+              aria-label="Ẩn/Hiện thanh bên"
+              className="flex h-11 w-11 items-center justify-center rounded-lg border border-bv-ink/10 text-bv-text-muted transition hover:bg-black/5"
+              onClick={() => {
+                if (window.innerWidth < 1024) {
+                  setIsMobileSidebarOpen(!isMobileSidebarOpen);
+                } else {
+                  setIsSidebarOpen(!isSidebarOpen);
+                }
+              }}
+              type="button"
+            >
+              {isSidebarOpen ? (
+                <PanelLeftClose className="h-4 w-4" />
+              ) : (
+                <PanelLeft className="h-4 w-4" />
+              )}
+            </button>
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm font-black text-bv-heading">
+                Nova · Trợ lý đọc sách
+              </h1>
+              <span className="flex h-2 w-2 rounded-full bg-emerald-500" />
             </div>
           </div>
-          {latestResponse ? (
-            <div
-              className={cn(
-                "mt-4 rounded-lg border px-4 py-3 text-sm",
-                latestResponse.degraded
-                  ? "border-amber-300 bg-amber-50 text-amber-900"
-                  : "border-emerald-200 bg-emerald-50 text-emerald-800",
-              )}
-              role="status"
-            >
-              <div className="flex items-start gap-2">
-                {latestResponse.degraded ? (
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                ) : (
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                )}
-                <span>
-                  {latestResponse.degraded
-                    ? latestResponse.mocked
-                      ? "Development mock đang bật rõ ràng. Không dùng cấu hình này ở production."
-                      : "Chế độ dự phòng từ dữ liệu BookVerse đã xác minh; không phải phản hồi giả."
-                    : `${latestResponse.provider} + ${latestResponse.source}`}
-                </span>
-              </div>
-            </div>
-          ) : null}
-        </aside>
 
-        <section aria-label="Hội thoại với trợ lý" aria-live="polite" className="space-y-5">
-          {messages.map((message) => (
-            <article
-              className={cn(
-                "rounded-lg border p-5 shadow-sm",
-                message.role === "user"
-                  ? "ml-auto max-w-2xl border-[#0F766E]/20 bg-[#EAF2EF]"
-                  : message.isError
-                    ? "border-red-200 bg-red-50"
-                    : "bv-card",
-              )}
-              key={message.id}
+          <div className="flex items-center gap-2">
+            <Button
+              className="gap-1.5 rounded-xl text-xs font-bold lg:hidden"
+              onClick={startNewConversation}
+              size="sm"
+              variant="outline"
             >
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-[#E76F51]">
-                {message.role === "user" ? "Bạn" : "BookVerse Assistant"}
-              </p>
-              <p className="mt-2 whitespace-pre-wrap leading-7 text-[#42524D]">{message.content}</p>
+              <Plus className="h-3.5 w-3.5" />
+              Mới
+            </Button>
+          </div>
+        </header>
 
-              {message.response?.validatedBooks.length ? (
-                <div className="mt-5 grid gap-3 md:grid-cols-2">
-                  {message.response.validatedBooks.map((book) => (
-                    <Link
-                      className="group grid min-h-36 grid-cols-[72px_1fr] gap-3 rounded-xl border border-[#17191F]/10 bg-[#FFFDF8] p-3 transition duration-200 hover:border-[#0F766E]/40 hover:bg-[#F8FCFB] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#176B62]"
-                      href={book.href}
+        {/* Message Stream List */}
+        <div
+          ref={scrollContainerRef}
+          aria-label="Dòng thời gian hội thoại"
+          aria-live="polite"
+          className="bv-scrollbar flex-1 overflow-y-auto px-4 py-6 scroll-smooth"
+        >
+          <div className="mx-auto max-w-3xl space-y-5">
+            {/* EMPTY STATE: 3 BƯỚC RAG + PROMPT CARDS (Hiển thị mờ, tinh tế ở chính giữa khi chưa chat) */}
+            {isConversationEmpty ? (
+              <div className="my-auto py-6 text-center animate-in fade-in zoom-in-95 duration-300">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-bv-primary text-white shadow-md shadow-bv-primary/20">
+                  <Bot className="h-7 w-7" />
+                </div>
+                <h2 className="mt-3.5 text-2xl font-black tracking-tight text-bv-heading sm:text-3xl">
+                  Chào bạn, mình là Nova
+                </h2>
+                <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-bv-text-subtle">
+                  Nova có thể tìm sách, tra cứu đơn hàng, giải đáp về gói hội viên và hỗ trợ bạn đọc sách.
+                </p>
+
+                {/* Gợi ý thật từ catalog để người dùng có thể bắt đầu ngay. */}
+                <p className="mt-6 text-xs font-black uppercase tracking-wider text-bv-text-muted">
+                  3 sách để bắt đầu cùng Nova
+                </p>
+                <div className="mt-2.5 grid gap-3 sm:grid-cols-3">
+                  {starterBooks.map((book) => (
+                    <article
+                      className="overflow-hidden rounded-2xl border border-bv-ink/10 bg-white text-left shadow-xs transition hover:border-bv-primary/40 hover:shadow-md"
                       key={book.id}
                     >
-                      <BookCover
-                        alt={`Bìa sách ${book.title}`}
-                        author={book.author}
-                        bookId={book.id}
-                        className="aspect-[2/3] w-[72px] rounded-lg object-cover shadow-sm"
-                        loading="lazy"
-                        src={null}
-                        title={book.title}
-                        useBookVerseArtwork
-                      />
-                      <span className="min-w-0">
-                        <span className="line-clamp-2 font-black leading-5 text-[#17202A] group-hover:text-[#176B62]">
-                          {book.title}
-                        </span>
-                        <span className="mt-1 block truncate text-sm text-[#66706B]">
-                          {book.author}
-                        </span>
-                        <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-[#EAF5F1] px-2 py-1 text-xs font-semibold text-[#0F766E]">
-                          <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-                          Đã xác minh · {book.score.toFixed(3)}
-                        </span>
-                      </span>
-                    </Link>
+                      <Link className="flex gap-3 p-3" href={`/book/${book.id}`}>
+                        <div className="aspect-[2/3] w-12 shrink-0 overflow-hidden rounded-lg bg-bv-surface">
+                          <BookCover
+                            alt={`Bìa sách ${book.title}`}
+                            author={book.author}
+                            bookId={book.id}
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                            src={book.coverImage}
+                            title={book.title}
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="line-clamp-2 text-xs font-black leading-5 text-bv-heading">
+                            {book.title}
+                          </p>
+                          <p className="mt-1 truncate text-[11px] text-bv-text-muted">
+                            {book.author}
+                          </p>
+                        </div>
+                      </Link>
+                      <button
+                        className="min-h-11 w-full border-t border-bv-ink/10 px-3 text-xs font-black text-bv-primary transition hover:bg-[#EBF6F3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-bv-focus disabled:opacity-50"
+                        disabled={isSending}
+                        onClick={() => void sendMessage(`Tóm tắt nội dung chính của chương đầu cuốn “${book.title}”.`, book.id)}
+                        type="button"
+                      >
+                        Hỏi Nova về nội dung
+                      </button>
+                    </article>
                   ))}
                 </div>
-              ) : null}
 
-              {message.response ? (
-                <div className="mt-4 border-t border-[#17191F]/10 pt-3">
-                  <p className="inline-flex flex-wrap items-center gap-1.5 text-xs text-[#66706B]">
-                    <Bot className="h-3.5 w-3.5 text-[#176B62]" aria-hidden="true" />
-                    Nội dung do AI hỗ trợ · {message.response.provider} ·{" "}
-                    {message.response.source === "vector" ? "Vector RAG" : "Tri thức + Keyword RAG"}
+                {/* Quick Prompts Pills */}
+                <div className="mt-6">
+                  <p className="text-xs font-bold uppercase tracking-wider text-bv-text-muted">
+                    Gợi ý câu hỏi phổ biến
                   </p>
-                  <div className="mt-2 flex items-center gap-2">
-                    <span className="text-xs text-[#66706B]">Phản hồi này hữu ích?</span>
-                    <button
-                      aria-label="Câu trả lời hữu ích"
-                      className={cn(
-                        "inline-flex h-11 w-11 items-center justify-center rounded-full border text-[#66706B] transition duration-200 hover:bg-emerald-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#176B62]",
-                        message.feedback === "HELPFUL" && "border-emerald-400 bg-emerald-50 text-emerald-700",
-                      )}
-                      onClick={() => handleFeedback(message, "HELPFUL")}
-                      type="button"
-                    >
-                      <ThumbsUp className="h-4 w-4" aria-hidden="true" />
-                    </button>
-                    <button
-                      aria-label="Câu trả lời chưa hữu ích"
-                      className={cn(
-                        "inline-flex h-11 w-11 items-center justify-center rounded-full border text-[#66706B] transition duration-200 hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#176B62]",
-                        message.feedback === "NOT_HELPFUL" && "border-red-300 bg-red-50 text-red-700",
-                      )}
-                      onClick={() => handleFeedback(message, "NOT_HELPFUL")}
-                      type="button"
-                    >
-                      <ThumbsDown className="h-4 w-4" aria-hidden="true" />
-                    </button>
+                  <div className="mt-2.5 flex flex-wrap justify-center gap-2">
+                    {AI_DISCOVERY_PROMPTS.map((prompt) => (
+                      <button
+                        className="inline-flex items-center gap-1.5 rounded-full border border-bv-ink/10 bg-white px-3.5 py-1.5 text-xs font-semibold text-bv-ink shadow-xs transition hover:border-bv-primary hover:bg-[#EBF6F3] hover:text-bv-primary"
+                        disabled={isSending}
+                        key={prompt.id}
+                        onClick={() => void sendMessage(prompt.query)}
+                        type="button"
+                      >
+                        <Sparkles className="h-3 w-3 text-bv-gold" />
+                        <span>{prompt.label}</span>
+                        <ChevronRight className="h-3 w-3 opacity-40" />
+                      </button>
+                    ))}
                   </div>
                 </div>
-              ) : null}
-            </article>
-          ))}
+              </div>
+            ) : null}
 
-          {isSending ? (
-            <div className="bv-card inline-flex items-center gap-2 rounded-lg px-4 py-3" role="status">
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              Đang truy xuất catalog và provider...
+            {/* MESSAGES FLOW */}
+            {messages.map((message) => {
+              const isUser = message.role === "user";
+
+              return (
+                <div
+                  className={cn(
+                    "flex w-full animate-in fade-in slide-in-from-bottom-2 duration-300",
+                    isUser ? "justify-end" : "justify-start gap-3",
+                  )}
+                  key={message.id}
+                >
+                  {/* AI Avatar */}
+                  {!isUser ? (
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-bv-primary text-white shadow-xs">
+                      <Bot className="h-4 w-4" />
+                    </div>
+                  ) : null}
+
+                  {/* Bubble */}
+                  <div
+                    className={cn(
+                      "group relative max-w-[88%] sm:max-w-[80%]",
+                      isUser
+                        ? "rounded-2xl rounded-tr-xs bg-bv-primary px-4 py-3 text-white shadow-sm font-medium"
+                        : message.isError
+                          ? "rounded-2xl rounded-tl-xs border border-red-200 bg-red-50 p-4 text-red-800"
+                          : "rounded-2xl rounded-tl-xs border border-bv-ink/10 bg-white p-4 text-bv-ink shadow-xs",
+                    )}
+                  >
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed sm:text-[15px]">
+                      {message.content}
+                    </p>
+
+                    {/* Validated Book Recommendations */}
+                    {message.response?.validatedBooks?.length ? (
+                      <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
+                        {message.response.validatedBooks.map((book) => (
+                          <div key={book.id} className="overflow-hidden rounded-2xl border border-bv-ink/10 bg-[#FAF8F2] shadow-xs transition hover:border-bv-primary/40 hover:shadow-sm">
+                            <Link
+                              className="group/card flex gap-3 p-3 transition hover:bg-[#EBF6F3]"
+                              href={book.href}
+                            >
+                              <div className="aspect-[2/3] w-14 shrink-0 overflow-hidden rounded-lg shadow-xs">
+                                <BookCover
+                                  alt={`Bìa sách ${book.title}`}
+                                  author={book.author}
+                                  bookId={book.id}
+                                  className="h-full w-full object-cover transition duration-200 group-hover/card:scale-105"
+                                  loading="lazy"
+                                  src={null}
+                                  title={book.title}
+                                  useBookVerseArtwork
+                                />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <h4 className="line-clamp-2 text-xs font-black leading-snug text-bv-heading transition group-hover/card:text-bv-primary">
+                                  {book.title}
+                                </h4>
+                                <p className="mt-0.5 truncate text-[11px] text-bv-text-muted">
+                                  {book.author}
+                                </p>
+                                <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                                  <ShieldCheck className="h-3 w-3" />
+                                  Có trong kho sách
+                                </span>
+                              </div>
+                            </Link>
+                            <button
+                              type="button"
+                              disabled={isSending}
+                              className="flex min-h-10 w-full items-center justify-center border-t border-bv-ink/10 px-3 py-2 text-xs font-bold text-bv-primary transition hover:bg-bv-mint disabled:opacity-50"
+                              onClick={() => void sendMessage(`Tóm tắt nội dung chính của chương đầu cuốn “${book.title}”.`, book.id)}
+                            >
+                              Hỏi Nova về nội dung
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {/* Nguồn tham khảo và phản hồi cho câu trả lời */}
+                    {!isUser && message.response ? (
+                      <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2 border-t border-bv-ink/10 pt-2.5 text-[11px] text-bv-text-muted">
+                        <div className="flex items-center gap-1.5">
+                          <ShieldCheck className="h-3.5 w-3.5 text-bv-accent" />
+                          <span>
+                            {message.response.provider === "local"
+                              ? "Thông tin từ BookVerse"
+                              : message.response.provider === "mock" ? "Dữ liệu thử nghiệm" : "Thông tin từ BookVerse"}
+                          </span>
+                        </div>
+
+                        {/* Thumbs Up / Down Feedback */}
+                        <div className="flex items-center gap-1">
+                          <button
+                            aria-label="Câu trả lời hữu ích"
+                            className={cn(
+                              "flex h-7 w-7 items-center justify-center rounded-lg transition hover:bg-emerald-50 hover:text-emerald-700",
+                              message.feedback === "HELPFUL" && "bg-emerald-50 text-emerald-700",
+                            )}
+                            onClick={() => handleFeedback(message, "HELPFUL")}
+                            type="button"
+                          >
+                            <ThumbsUp className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            aria-label="Câu trả lời chưa hữu ích"
+                            className={cn(
+                              "flex h-7 w-7 items-center justify-center rounded-lg transition hover:bg-red-50 hover:text-red-700",
+                              message.feedback === "NOT_HELPFUL" && "bg-red-50 text-red-700",
+                            )}
+                            onClick={() => handleFeedback(message, "NOT_HELPFUL")}
+                            type="button"
+                          >
+                            <ThumbsDown className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Thinking State */}
+            {isSending ? (
+              <div className="flex items-center gap-3 animate-in fade-in duration-200">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-bv-primary text-white shadow-xs">
+                  <Bot className="h-4 w-4" />
+                </div>
+                <div className="flex items-center gap-2 rounded-2xl rounded-tl-xs border border-bv-ink/10 bg-white px-4 py-3 text-xs font-bold text-bv-text-muted shadow-xs">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-bv-primary" />
+                  Nova đang tìm thông tin để trả lời bạn...
+                </div>
+              </div>
+            ) : null}
+
+            {feedbackError ? (
+              <p className="rounded-xl bg-red-50 p-3 text-center text-xs font-bold text-red-700" role="alert">
+                {feedbackError}
+              </p>
+            ) : null}
+          </div>
+        </div>
+
+        {/* FIXED BOTTOM INPUT BOX (Khung gõ câu hỏi cố định đáy màn hình) */}
+        <div className="shrink-0 border-t border-bv-ink/10 bg-white/90 p-3 backdrop-blur-md sm:p-4">
+          <div className="mx-auto max-w-3xl">
+            <form className="relative flex items-center" onSubmit={handleSubmit}>
+              <Input
+                aria-describedby="assistant-character-count"
+                aria-label="Câu hỏi cho trợ lý BookVerse"
+                className="h-12 w-full rounded-2xl border border-bv-ink/20 bg-white pr-14 pl-4 text-sm font-medium text-bv-ink shadow-xs transition placeholder:text-bv-text-muted focus-visible:border-bv-primary focus-visible:ring-2 focus-visible:ring-bv-primary/20"
+                disabled={isSending}
+                maxLength={MAX_ASSISTANT_MESSAGE_LENGTH}
+                onChange={(event) => setInputValue(event.target.value)}
+                placeholder="Ví dụ: Tìm sách nhập môn công nghệ hoặc kiểm tra đơn hàng..."
+                type="text"
+                value={inputValue}
+              />
+
+              <button
+                aria-label="Gửi câu hỏi"
+                className="absolute right-1.5 flex h-9 w-9 items-center justify-center rounded-xl bg-bv-primary text-white shadow-xs transition hover:bg-bv-primary-dark active:scale-95 disabled:cursor-not-allowed disabled:bg-bv-ink/20 disabled:opacity-50"
+                disabled={isSending || !inputValue.trim()}
+                type="submit"
+              >
+                {isSending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </button>
+            </form>
+
+            <div className="mt-2 flex items-center justify-between px-1 text-[11px] text-bv-text-muted">
+              <span>Nova có thể tra cứu sách, giỏ hàng và gói hội viên trong tài khoản của bạn.</span>
+              <span id="assistant-character-count">
+                {inputValue.length}/{MAX_ASSISTANT_MESSAGE_LENGTH}
+              </span>
             </div>
-          ) : null}
-          {feedbackError ? (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
-              {feedbackError}
-            </p>
-          ) : null}
-        </section>
+          </div>
+        </div>
       </section>
-    </main>
+    </div>
   );
 }

@@ -7,6 +7,10 @@ export type RecommendationEvidenceStatus =
   | "INVALID_OWNER"
   | "POPULARITY_FALLBACK"
   | "CATEGORY_FALLBACK"
+  | "TRENDING_FALLBACK"
+  | "NEW_FALLBACK"
+  | "QUALITY_FALLBACK"
+  | "DISCOVERY_FALLBACK"
   | "DEGRADED_PROVIDER";
 
 export interface RecommendationEvidenceProvenance {
@@ -23,8 +27,16 @@ export interface RecommendationEvidenceProvenance {
 }
 
 export interface RecommendationEvidenceDisplay {
-  badgeLabel: "AI gợi ý" | "Sách đang được quan tâm" | "Gợi ý từ danh mục" | "Khám phá thêm";
-  evidenceLabel: "Vì sao:" | "Trạng thái:";
+  badgeLabel:
+    | "Gợi ý cho bạn"
+    | "Sách mới"
+    | "Đang được quan tâm"
+    | "Được đánh giá tốt"
+    | "Khám phá thêm"
+    | "Theo danh mục"
+    | "Theo sở thích"
+    | "Sách khác";
+  evidenceLabel: "Lý do:" | "Thông tin:";
   evidenceText: string;
   hasVerifiedEvidence: boolean;
   status: RecommendationEvidenceStatus;
@@ -72,13 +84,61 @@ export function getRecommendationEvidenceDisplay(input: {
 }): RecommendationEvidenceDisplay {
   const status = input.status ?? getRecommendationEvidenceStatus({ evidence: input.evidence });
   if (status === "VERIFIED_REAL_USER" && input.evidence?.trim()) {
-    return { badgeLabel: "AI gợi ý", evidenceLabel: "Vì sao:", evidenceText: input.evidence.trim(), hasVerifiedEvidence: true, status };
+    return { badgeLabel: "Gợi ý cho bạn", evidenceLabel: "Lý do:", evidenceText: input.evidence.trim(), hasVerifiedEvidence: true, status };
   }
   if (status === "POPULARITY_FALLBACK") {
-    return { badgeLabel: "Sách đang được quan tâm", evidenceLabel: "Trạng thái:", evidenceText: "Xếp hạng theo tín hiệu tổng hợp; chưa có giải thích cá nhân hóa.", hasVerifiedEvidence: false, status };
+    return {
+      badgeLabel: "Sách mới",
+      evidenceLabel: "Thông tin:",
+      evidenceText: "Các sách mới được thêm vào BookVerse.",
+      hasVerifiedEvidence: false,
+      status,
+    };
   }
   if (status === "CATEGORY_FALLBACK") {
-    return { badgeLabel: "Gợi ý từ danh mục", evidenceLabel: "Trạng thái:", evidenceText: "Gợi ý theo danh mục; chưa có bằng chứng cá nhân hóa.", hasVerifiedEvidence: false, status };
+    return {
+      badgeLabel: "Theo sở thích",
+      evidenceLabel: "Lý do:",
+      evidenceText: input.evidence?.trim() || "Dựa trên thể loại bạn đã chọn.",
+      hasVerifiedEvidence: false,
+      status,
+    };
   }
-  return { badgeLabel: "Khám phá thêm", evidenceLabel: "Trạng thái:", evidenceText: "Chưa có bằng chứng cá nhân hóa đã được xác minh.", hasVerifiedEvidence: false, status };
+  if (status === "TRENDING_FALLBACK") {
+    return {
+      badgeLabel: "Đang được quan tâm",
+      evidenceLabel: "Lý do:",
+      evidenceText: input.evidence?.trim() || "Được nhiều độc giả quan tâm gần đây.",
+      hasVerifiedEvidence: false,
+      status,
+    };
+  }
+  if (status === "NEW_FALLBACK") {
+    return {
+      badgeLabel: "Sách mới",
+      evidenceLabel: "Thông tin:",
+      evidenceText: input.evidence?.trim() || "Mới được cập nhật trên BookVerse.",
+      hasVerifiedEvidence: false,
+      status,
+    };
+  }
+  if (status === "QUALITY_FALLBACK") {
+    return {
+      badgeLabel: "Được đánh giá tốt",
+      evidenceLabel: "Lý do:",
+      evidenceText: input.evidence?.trim() || "Nhận được đánh giá tốt từ độc giả.",
+      hasVerifiedEvidence: false,
+      status,
+    };
+  }
+  if (status === "DISCOVERY_FALLBACK") {
+    return {
+      badgeLabel: "Khám phá thêm",
+      evidenceLabel: "Thông tin:",
+      evidenceText: input.evidence?.trim() || "Một lựa chọn khác trong kho sách BookVerse.",
+      hasVerifiedEvidence: false,
+      status,
+    };
+  }
+  return { badgeLabel: "Sách khác", evidenceLabel: "Thông tin:", evidenceText: "Chưa có lý do gợi ý cho cuốn sách này.", hasVerifiedEvidence: false, status };
 }

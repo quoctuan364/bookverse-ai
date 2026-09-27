@@ -7,6 +7,7 @@ import {
 } from "@/lib/assistant-contract";
 import { sanitizeAssistantLog } from "@/lib/assistant-runtime";
 import { AssistantServiceError, runAssistantMessage } from "@/lib/assistant-service";
+import { observeApiRoute, writeServerLog } from "@/lib/observability";
 import { getCurrentUser } from "@/lib/permissions";
 
 function buildStreamResponse(payload: AssistantSuccessResponse): Response {
@@ -45,7 +46,7 @@ function buildStreamResponse(payload: AssistantSuccessResponse): Response {
   });
 }
 
-export async function POST(request: Request) {
+async function handlePost(request: Request): Promise<Response> {
   try {
     const rawPayload: unknown = await request.json().catch(() => null);
     const parsed = parseAssistantRequestPayload(rawPayload);
@@ -71,7 +72,9 @@ export async function POST(request: Request) {
       );
     }
 
-    console.error(`[api/chat] ${sanitizeAssistantLog(error)}`);
+    writeServerLog("error", "api.chat.failed", {
+      error: sanitizeAssistantLog(error),
+    });
     return NextResponse.json(
       createAssistantError(
         "SERVICE_UNAVAILABLE",
@@ -81,4 +84,8 @@ export async function POST(request: Request) {
       { status: 503 },
     );
   }
+}
+
+export async function POST(request: Request): Promise<Response> {
+  return observeApiRoute(request, "api.chat", () => handlePost(request));
 }

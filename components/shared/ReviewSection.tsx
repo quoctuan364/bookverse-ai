@@ -31,14 +31,14 @@ function getRatingStars(rating: number): boolean[] {
 export function ReviewSection({ reviews }: ReviewSectionProps) {
   if (reviews.length === 0) {
     return (
-      <div className="rounded-2xl border border-[#1D2433]/10 bg-[#FFFDF8] p-6 text-sm text-[#687083] shadow-[0_12px_34px_rgba(39,44,51,0.08)]">
+      <div className="rounded-2xl border border-bv-ink/10 bg-bv-ivory p-6 text-sm text-bv-text-subtle shadow-[0_12px_34px_rgba(39,44,51,0.08)]">
         Chưa có đánh giá nào. Hãy là người đầu tiên chia sẻ cảm nhận của bạn.
       </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-[#1D2433]/10 bg-[#FFFDF8] shadow-[0_12px_34px_rgba(39,44,51,0.08)]">
+    <div className="overflow-hidden rounded-2xl border border-bv-ink/10 bg-bv-ivory shadow-[0_12px_34px_rgba(39,44,51,0.08)]">
       {reviews.map((review) => (
         <article className="border-b border-[#17191F]/10 p-5 last:border-b-0" key={review.id}>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -47,15 +47,15 @@ export function ReviewSection({ reviews }: ReviewSectionProps) {
                 {getRatingStars(review.rating).map((isActive, index) => (
                   <Star
                     aria-hidden="true"
-                    className={isActive ? "h-4 w-4 fill-[#D89B25] text-[#D89B25]" : "h-4 w-4 text-[#D8D0C2]"}
+                    className={isActive ? "h-4 w-4 fill-[#D89B25] text-[#D89B25]" : "h-4 w-4 text-bv-border"}
                     key={`${review.id}-star-${index}`}
                   />
                 ))}
               </div>
-              <p className="mt-1 font-black text-[#17202A]">{review.user.name}</p>
+              <p className="mt-1 font-black text-bv-heading">{review.user.name}</p>
             </div>
 
-            <time className="text-sm text-[#66706B]" dateTime={review.createdAt}>
+            <time className="text-sm text-bv-text-muted" dateTime={review.createdAt}>
               {formatDate(review.createdAt)}
             </time>
           </div>

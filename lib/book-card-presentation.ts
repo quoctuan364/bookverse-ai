@@ -12,3 +12,10 @@ export function getRecommendationEvidencePresentation(
 ): RecommendationEvidencePresentation {
   return getRecommendationEvidenceDisplay({ evidence: recommendationEvidence, status });
 }
+
+/** Nhãn demo chỉ hiển thị một lần ở cấp trang, không lặp trên từng BookCard. */
+export function getBookCardMetadataBadge(label?: string | null): string | null {
+  const cleanLabel = label?.trim();
+  if (!cleanLabel || cleanLabel === "Dữ liệu demo") return null;
+  return cleanLabel;
+}

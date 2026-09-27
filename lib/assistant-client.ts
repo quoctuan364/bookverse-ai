@@ -16,20 +16,34 @@ export class AssistantClientError extends Error {
   }
 }
 
-export function createAssistantRequestPayload(message: string, sessionId: string | null) {
-  return sessionId ? { message, sessionId } : { message };
+export function selectAssistantContextQuery(
+  messages: Array<{ role: string; content: string }>,
+): string | undefined {
+  return [...messages].reverse().find((item) => {
+    if (item.role !== "user") return false;
+    const text = item.content.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").toLowerCase();
+    return !/\b(cuon nay|sach nay|cuon do|sach do|cuon thu|cuon so|cuon [1-5]|sach [1-5]|tac gia la ai|noi dung the nao|gia bao nhieu|bao nhieu tien|bao nhieu trang|xuat ban nam nao|ngon ngu gi|the loai gi|danh gia bao nhieu|so sanh|re hon|ngan hon|moi hon|hay hon|con cuon nao khac|con sach nao khac|cuon khac|sach khac|goi y them|them cuon|them sach|khac di|loai khac|khong hop|khong thich)\b/.test(text);
+  })?.content;
+}
+
+export function createAssistantRequestPayload(message: string, sessionId: string | null, contextBookIds: string[] = [], focusedBookId?: string, contextQuery?: string) {
+  return { message, ...(sessionId ? { sessionId } : {}), ...(contextBookIds.length ? { contextBookIds: contextBookIds.slice(0, 5) } : {}), ...(focusedBookId ? { focusedBookId } : {}), ...(contextQuery?.trim() ? { contextQuery: contextQuery.trim() } : {}) };
 }
 
 export async function requestAssistant(
   message: string,
   sessionId: string | null,
+  contextBookIds: string[] = [],
+  focusedBookId?: string,
+  contextQuery?: string,
 ): Promise<AssistantSuccessResponse> {
   let response: Response;
   try {
     response = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(createAssistantRequestPayload(message, sessionId)),
+      body: JSON.stringify(createAssistantRequestPayload(message, sessionId, contextBookIds, focusedBookId, contextQuery)),
+      signal: AbortSignal.timeout(45_000),
     });
   } catch {
     throw new AssistantClientError("Không kết nối được với trợ lý. Vui lòng thử lại sau.");

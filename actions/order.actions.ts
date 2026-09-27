@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { OrderStatus, UserRole } from "@prisma/client";
 import { normalizeBookCoverUrl } from "@/lib/book-cover";
+import { getVietnameseBookTitle } from "@/lib/book-display-title";
 import {
   cancelOrderWithRestock,
   OrderCancellationError,
@@ -96,7 +97,7 @@ export async function getMyOrders(page = 1, status?: string) {
         items: {
           take: 3,
           orderBy: { createdAt: "asc" },
-          select: { quantity: true, book: { select: { title: true } } },
+          select: { quantity: true, book: { select: { id: true, title: true } } },
         },
         _count: { select: { items: true } },
       },
@@ -111,7 +112,10 @@ export async function getMyOrders(page = 1, status?: string) {
       totalAmount: decimalToNumber(order.totalAmount),
       createdAt: order.createdAt,
       itemCount: order._count.items,
-      books: order.items.map((item) => ({ title: item.book.title, quantity: item.quantity })),
+      books: order.items.map((item) => ({
+        title: getVietnameseBookTitle(item.book.id, item.book.title),
+        quantity: item.quantity,
+      })),
     })),
     total,
     page: safePage,
@@ -256,7 +260,7 @@ export async function getOrderDetailData(orderId: string): Promise<OrderDetailDa
       totalPrice: decimalToNumber(item.totalPrice),
       book: {
         id: item.book.id,
-        title: item.book.title,
+        title: getVietnameseBookTitle(item.book.id, item.book.title),
         author: item.book.authorName,
         coverImage: normalizeBookCoverUrl(item.book.coverPath),
       },

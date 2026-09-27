@@ -3,12 +3,17 @@ import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, Eye, EyeOff, Save } from "lucide-react";
 import { ListingCondition, ListingStatus } from "@prisma/client";
 import {
+  getSellerGateData,
   getSellerListingEditorData,
   setSellerListingVisibility,
   updateSellerListing,
 } from "@/actions/seller.actions";
 import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
+import { ListingImageUploadField } from "@/components/seller/ListingImageUploadField";
+import { SubmitButton } from "@/components/shared/SubmitButton";
 import { Input } from "@/components/ui/input";
+import { prepareListingUpload, storeListingUpload } from "@/lib/listing-upload";
+import { MAX_LISTING_IMAGES } from "@/lib/listing-upload-policy";
 import {
   conditionLabel,
   dangerButton,
@@ -42,6 +47,38 @@ async function updateListingAction(formData: FormData) {
   "use server";
 
   const listingId = String(formData.get("listingId") ?? "");
+  const gate = await getSellerGateData();
+  if (!gate.authenticated || !gate.user) {
+    redirect(`/login?callbackUrl=/seller/listings/${encodeURIComponent(listingId)}/edit`);
+  }
+  if (!gate.canSell) {
+    redirect(`/seller?error=${encodeURIComponent("Tài khoản chưa được phép bán sách.")}`);
+  }
+
+  const existingImageUrls = formData
+    .getAll("existingImageUrls")
+    .map((item) => String(item).trim())
+    .filter(Boolean);
+
+  const rawImageFiles = formData.getAll("imageFiles");
+  const imageFiles = rawImageFiles.filter((item): item is File => item instanceof File && item.size > 0);
+
+  const uploadedUrls: string[] = [];
+  const remainingSlots = Math.max(0, MAX_LISTING_IMAGES - existingImageUrls.length);
+
+  for (const file of imageFiles.slice(0, remainingSlots)) {
+    try {
+      const prepared = await prepareListingUpload(file);
+      const url = await storeListingUpload(gate.user.id, prepared);
+      uploadedUrls.push(url);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Tệp ảnh không hợp lệ.";
+      redirect(`/seller/listings/${encodeURIComponent(listingId)}/edit?error=${encodeURIComponent(msg)}`);
+    }
+  }
+
+  const finalImageUrls = [...existingImageUrls, ...uploadedUrls].slice(0, MAX_LISTING_IMAGES);
+
   const result = await updateSellerListing(listingId, {
     bookId: String(formData.get("bookId") ?? ""),
     title: String(formData.get("title") ?? ""),
@@ -49,7 +86,7 @@ async function updateListingAction(formData: FormData) {
     price: String(formData.get("price") ?? ""),
     condition: String(formData.get("condition") ?? ""),
     targetAudience: String(formData.get("targetAudience") ?? ""),
-    imageUrl: String(formData.get("imageUrl") ?? ""),
+    imageUrls: finalImageUrls,
   });
 
   if (!result.success) {
@@ -58,7 +95,7 @@ async function updateListingAction(formData: FormData) {
     }
 
     if (result.reason === "FORBIDDEN") {
-      redirect("/seller/apply");
+      redirect(`/seller?error=${encodeURIComponent(result.message)}`);
     }
 
     redirect(`/seller/listings/${encodeURIComponent(listingId)}/edit?error=${encodeURIComponent(result.message)}`);
@@ -85,7 +122,7 @@ export default async function EditSellerListingPage({ params, searchParams }: Ed
   const [{ id }, query] = await Promise.all([params, searchParams]);
   const data = await getSellerListingEditorData(id);
 
-  if (data.gate.status === "SELLER" && !data.listing) {
+  if (data.gate.canSell && !data.listing) {
     notFound();
   }
 
@@ -94,26 +131,26 @@ export default async function EditSellerListingPage({ params, searchParams }: Ed
   return (
     <main className="bv-page bv-seller">
       <SellerHero
-        description="Cập nhật listing của chính seller hiện tại. Nếu listing đã được duyệt, việc sửa nội dung sẽ chuyển về trạng thái chờ duyệt."
-        title="Sửa listing"
+        description="Cập nhật tin bán của chính bạn. Sau khi lưu, hệ thống tự kiểm tra lại chất lượng và chỉ chuyển ngoại lệ cho admin."
+        title="Sửa tin bán sách"
       />
 
-      {data.gate.status !== "SELLER" || !listing ? (
+      {!data.gate.canSell || !listing ? (
         <SellerGatePanel gate={data.gate} />
       ) : (
         <section className="mx-auto grid w-full max-w-5xl gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <SellerNav />
 
-          <form action={updateListingAction} className="bv-card rounded-lg p-6">
+          <form action={updateListingAction} className="bv-card rounded-2xl p-6 shadow-sm">
             <input name="listingId" type="hidden" value={listing.id} />
-            <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-bv-ink/10 pb-5">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-black uppercase tracking-[0.16em] text-[#F2C14E]">Listing seller</p>
+                  <p className="text-sm font-black uppercase tracking-[0.16em] text-bv-primary">Tin bán sách</p>
                   <StatusBadge label={listingStatusLabel(listing.status)} value={listing.status} />
                 </div>
-                <h1 className="mt-2 text-2xl font-black text-white">{listing.title}</h1>
-                <p className="mt-1 text-sm text-zinc-400">
+                <h1 className="mt-2 text-2xl font-black text-bv-heading">{listing.title}</h1>
+                <p className="mt-1 text-sm text-bv-text-muted">
                   Tạo {formatDate(listing.createdAt)} - Cập nhật {formatDate(listing.updatedAt)}
                 </p>
               </div>
@@ -129,43 +166,56 @@ export default async function EditSellerListingPage({ params, searchParams }: Ed
             </div>
 
             {listing.status === ListingStatus.APPROVED || listing.status === ListingStatus.REJECTED ? (
-              <p className="mt-5 rounded-lg border border-amber-300/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
-                Nếu bấm lưu, listing sẽ chuyển về chờ admin duyệt lại.
+              <p className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                Sau khi lưu, tin đủ thông tin sẽ tiếp tục hiển thị; tin thiếu dữ liệu sẽ vào hàng chờ kiểm tra ngoại lệ.
               </p>
             ) : null}
 
             {listing.rejectionReason ? (
-              <p className="mt-5 rounded-lg border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+              <p className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 Lý do từ chối: {listing.rejectionReason}
               </p>
             ) : null}
 
             <div className="mt-6 grid gap-5">
               <div className="space-y-2">
-                <label className="text-sm font-bold text-white" htmlFor="bookId">
-                  Liên kết sách trong catalog
+                <label className="text-sm font-bold text-bv-heading" htmlFor="bookId">
+                  Chọn sách có sẵn trong BookVerse <span className="font-normal text-bv-text-muted">(không bắt buộc)</span>
                 </label>
-                <select className={selectClass} defaultValue={listing.book?.id ?? ""} id="bookId" name="bookId">
-                  <option value="">Không liên kết sách có sẵn</option>
+                <p className="text-sm leading-6 text-bv-text-muted" id="bookId-help">
+                  Lựa chọn này giúp tin bán hiển thị đúng tác giả, ảnh bìa và đường dẫn tới trang sách. BookVerse không
+                  tham gia sở hữu hay bán thay cuốn sách của bạn.
+                </p>
+                <select
+                  aria-describedby="bookId-help bookId-note"
+                  className={selectClass}
+                  defaultValue={listing.book?.id ?? ""}
+                  id="bookId"
+                  name="bookId"
+                >
+                  <option value="">Không tìm thấy sách - dùng thông tin và ảnh do tôi cung cấp</option>
                   {data.bookOptions.map((book) => (
                     <option key={book.id} value={book.id}>
                       {book.title} - {book.author}
                     </option>
                   ))}
                 </select>
+                <p className="text-xs leading-5 text-bv-text-muted" id="bookId-note">
+                  Khi không chọn sách có sẵn, hãy giữ ít nhất một ảnh thể hiện rõ cuốn sách và tình trạng thực tế.
+                </p>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-bold text-white" htmlFor="title">
-                  Tiêu đề listing
+                <label className="text-sm font-bold text-bv-heading" htmlFor="title">
+                  Tiêu đề tin bán sách
                 </label>
                 <Input id="title" maxLength={180} name="title" required defaultValue={listing.title} />
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-white" htmlFor="price">
-                    Giá bán
+                  <label className="text-sm font-bold text-bv-heading" htmlFor="price">
+                    Giá bán (VNĐ)
                   </label>
                   <Input
                     id="price"
@@ -178,7 +228,7 @@ export default async function EditSellerListingPage({ params, searchParams }: Ed
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-white" htmlFor="condition">
+                  <label className="text-sm font-bold text-bv-heading" htmlFor="condition">
                     Tình trạng
                   </label>
                   <select className={selectClass} defaultValue={listing.condition} id="condition" name="condition">
@@ -191,25 +241,20 @@ export default async function EditSellerListingPage({ params, searchParams }: Ed
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-white" htmlFor="targetAudience">
-                    Nhóm độc giả mục tiêu
-                  </label>
-                  <Input id="targetAudience" name="targetAudience" defaultValue={listing.targetAudience ?? ""} />
-                </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-bv-heading" htmlFor="targetAudience">
+                  Nhóm độc giả mục tiêu
+                </label>
+                <Input id="targetAudience" name="targetAudience" defaultValue={listing.targetAudience ?? ""} />
+              </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-white" htmlFor="imageUrl">
-                    URL ảnh bìa hoặc ảnh tình trạng
-                  </label>
-                  <Input id="imageUrl" name="imageUrl" placeholder="https://... hoặc /covers/..." defaultValue={listing.imageUrl ?? ""} />
-                </div>
+              <div className="rounded-xl border border-bv-ink/10 bg-bv-surface/50 p-4 sm:p-5">
+                <ListingImageUploadField initialImages={listing.imageUrls} />
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-bold text-white" htmlFor="description">
-                  Mô tả
+                <label className="text-sm font-bold text-bv-heading" htmlFor="description">
+                  Mô tả chi tiết
                 </label>
                 <textarea
                   className={textareaClass}
@@ -222,24 +267,28 @@ export default async function EditSellerListingPage({ params, searchParams }: Ed
               </div>
             </div>
 
-            <div className="mt-6 flex flex-wrap justify-end gap-3">
-              <div className="flex flex-wrap gap-3">
-                <p className="inline-flex h-10 items-center rounded-lg border border-white/10 bg-white/[0.05] px-4 text-sm font-black text-[#F2C14E]">
+            <div className="mt-6 flex flex-wrap justify-end gap-3 border-t border-bv-ink/10 pt-5">
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="inline-flex h-11 items-center rounded-xl border border-bv-primary/20 bg-bv-mint px-4 text-sm font-black text-bv-primary">
                   {formatPrice(listing.price)}
                 </p>
-                <button className={primaryButton} type="submit">
+                <SubmitButton
+                  className={primaryButton}
+                  pendingLabel="Đang lưu thay đổi..."
+                  size="default"
+                >
                   <Save className="h-4 w-4" aria-hidden="true" />
                   Lưu thay đổi
-                </button>
+                </SubmitButton>
               </div>
             </div>
           </form>
 
-          <form action={updateVisibilityAction} className="bv-card flex flex-wrap items-center justify-between gap-3 rounded-lg p-5">
+          <form action={updateVisibilityAction} className="bv-card flex flex-wrap items-center justify-between gap-3 rounded-2xl p-5 shadow-sm">
             <div>
-              <h2 className="font-black text-white">Hiển thị listing</h2>
-              <p className="mt-1 text-sm text-zinc-400">
-                Ẩn listing khỏi marketplace hoặc gửi lại quy trình duyệt nếu listing đang bị ẩn.
+              <h2 className="font-black text-bv-heading">Hiển thị tin bán sách</h2>
+              <p className="mt-1 text-sm text-bv-text-muted">
+                Ẩn tin bán sách khỏi marketplace hoặc gửi lại quy trình duyệt nếu tin bán sách đang bị ẩn.
               </p>
             </div>
             <input name="listingId" type="hidden" value={listing.id} />
@@ -249,14 +298,14 @@ export default async function EditSellerListingPage({ params, searchParams }: Ed
               value={listing.status === ListingStatus.HIDDEN ? "SHOW" : "HIDE"}
             />
             {listing.status === ListingStatus.HIDDEN ? (
-              <ConfirmSubmitButton className={secondaryButton} confirmMessage="Gửi listing này duyệt lại?">
+              <ConfirmSubmitButton className={secondaryButton} confirmMessage="Gửi tin này qua kiểm tra tự động để hiển thị lại?">
                 <Eye className="h-4 w-4" aria-hidden="true" />
                 Hiện lại
               </ConfirmSubmitButton>
             ) : (
-              <ConfirmSubmitButton className={dangerButton} confirmMessage="Ẩn listing này khỏi marketplace?">
+              <ConfirmSubmitButton className={dangerButton} confirmMessage="Ẩn tin bán sách này khỏi marketplace?">
                 <EyeOff className="h-4 w-4" aria-hidden="true" />
-                Ẩn listing
+                Ẩn tin bán sách
               </ConfirmSubmitButton>
             )}
           </form>

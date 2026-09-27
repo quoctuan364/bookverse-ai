@@ -4,6 +4,7 @@ import { recordAuditLog } from "@/lib/audit";
 import { createNotifications } from "@/lib/notifications";
 import { checkOrderTransition, type OrderTransitionActor } from "@/lib/order-workflow";
 import prisma from "@/lib/prisma";
+import { isMemberRole } from "@/lib/user-roles";
 
 export type OrderCancellationErrorCode =
   | "AUTH_REQUIRED"
@@ -38,10 +39,11 @@ export interface CancelOrderReceipt {
   missingListingIds: string[];
 }
 
+
 function roleMatchesActor(role: UserRole, actor: OrderTransitionActor): boolean {
   if (actor === "ADMIN") return role === UserRole.ADMIN;
   if (actor === "MODERATOR") return role === UserRole.MODERATOR;
-  if (actor === "SELLER") return role === UserRole.SELLER || role === UserRole.ADMIN;
+  if (actor === "SELLER") return isMemberRole(role) || role === UserRole.ADMIN;
   return true;
 }
 

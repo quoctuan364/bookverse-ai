@@ -27,7 +27,7 @@ function failureDetails(code: AssistantFailureCode) {
     case "MESSAGE_NOT_FOUND":
       return { status: 404, message: "Không tìm thấy phản hồi của trợ lý trong phiên chat." };
     default:
-      return { status: 400, message: "Feedback không hợp lệ." };
+      return { status: 400, message: "phản hồi không hợp lệ." };
   }
 }
 
@@ -101,7 +101,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       createAssistantError(
         "SERVICE_UNAVAILABLE",
-        "Chưa thể lưu feedback chatbot lúc này. Vui lòng thử lại sau.",
+        "Chưa thể lưu phản hồi chatbot lúc này. Vui lòng thử lại sau.",
         true,
       ),
       { status: 503 },

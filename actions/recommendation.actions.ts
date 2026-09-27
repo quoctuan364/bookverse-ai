@@ -1,11 +1,15 @@
 "use server";
 
 import {
+  Prisma,
   RecommendationEvidenceType,
   RecommendationSurface,
   TargetType,
 } from "@prisma/client";
 import { normalizeBookCoverUrl } from "@/lib/book-cover";
+import { getVietnameseBookTitle } from "@/lib/book-display-title";
+import { normalizeBookPrice } from "@/lib/book-display-price";
+import { hasEnglishTitleEvidence } from "@/lib/book-language";
 import { getCurrentUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
 import {
@@ -30,15 +34,44 @@ import {
   type RecommendationEvidenceStatus,
 } from "@/lib/recommendation-evidence-policy";
 import { diversifyRecommendationCandidates } from "@/lib/recommendation-diversity";
+import { shouldPreferVietnameseRecommendations } from "@/lib/recommendation-language-policy";
+import { rankTrendingBooks } from "@/lib/home-discovery";
+import { rankSmartRecommendations } from "@/lib/smart-recommendation-ranking";
+import { buildRecommendationPreferenceProfile } from "@/lib/recommendation-affinity";
+import { headers } from "next/headers";
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL ?? "http://127.0.0.1:8000";
 const AI_SERVICE_TOKEN = process.env.BOOKVERSE_AI_SERVICE_TOKEN?.trim();
 const AI_TIMEOUT_MS = 4_000;
 const FALLBACK_LIMIT = 10;
+const FALLBACK_POOL_SIZE = 40;
 
-type DecimalLike = {
-  toNumber: () => number;
-};
+async function shouldPreferVietnameseForUser(userId: string): Promise<boolean> {
+  const recentSignals = await prisma.interactionEvent.findMany({
+    where: {
+      userId,
+      actionType: {
+        in: [
+          "BOOK_VIEW",
+          "READING_START",
+          "READING_PROGRESS",
+          "READING_COMPLETE",
+          "BOOKMARK_ADD",
+          "FAVORITE_ADD",
+          "CART_ADD",
+          "PURCHASE",
+        ],
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 20,
+    select: { book: { select: { languageCode: true } } },
+  });
+
+  return shouldPreferVietnameseRecommendations(
+    recentSignals.map((signal) => signal.book.languageCode),
+  );
+}
 
 export type AIRecommendation = {
   bookId: string;
@@ -52,6 +85,7 @@ export interface RecommendedBook {
   id: string;
   title: string;
   author: string;
+  category?: string | null;
   coverImage: string | null;
   price: number;
   recommendationScore?: number;
@@ -80,18 +114,6 @@ const EMPTY_NORMALIZATION: RecommendationNormalizationStats = {
   invalidCandidateCount: 0,
   truncatedCount: 0,
 };
-
-function decimalToNumber(value: DecimalLike | number | string): number {
-  if (typeof value === "number") {
-    return value;
-  }
-
-  if (typeof value === "string") {
-    return Number(value);
-  }
-
-  return value.toNumber();
-}
 
 function isAIRecommendation(value: unknown): value is AIRecommendation {
   if (!value || typeof value !== "object") {
@@ -154,7 +176,9 @@ async function getBooksByRecommendations(
   }
 
   const hasPublicRealCatalog =
-    (await prisma.book.count({ where: publicBookQualityWhere(), take: 1 })) > 0;
+    (await prisma.book.findFirst({ where: publicBookQualityWhere(), select: { id: true } })) !==
+    null;
+  const preferVietnamese = await shouldPreferVietnameseForUser(userId);
   const books = await prisma.book.findMany({
     where: {
       AND: [
@@ -167,7 +191,9 @@ async function getBooksByRecommendations(
       title: true,
       authorName: true,
       categoryId: true,
+      category: { select: { name: true } },
       coverPath: true,
+      languageCode: true,
       price: true,
       listings: {
         where: {
@@ -192,13 +218,19 @@ async function getBooksByRecommendations(
   const candidates = uniqueBookIds
     .map((bookId) => bookById.get(bookId))
     .filter((book): book is NonNullable<typeof book> => Boolean(book))
+    .filter(
+      (book) =>
+        !preferVietnamese ||
+        (book.languageCode === "vi" && !hasEnglishTitleEvidence(book.title)),
+    )
     .map((book) => ({
       id: book.id,
-      title: book.title,
+      title: getVietnameseBookTitle(book.id, book.title),
       author: book.authorName,
+      category: book.category.name,
       categoryId: book.categoryId,
       coverImage: normalizeBookCoverUrl(book.coverPath),
-      price: decimalToNumber(book.price),
+      price: normalizeBookPrice(book.price),
       recommendationScore: recommendationById.get(book.id)?.score,
       recommendationEvidence: recommendationById.get(book.id)?.evidence,
       recommendationEvidenceStatus: getRecommendationEvidenceStatus({
@@ -218,6 +250,7 @@ async function getBooksByRecommendations(
     id: candidate.id,
     title: candidate.title,
     author: candidate.author,
+    category: candidate.category,
     coverImage: candidate.coverImage,
     price: candidate.price,
     recommendationScore: candidate.recommendationScore,
@@ -299,58 +332,239 @@ async function persistRecommendations(
   }
 }
 
-async function getFallbackBooks(userId?: string): Promise<RecommendedBook[]> {
-  const hasPublicRealCatalog =
-    (await prisma.book.count({ where: publicBookQualityWhere(), take: 1 })) > 0;
-  const books = await prisma.book.findMany({
-    where: catalogBookQualityWhere(hasPublicRealCatalog),
-    orderBy: [
-      {
-        createdAt: "desc",
-      },
-      {
-        id: "asc",
-      },
+async function getFallbackBooks(userId?: string, visitorId?: string): Promise<RecommendedBook[]> {
+  const [profile, recentSignals, publicRealBook] = await Promise.all([
+    userId
+      ? prisma.profile.findUnique({
+          where: { userId },
+          select: { preferredGenres: true },
+        })
+      : Promise.resolve(null),
+    userId
+      ? prisma.interactionEvent.findMany({
+          where: {
+            userId,
+            actionType: {
+              in: [
+                "BOOK_VIEW",
+                "READING_START",
+                "READING_PROGRESS",
+                "READING_COMPLETE",
+                "READING_HIGHLIGHT",
+                "BOOKMARK_ADD",
+                "FAVORITE_ADD",
+                "CART_ADD",
+                "PURCHASE",
+              ],
+            },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 100,
+          select: {
+            bookId: true,
+            actionType: true,
+            book: {
+              select: {
+                languageCode: true,
+                category: { select: { name: true, canonicalName: true } },
+              },
+            },
+          },
+        })
+      : Promise.resolve([]),
+    prisma.book.findFirst({ where: publicBookQualityWhere(), select: { id: true } }),
+  ]);
+  const preferredGenres = profile?.preferredGenres ?? [];
+  const preferenceProfile = buildRecommendationPreferenceProfile(
+    preferredGenres,
+    recentSignals.map((signal) => ({
+      actionType: signal.actionType,
+      categoryName: signal.book.category.name,
+      canonicalName: signal.book.category.canonicalName,
+    })),
+  );
+  const preferredGenreSet = new Set(preferenceProfile.queryLabels);
+  const hasPublicRealCatalog = publicRealBook !== null;
+  const preferVietnamese = userId
+    ? shouldPreferVietnameseRecommendations(
+        recentSignals.slice(0, 20).map((signal) => signal.book.languageCode),
+      )
+    : true;
+  const excludedBookIds = [
+    ...new Set(
+      recentSignals
+        .filter((signal) => signal.actionType !== "BOOK_VIEW")
+        .map((signal) => signal.bookId),
+    ),
+  ];
+  const qualityWhere: Prisma.BookWhereInput = {
+    AND: [
+      catalogBookQualityWhere(hasPublicRealCatalog),
+      ...(preferVietnamese ? [{ languageCode: "vi" }] : []),
+      ...(excludedBookIds.length > 0 ? [{ id: { notIn: excludedBookIds } }] : []),
     ],
-    take: FALLBACK_LIMIT,
-    select: {
-      id: true,
-      title: true,
-      authorName: true,
-      coverPath: true,
-      price: true,
-      listings: {
-        where: {
-          status: "APPROVED",
-          stock: { gt: 0 },
-        },
-        orderBy: { price: "asc" },
-        take: 1,
-        select: { id: true },
-      },
-      favoriteBooks: {
-        where: { userId: userId ?? "__BOOKVERSE_GUEST__" },
-        take: 1,
-        select: { id: true },
+  };
+  const bookSelect = {
+    id: true,
+    title: true,
+    authorName: true,
+    coverPath: true,
+    price: true,
+    rating: true,
+    createdAt: true,
+    category: {
+      select: {
+        name: true,
+        canonicalName: true,
       },
     },
-  });
+    listings: {
+      where: {
+        status: "APPROVED",
+        stock: { gt: 0 },
+      },
+      orderBy: { price: "asc" },
+      take: 1,
+      select: { id: true },
+    },
+    favoriteBooks: {
+      where: { userId: userId ?? "__BOOKVERSE_GUEST__" },
+      take: 1,
+      select: { id: true },
+    },
+  } satisfies Prisma.BookSelect;
+  const orderBy = [
+    { createdAt: "desc" as const },
+    { id: "asc" as const },
+  ];
 
-  return books.map((book) => ({
+  const trendWindowStart = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const [preferredBooks, generalBooks, topRatedBooks, trendSignals] = await Promise.all([
+    preferenceProfile.queryLabels.length > 0
+      ? prisma.book.findMany({
+          where: {
+            AND: [
+              qualityWhere,
+              {
+                category: {
+                  OR: [
+                    { name: { in: preferenceProfile.queryLabels } },
+                    { canonicalName: { in: preferenceProfile.queryLabels } },
+                  ],
+                },
+              },
+            ],
+          },
+          orderBy,
+          take: FALLBACK_POOL_SIZE,
+          select: bookSelect,
+        })
+      : Promise.resolve([]),
+    prisma.book.findMany({
+      where: qualityWhere,
+      orderBy,
+      take: FALLBACK_POOL_SIZE,
+      select: bookSelect,
+    }),
+    prisma.book.findMany({
+      where: qualityWhere,
+      orderBy: [{ rating: "desc" }, { id: "asc" }],
+      take: FALLBACK_POOL_SIZE,
+      select: bookSelect,
+    }),
+    prisma.interactionEvent.findMany({
+      where: {
+        createdAt: { gte: trendWindowStart },
+        book: qualityWhere,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 500,
+      select: { bookId: true, actionType: true, createdAt: true },
+    }),
+  ]);
+
+  // Seed chỉ dùng để phá hòa; điểm chính vẫn đến từ sở thích, xu hướng,
+  // độ mới và đánh giá thật của sách. Kết hợp ngày (YYYY-MM-DD) để gợi ý đổi mới mỗi ngày cho độc giả.
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const recommendationSeed = `${userId ?? visitorId ?? "bookverse-guest"}:${todayKey}`;
+  const visiblePreferredBooks = preferVietnamese
+    ? preferredBooks.filter((book) => !hasEnglishTitleEvidence(book.title))
+    : preferredBooks;
+  const visibleGeneralBooks = preferVietnamese
+    ? generalBooks.filter((book) => !hasEnglishTitleEvidence(book.title))
+    : generalBooks;
+  const visibleTopRatedBooks = preferVietnamese
+    ? topRatedBooks.filter((book) => !hasEnglishTitleEvidence(book.title))
+    : topRatedBooks;
+  const rankedTrendSignals = rankTrendingBooks(trendSignals, new Date(), 100);
+  const trendScoreByBookId = new Map(
+    rankedTrendSignals.map((item) => [item.bookId, item.score]),
+  );
+  const trendingBooks = rankedTrendSignals.length > 0
+    ? await prisma.book.findMany({
+        where: {
+          AND: [qualityWhere, { id: { in: rankedTrendSignals.map((item) => item.bookId) } }],
+        },
+        select: bookSelect,
+      })
+    : [];
+  const visibleTrendingBooks = preferVietnamese
+    ? trendingBooks.filter((book) => !hasEnglishTitleEvidence(book.title))
+    : trendingBooks;
+  const candidateById = new Map(
+    [
+      ...visiblePreferredBooks,
+      ...visibleTrendingBooks,
+      ...visibleGeneralBooks,
+      ...visibleTopRatedBooks,
+    ]
+      .map((book) => [book.id, book] as const),
+  );
+  const rankedBooks = rankSmartRecommendations(
+    [...candidateById.values()].map((book) => ({
+      ...book,
+      trendScore: trendScoreByBookId.get(book.id) ?? 0,
+      category: book.category.canonicalName ?? book.category.name,
+      rating: Number(book.rating ?? 0),
+    })),
+    {
+      preferredGenres: preferredGenreSet,
+      categoryAffinity: preferenceProfile.affinityByCategory,
+      seed: recommendationSeed,
+    },
+  ).slice(0, FALLBACK_LIMIT);
+
+  return rankedBooks.map(({ item: book, evidence, reasonType, score }) => ({
     id: book.id,
-    title: book.title,
+    title: getVietnameseBookTitle(book.id, book.title),
     author: book.authorName,
+    category: book.category,
     coverImage: normalizeBookCoverUrl(book.coverPath),
-    price: decimalToNumber(book.price),
-    recommendationEvidenceStatus: "POPULARITY_FALLBACK",
+    price: normalizeBookPrice(book.price),
+    recommendationScore: score,
+    recommendationEvidence: evidence,
+    recommendationEvidenceStatus:
+      reasonType === "PREFERENCE"
+        ? "CATEGORY_FALLBACK"
+        : reasonType === "TRENDING"
+          ? "TRENDING_FALLBACK"
+          : reasonType === "NEW"
+            ? "NEW_FALLBACK"
+            : reasonType === "QUALITY"
+              ? "QUALITY_FALLBACK"
+              : "DISCOVERY_FALLBACK",
     availableListingId: book.listings[0]?.id ?? null,
     isFavorite: book.favoriteBooks.length > 0,
   }));
 }
 
-async function getFallbackBooksSafely(context: string, userId?: string): Promise<RecommendedBook[]> {
+async function getFallbackBooksSafely(
+  context: string,
+  userId?: string,
+  visitorId?: string,
+): Promise<RecommendedBook[]> {
   try {
-    return await getFallbackBooks(userId);
+    return await getFallbackBooks(userId, visitorId);
   } catch {
     console.error(`[getRecommendedBooks] Không thể lấy fallback (${context}).`);
     return [];
@@ -392,8 +606,10 @@ export async function getRecommendedBooks(): Promise<RecommendationBatch> {
   const resolvedUserId = currentUser && !currentUser.isLocked ? currentUser.id : undefined;
 
   if (!resolvedUserId) {
+    const requestHeaders = await headers();
+    const visitorId = requestHeaders.get("x-bookverse-visitor-id") ?? undefined;
     return {
-      books: await getFallbackBooksSafely("guest"),
+      books: await getFallbackBooksSafely("guest", undefined, visitorId),
       requestId: null,
       source: "fallback",
       trackingStatus: "DEGRADED",

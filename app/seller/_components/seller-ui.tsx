@@ -5,22 +5,22 @@ import type { SellerGateData } from "@/actions/seller.actions";
 import { cn } from "@/lib/utils";
 
 export const primaryButton =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-black text-[#FFFDF8] transition hover:bg-[#0F5F59] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E]";
+  "inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-bv-primary px-5 py-2.5 text-sm font-black text-white shadow-xs transition hover:bg-bv-primary-dark active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bv-primary disabled:cursor-not-allowed disabled:opacity-50";
 export const secondaryButton =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.07] px-4 py-2 text-sm font-black text-zinc-100 transition hover:bg-white/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E]";
+  "inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-bv-ink/15 bg-white px-4 py-2 text-sm font-black text-bv-heading shadow-xs transition hover:bg-bv-surface active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bv-primary disabled:cursor-not-allowed disabled:opacity-50";
 export const dangerButton =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm font-black text-red-200 transition hover:bg-red-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500";
+  "inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-black text-red-700 shadow-xs transition hover:bg-red-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-not-allowed disabled:opacity-50";
 export const neutralButton =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#D8D0C2] bg-[#FFFDF8] px-4 py-2 text-sm font-black text-[#17202A] transition hover:bg-[#EAF2EF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E]";
+  "inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-bv-ink/15 bg-bv-surface px-4 py-2 text-sm font-black text-bv-heading transition hover:bg-bv-mint active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bv-primary disabled:cursor-not-allowed disabled:opacity-50";
 
 export const selectClass =
-  "h-11 w-full rounded-lg border border-[#D8D0C2] bg-[#FFFDF8] px-3 text-sm font-semibold text-[#17202A] outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E]/30";
+  "h-12 w-full cursor-pointer rounded-xl border border-bv-ink/15 bg-white px-3 text-sm font-bold text-bv-heading outline-none transition focus-visible:border-bv-primary focus-visible:ring-2 focus-visible:ring-bv-primary/20";
 export const textareaClass =
-  "min-h-36 w-full resize-y rounded-lg border border-[#D8D0C2] bg-[#FFFDF8] px-3 py-3 text-sm leading-6 text-[#17202A] outline-none transition placeholder:text-[#7A817C] focus-visible:ring-2 focus-visible:ring-[#0F766E]/30";
+  "min-h-36 w-full resize-y rounded-xl border border-bv-ink/15 bg-white px-3.5 py-3 text-sm leading-6 text-bv-heading outline-none transition placeholder:text-bv-text-muted/70 focus-visible:border-bv-primary focus-visible:ring-2 focus-visible:ring-bv-primary/20";
 
 const sellerLinks = [
   { href: "/seller", label: "Tổng quan", icon: Store },
-  { href: "/seller/listings", label: "Listing", icon: PackagePlus },
+  { href: "/seller/listings", label: "Tin đăng", icon: PackagePlus },
   { href: "/seller/orders", label: "Đơn hàng", icon: ClipboardList },
   { href: "/seller/revenue", label: "Doanh thu", icon: BarChart3 },
 ];
@@ -56,7 +56,7 @@ export function conditionLabel(value: string): string {
     case "POOR":
       return "Cũ";
     case "DIGITAL":
-      return "Ebook";
+      return "sách điện tử";
     default:
       return value;
   }
@@ -144,7 +144,7 @@ export function StatusBadge({ value, label }: { value: string; label?: string })
 export function SellerHero({
   action,
   description,
-  kicker = "BookVerse Seller",
+  kicker = "Kênh bán sách",
   title,
 }: {
   action?: ReactNode;
@@ -156,9 +156,9 @@ export function SellerHero({
     <section className="bv-hero">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-10 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-8">
         <div>
-          <p className="text-sm font-black uppercase tracking-[0.16em] text-[#F2C14E]">{kicker}</p>
+          <p className="text-sm font-black uppercase tracking-[0.16em] text-bv-gold">{kicker}</p>
           <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-5xl">{title}</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-[#EAF5F1]">{description}</p>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-bv-mint-soft">{description}</p>
         </div>
         {action}
       </div>
@@ -184,29 +184,25 @@ export function SellerNav() {
 }
 
 export function SellerGatePanel({ gate }: { gate: SellerGateData }) {
-  if (gate.status === "SELLER") {
+  if (gate.canSell || gate.status === "SELLER") {
     return null;
   }
-
-  const isLoggedIn = gate.status !== "UNAUTHENTICATED";
 
   return (
     <section className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
       <div className="bv-card rounded-lg p-6">
-        <p className="text-sm font-black uppercase tracking-[0.16em] text-[#F2C14E]">
-          {isLoggedIn ? "Cần bật vai trò người bán" : "Cần đăng nhập"}
+        <p className="text-sm font-black uppercase tracking-[0.16em] text-bv-gold">
+          Kênh bán sách thành viên
         </p>
-        <h2 className="mt-2 text-2xl font-black text-white">
-          {isLoggedIn ? "Tài khoản của bạn chưa phải seller." : "Đăng nhập để mở Seller Dashboard."}
+        <h2 className="mt-2 text-2xl font-black text-bv-heading">
+          Đăng nhập để vào Kênh bán sách
         </h2>
-        <p className="mt-3 text-sm leading-6 text-zinc-300">
-          {isLoggedIn
-            ? "Buyer có thể đăng ký nhanh để gửi listing chờ duyệt, theo dõi đơn và xem doanh thu."
-            : "BookVerse cần biết tài khoản để bảo vệ listing, đơn hàng và doanh thu của từng người bán."}
+        <p className="mt-3 text-sm leading-6 text-bv-text-muted">
+          BookVerse hỗ trợ mọi thành viên đăng bán sách cũ, quản lý tin đăng và trao đổi trực tiếp với người mua.
         </p>
         <div className="mt-5 flex flex-wrap gap-3">
-          <Link className={primaryButton} href={isLoggedIn ? "/seller/apply" : "/login?callbackUrl=/seller"}>
-            {isLoggedIn ? "Đăng ký làm seller" : "Đăng nhập"}
+          <Link className={primaryButton} href="/login?callbackUrl=/seller">
+            Đăng nhập
           </Link>
           <Link className={secondaryButton} href="/marketplace">
             Xem chợ sách

@@ -1,13 +1,19 @@
 "use server";
 
 import bcrypt from "bcrypt";
-import { NotificationType, Prisma, TargetType } from "@prisma/client";
+import { BookStatus, NotificationType, Prisma, TargetType } from "@prisma/client";
 import { recordAuditLog } from "@/lib/audit";
+import { prepareAvatarUpload, storeAvatarUpload } from "@/lib/avatar-upload";
 import { normalizeBookCoverUrl } from "@/lib/book-cover";
+import { getVietnameseBookTitle } from "@/lib/book-display-title";
 import { createNotification } from "@/lib/notifications";
 import { getCurrentUser, PermissionError, requireAuthenticatedUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
 import { getRecommendationEvidenceStatus, type RecommendationEvidenceStatus } from "@/lib/recommendation-evidence-policy";
+import {
+  isValidReadingPreferenceCount,
+  normalizeReadingPreferences,
+} from "@/lib/reading-preference-policy";
 
 type DecimalLike = {
   toNumber: () => number;
@@ -105,9 +111,20 @@ export interface ProfileSettingsData {
   categories: string[];
 }
 
+export interface ReadingPreferenceOnboardingData {
+  userName: string;
+  preferredGenres: string[];
+  categories: Array<{
+    name: string;
+    description: string | null;
+    bookCount: number;
+  }>;
+}
+
 export interface UpdateProfileSettingsInput {
   displayName: string;
-  avatarUrl: string;
+  avatarFile?: File | null;
+  removeAvatar?: boolean;
   persona: string;
   bio: string;
   preferredGenres: string[];
@@ -184,20 +201,6 @@ function parseOptionalPositiveInt(value: string, maxValue: number): number | nul
   }
 
   return Math.min(parsedValue, maxValue);
-}
-
-function normalizeAvatarUrl(value: string): string | null {
-  const cleanValue = value.trim();
-
-  if (!cleanValue) {
-    return null;
-  }
-
-  if (cleanValue.startsWith("/") || cleanValue.startsWith("https://") || cleanValue.startsWith("http://")) {
-    return cleanValue.slice(0, 500);
-  }
-
-  return null;
 }
 
 function handleProfileActionError(error: unknown, fallbackMessage: string): ProfileActionResult {
@@ -287,6 +290,7 @@ export async function getProfileDashboardData(): Promise<ProfileDashboardData | 
             include: {
               book: {
                 select: {
+                  id: true,
                   title: true,
                 },
               },
@@ -314,6 +318,7 @@ export async function getProfileDashboardData(): Promise<ProfileDashboardData | 
         include: {
           book: {
             select: {
+              id: true,
               title: true,
             },
           },
@@ -393,7 +398,7 @@ export async function getProfileDashboardData(): Promise<ProfileDashboardData | 
       ],
       reading: reading.map((item) => ({
         bookId: item.bookId,
-        title: item.book.title,
+        title: getVietnameseBookTitle(item.book.id, item.book.title),
         author: item.book.authorName,
         coverImage: normalizeBookCoverUrl(item.book.coverPath),
         currentPage: item.currentPage,
@@ -406,7 +411,7 @@ export async function getProfileDashboardData(): Promise<ProfileDashboardData | 
         status: order.status,
         totalAmount: decimalToNumber(order.totalAmount),
         createdAt: order.createdAt,
-        books: order.items.map((item) => item.book.title),
+        books: order.items.map((item) => getVietnameseBookTitle(item.book.id, item.book.title)),
       })),
       listings: listings.map((listing) => ({
         id: listing.id,
@@ -420,7 +425,7 @@ export async function getProfileDashboardData(): Promise<ProfileDashboardData | 
       highlights: highlights.map((highlight) => ({
         id: highlight.id,
         bookId: highlight.bookId,
-        bookTitle: highlight.book.title,
+        bookTitle: getVietnameseBookTitle(highlight.book.id, highlight.book.title),
         pageNumber: highlight.pageNumber,
         text: highlight.text,
         note: highlight.note,
@@ -437,7 +442,7 @@ export async function getProfileDashboardData(): Promise<ProfileDashboardData | 
           return {
             id: recommendation.id,
             bookId: book.id,
-            title: book.title,
+            title: getVietnameseBookTitle(book.id, book.title),
             author: book.authorName,
             score: recommendation.score,
             reason: recommendation.reason,
@@ -489,7 +494,6 @@ export async function getProfileSettingsData(): Promise<ProfileSettingsData | nu
         select: {
           name: true,
         },
-        take: 18,
       }),
     ]);
 
@@ -511,12 +515,158 @@ export async function getProfileSettingsData(): Promise<ProfileSettingsData | nu
         dailyReadingGoalMinutes: user.profile?.dailyReadingGoalMinutes ?? null,
         dailyReadingGoalPages: user.profile?.dailyReadingGoalPages ?? null,
       },
-      categories: categories.map((category) => category.name),
+      categories: categories
+        .map((category) => category.name)
+        .filter((categoryName) => !categoryName.includes("#") && !categoryName.includes("—"))
+        .slice(0, 24),
     };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Lỗi không xác định.";
     console.error(`[getProfileSettingsData] ${message}`);
     return null;
+  }
+}
+
+export async function getReadingPreferenceOnboardingData(): Promise<ReadingPreferenceOnboardingData | null> {
+  const currentUser = await getCurrentUser();
+
+  if (!currentUser || currentUser.isLocked) {
+    return null;
+  }
+
+  try {
+    const [user, categories] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: currentUser.id },
+        select: {
+          name: true,
+          profile: {
+            select: {
+              preferredGenres: true,
+            },
+          },
+        },
+      }),
+      prisma.category.findMany({
+        where: {
+          books: {
+            some: {
+              status: BookStatus.ACTIVE,
+            },
+          },
+        },
+        select: {
+          name: true,
+          description: true,
+          _count: {
+            select: {
+              books: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    if (!user) {
+      return null;
+    }
+
+    const preferredGenreSet = new Set(user.profile?.preferredGenres ?? []);
+
+    return {
+      userName: user.name,
+      preferredGenres: user.profile?.preferredGenres ?? [],
+      categories: categories
+        .map((category) => ({
+          name: category.name,
+          description: category.description,
+          bookCount: category._count.books,
+        }))
+        .filter((category) => !category.name.includes("#") && !category.name.includes("—"))
+        // Luôn giữ các thể loại user đang chọn trong danh sách, kể cả khi chúng
+        // không thuộc nhóm có nhiều sách nhất.
+        .sort((left, right) => {
+          const selectedDifference = Number(preferredGenreSet.has(right.name)) - Number(preferredGenreSet.has(left.name));
+          return selectedDifference || right.bookCount - left.bookCount || left.name.localeCompare(right.name, "vi");
+        })
+        .slice(0, 12),
+    };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Lỗi không xác định.";
+    console.error(`[getReadingPreferenceOnboardingData] ${message}`);
+    return null;
+  }
+}
+
+export async function saveReadingPreferences(preferredGenresInput: string[]): Promise<ProfileActionResult> {
+  try {
+    const currentUser = await requireAuthenticatedUser();
+    const preferredGenres = normalizeReadingPreferences(preferredGenresInput);
+
+    if (!isValidReadingPreferenceCount(preferredGenres.length)) {
+      return {
+        success: false,
+        message: "Vui lòng chọn từ 1 đến 5 thể loại yêu thích.",
+      };
+    }
+
+    const validCategories = await prisma.category.findMany({
+      where: {
+        name: {
+          in: preferredGenres,
+        },
+        books: {
+          some: {
+            status: BookStatus.ACTIVE,
+          },
+        },
+      },
+      select: {
+        name: true,
+      },
+    });
+
+    if (validCategories.length !== preferredGenres.length) {
+      return {
+        success: false,
+        message: "Một số thể loại không còn khả dụng. Vui lòng chọn lại.",
+      };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.profile.upsert({
+        where: {
+          userId: currentUser.id,
+        },
+        update: {
+          preferredGenres,
+        },
+        create: {
+          userId: currentUser.id,
+          preferredGenres,
+        },
+      });
+
+      await recordAuditLog(
+        {
+          actorId: currentUser.id,
+          action: "USER_READING_PREFERENCES_UPDATE",
+          entityType: "USER",
+          entityId: currentUser.id,
+          metadata: {
+            preferredGenreCount: preferredGenres.length,
+          } satisfies Prisma.InputJsonObject,
+        },
+        tx,
+      );
+    });
+
+    return {
+      success: true,
+      message: "Đã lưu thể loại yêu thích của bạn.",
+    };
+  } catch (error: unknown) {
+    return handleProfileActionError(error, "Không thể lưu sở thích đọc. Vui lòng thử lại.");
   }
 }
 
@@ -555,22 +705,27 @@ export async function updateProfileSettings(input: UpdateProfileSettingsInput): 
     const userId = currentUser.id;
     const selectedGenres = Array.from(new Set(input.preferredGenres.map((genre) => genre.trim()).filter(Boolean)))
       .slice(0, 8);
-    const validCategories = await prisma.category.findMany({
-      where: {
-        name: {
-          in: selectedGenres,
+    const [validCategories, existingProfile] = await Promise.all([
+      prisma.category.findMany({
+        where: {
+          name: {
+            in: selectedGenres,
+          },
         },
-      },
-      select: {
-        name: true,
-      },
-    });
+        select: {
+          name: true,
+        },
+      }),
+      prisma.profile.findUnique({
+        where: { userId },
+        select: { avatarUrl: true },
+      }),
+    ]);
     const validGenreNames = new Set(validCategories.map((category) => category.name));
     const preferredGenres = selectedGenres.filter((genre) => validGenreNames.has(genre));
     const persona = normalizeText(input.persona, 80);
     const bio = normalizeText(input.bio, 500);
     const displayName = normalizeText(input.displayName, 120);
-    const avatarUrl = normalizeAvatarUrl(input.avatarUrl);
     const budget = parseBudget(input.budget);
     const dailyReadingGoalMinutes = parseOptionalPositiveInt(input.dailyReadingGoalMinutes, 1_440);
     const dailyReadingGoalPages = parseOptionalPositiveInt(input.dailyReadingGoalPages, 5_000);
@@ -579,13 +734,6 @@ export async function updateProfileSettings(input: UpdateProfileSettingsInput): 
       return {
         success: false,
         message: "Tên hiển thị không được để trống.",
-      };
-    }
-
-    if (input.avatarUrl.trim() && !avatarUrl) {
-      return {
-        success: false,
-        message: "Avatar URL phải bắt đầu bằng http://, https:// hoặc /.",
       };
     }
 
@@ -608,6 +756,21 @@ export async function updateProfileSettings(input: UpdateProfileSettingsInput): 
         success: false,
         message: "Mục tiêu số trang mỗi ngày không hợp lệ.",
       };
+    }
+
+    let avatarUrl = input.removeAvatar ? null : existingProfile?.avatarUrl ?? null;
+    const avatarFile = input.avatarFile;
+
+    if (avatarFile && avatarFile.size > 0) {
+      try {
+        const preparedAvatar = await prepareAvatarUpload(avatarFile);
+        avatarUrl = await storeAvatarUpload(userId, preparedAvatar);
+      } catch (error: unknown) {
+        return {
+          success: false,
+          message: error instanceof Error ? error.message : "Ảnh đại diện không hợp lệ.",
+        };
+      }
     }
 
     await prisma.$transaction(async (tx) => {

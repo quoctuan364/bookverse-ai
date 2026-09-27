@@ -42,9 +42,9 @@ function formatDate(value: Date): string {
 function typeClass(type: string): string {
   switch (type) {
     case "ORDER":
-      return "bg-[#0F766E]/15 text-[#0F5F59]";
+      return "bg-bv-focus/15 text-[#0F5F59]";
     case "MARKETPLACE":
-      return "bg-[#F2C14E]/25 text-[#8A5C00]";
+      return "bg-bv-gold/25 text-[#8A5C00]";
     case "COMMUNITY":
       return "bg-[#E76F51]/15 text-[#B45334]";
     case "AI":
@@ -68,28 +68,30 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
   const data = await getNotificationCenterData(40, filter);
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(15,118,110,0.18),transparent_34%),linear-gradient(180deg,#020617_0%,#111827_52%,#18181b_100%)] px-4 py-8 text-zinc-100 sm:px-6 lg:px-8">
-      <section className="mx-auto max-w-4xl rounded-2xl border border-white/10 bg-slate-950/72 p-5 shadow-[0_24px_90px_rgba(0,0,0,0.34)] backdrop-blur-2xl sm:p-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <main className="bv-page">
+      <section className="bv-hero">
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 py-10 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-8">
           <div>
-            <p className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.16em] text-[#F2C14E]">
+            <p className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.16em] text-bv-gold">
               <Bell className="h-4 w-4" aria-hidden="true" />
-              Notification Center
+              Trung tâm thông báo
             </p>
-            <h1 className="mt-3 text-3xl font-black tracking-tight text-white">Thông báo của tôi</h1>
-            <p className="mt-2 text-sm text-zinc-400">
-              Theo dõi listing, đơn hàng, cộng đồng, bảo mật và AI recommendation.
+            <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-5xl">Thông báo của tôi</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-bv-mint-soft">
+              Xem tin mới về sách bạn đăng bán, đơn hàng và những cuộc trò chuyện.
             </p>
           </div>
           <form action={markAllReadAction}>
-            <Button className="min-h-11 gap-2 bg-[#D6A84F] text-slate-950 hover:bg-[#F2C14E]" disabled={data.unreadCount === 0} type="submit">
+            <Button className="min-h-11 gap-2 bg-bv-gold text-slate-950 hover:bg-bv-gold/90" disabled={data.unreadCount === 0} type="submit">
               <CheckCheck className="h-4 w-4" aria-hidden="true" />
               Đánh dấu đã đọc
             </Button>
           </form>
         </div>
+      </section>
 
-        <div className="mt-6 flex flex-wrap gap-2">
+      <section className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="flex flex-wrap gap-2">
           {[
             { value: "all", label: "Tất cả", href: "/notifications" },
             { value: "unread", label: "Chưa đọc", href: "/notifications?filter=unread" },
@@ -97,8 +99,8 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
             <Link
               className={`inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-black transition ${
                 filter === item.value
-                  ? "bg-[#D6A84F] text-slate-950"
-                  : "border border-white/10 bg-white/[0.07] text-zinc-100 hover:bg-white/[0.12]"
+                  ? "bg-bv-primary text-white shadow-xs"
+                  : "border border-bv-ink/10 bg-white text-bv-ink hover:bg-bv-surface"
               }`}
               href={item.href}
               key={item.value}
@@ -112,10 +114,10 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
           {data.notifications.map((notification) => {
             return (
               <article
-                className={`rounded-2xl border p-4 transition ${
+                className={`rounded-2xl border p-5 shadow-xs transition ${
                   notification.readAt
-                    ? "border-white/10 bg-white/[0.05]"
-                    : "border-[#F2C14E]/30 bg-[#F2C14E]/10"
+                    ? "border-bv-ink/10 bg-white"
+                    : "border-bv-primary/25 bg-[#FAF6EE] shadow-sm"
                 }`}
                 key={notification.id}
               >
@@ -126,19 +128,19 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
                         {notification.type}
                       </span>
                       {!notification.readAt ? (
-                        <span className="rounded-full bg-[#F2C14E] px-2.5 py-1 text-xs font-black text-slate-950">
+                        <span className="rounded-full bg-bv-gold px-2.5 py-1 text-xs font-black text-slate-950">
                           Mới
                         </span>
                       ) : null}
                     </div>
-                    <h2 className="mt-3 text-lg font-black text-zinc-50">{notification.title}</h2>
-                    <p className="mt-1 text-sm leading-6 text-zinc-300">{notification.message}</p>
-                    <p className="mt-2 text-xs text-zinc-500">{formatDate(notification.createdAt)}</p>
+                    <h2 className="mt-3 text-lg font-black text-bv-heading">{notification.title}</h2>
+                    <p className="mt-1 text-sm leading-6 text-bv-text-muted">{notification.message}</p>
+                    <p className="mt-2 text-xs text-bv-text-muted">{formatDate(notification.createdAt)}</p>
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-2">
                     {notification.href ? (
                       <Link
-                        className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.07] px-3 text-xs font-bold text-zinc-100 transition hover:bg-white/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D6A84F]"
+                        className="inline-flex min-h-11 items-center justify-center rounded-xl border border-bv-primary/25 bg-white px-4 text-xs font-bold text-bv-primary transition hover:bg-bv-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bv-primary"
                         href={notification.href}
                       >
                         Mở
@@ -147,8 +149,8 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
                     {!notification.readAt ? (
                       <form action={markReadAction}>
                         <input name="notificationId" type="hidden" value={notification.id} />
-                        <button className="min-h-11 cursor-pointer rounded-xl border border-white/10 bg-white/[0.07] px-3 text-xs font-bold text-zinc-100 transition hover:bg-white/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D6A84F]" type="submit">
-                          Đã đọc
+                        <button className="min-h-11 cursor-pointer rounded-xl border border-bv-ink/10 bg-white px-4 text-xs font-bold text-bv-ink transition hover:bg-bv-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bv-primary" type="submit">
+                          Đánh dấu đã đọc
                         </button>
                       </form>
                     ) : null}
@@ -159,8 +161,8 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
           })}
 
           {data.notifications.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-white/12 bg-white/[0.04] p-5 text-sm text-zinc-400">
-              Chưa có thông báo. Khi listing được duyệt, đơn hàng đổi trạng thái hoặc AI có cập nhật mới, dữ liệu sẽ xuất hiện ở đây.
+            <p className="rounded-2xl border border-dashed border-bv-ink/15 bg-white p-8 text-center text-sm text-bv-text-muted">
+              Chưa có thông báo mới. Khi sách bạn đăng được duyệt hoặc đơn hàng thay đổi, tin nhắn sẽ xuất hiện tại đây.
             </p>
           ) : null}
         </div>

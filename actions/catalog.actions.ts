@@ -1,8 +1,11 @@
 "use server";
 
+import { unstable_cache } from "next/cache";
 import { Prisma } from "@prisma/client";
 
 import { normalizeBookCoverUrl } from "@/lib/book-cover";
+import { getVietnameseBookTitle } from "@/lib/book-display-title";
+import { normalizeBookPrice } from "@/lib/book-display-price";
 import { normalizeCatalogLanguageFilter } from "@/lib/book-language";
 import {
   rankCatalogSearchCandidates,
@@ -14,11 +17,46 @@ import prisma from "@/lib/prisma";
 import {
   catalogBookQualityWhere,
   publicBookQualityWhere,
-  publicDemoBookWhere,
 } from "@/lib/public-book-policy";
+
+const getCachedHasRealCatalog = unstable_cache(
+  async () => {
+    return (
+      (await prisma.book.findFirst({
+        where: publicBookQualityWhere(),
+        select: { id: true },
+      })) !== null
+    );
+  },
+  ["catalog-has-real-v1"],
+  { revalidate: 3600 }
+);
+
+const getCachedCatalogCategories = unstable_cache(
+  async () => {
+    return prisma.category.findMany({
+      where: {
+        parentId: null,
+        canonicalKey: { not: null },
+        books: { some: publicBookQualityWhere() },
+      },
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        canonicalKey: true,
+        canonicalName: true,
+      },
+    });
+  },
+  ["catalog-parent-categories-v1"],
+  { revalidate: 3600, tags: ["catalog"] }
+);
 
 type DecimalLike = { toNumber: () => number };
 
+/** Giữ để các verifier cũ biên dịch; UI công khai không còn cho chọn catalog demo. */
 export type CatalogSourceFilter = "all" | "real" | "demo";
 
 export interface CatalogCategory {
@@ -37,8 +75,8 @@ export interface CatalogBook {
   rating: number | null;
   sourceRating: number | null;
   catalogSource: "CURATED_REAL" | "SYNTHETIC_DEMO";
-  metadataBadge: "Sách tuyển chọn" | "Sách đề xuất";
-  priceLabel: "Giá BookVerse" | null;
+  metadataBadge: "Sách tuyển chọn" | "Dữ liệu demo";
+  priceLabel: "Giá BookVerse" | "Giá demo" | null;
   category: CatalogCategory;
   availableListingId: string | null;
   isFavorite: boolean;
@@ -50,6 +88,10 @@ export interface CatalogFilters {
   source?: CatalogSourceFilter;
   language?: string;
   publishYear?: number;
+  minPrice?: number;
+  maxPrice?: number;
+  minRating?: number;
+  inStock?: boolean;
   hasIsbn?: boolean;
   hasSourceRating?: boolean;
   page?: number;
@@ -68,7 +110,9 @@ export interface CatalogData {
   hasNextPage: boolean;
 }
 
-const PAGE_SIZE = 24;
+// 20 chia hết cho các số cột đang dùng ở tablet/desktop (2, 4 và 5),
+// nhờ đó mỗi trang kết thúc bằng một hàng đầy thay vì dư một ô trống.
+const PAGE_SIZE = 20;
 const CATALOG_BOOK_INCLUDE = {
   category: { select: { id: true, name: true, slug: true, canonicalName: true } },
   sourceMetadata: {
@@ -100,6 +144,7 @@ function buildMetadataFilter(filters: CatalogFilters): Prisma.BookSourceMetadata
   return {
     ...(filters.hasIsbn ? { isbn: { not: null } } : {}),
     ...(filters.hasSourceRating ? { sourceRatingAverage: { not: null } } : {}),
+    ...(filters.minRating ? { sourceRatingAverage: { gte: filters.minRating } } : {}),
   };
 }
 
@@ -124,7 +169,13 @@ function catalogOrderBy(sort: CatalogSearchSort): Prisma.BookOrderByWithRelation
     case "newest":
       return [{ publishYear: "desc" }, { title: "asc" }, { id: "asc" }];
     default:
-      return [{ title: "asc" }, { id: "asc" }];
+      // Danh mục vẫn giữ đủ ngoại văn và bộ lọc ngôn ngữ, nhưng lần mở mặc định
+      // đưa các bản tiếng Việt lên trước để phù hợp ngữ cảnh nhà sách Việt.
+      return [
+        { languageCode: { sort: "desc", nulls: "last" } },
+        { title: "asc" },
+        { id: "asc" },
+      ];
   }
 }
 
@@ -134,19 +185,16 @@ export async function getCatalogData(filters: CatalogFilters = {}): Promise<Cata
     const userId = currentUser && !currentUser.isLocked ? currentUser.id : null;
     const query = filters.query?.trim();
     const categoryId = filters.categoryId?.trim();
-    const source = filters.source ?? "all";
     const languageCode = normalizeCatalogLanguageFilter(filters.language);
     const page = Math.max(1, Math.floor(filters.page ?? 1));
     const sort = normalizeCatalogSort(filters.sort);
+    void filters.source;
     const metadataFilter = buildMetadataFilter(filters);
-    const publicRealWhere = publicBookQualityWhere();
-    const hasPublicRealCatalog =
-      (await prisma.book.count({ where: publicRealWhere, take: 1 })) > 0;
-    const useDemoCatalog = source === "demo" || !hasPublicRealCatalog;
-    const publicWhere = useDemoCatalog
-      ? publicDemoBookWhere()
-      : catalogBookQualityWhere(true);
-    const needsMetadataFilter = Boolean(filters.hasIsbn || filters.hasSourceRating);
+    const hasPublicRealCatalog = await getCachedHasRealCatalog();
+    const publicWhere = catalogBookQualityWhere(hasPublicRealCatalog);
+    const needsMetadataFilter = Boolean(
+      filters.hasIsbn || filters.hasSourceRating || filters.minRating,
+    );
     const where: Prisma.BookWhereInput = {
       ...publicWhere,
       ...(filters.language === "NOT_AVAILABLE"
@@ -154,29 +202,24 @@ export async function getCatalogData(filters: CatalogFilters = {}): Promise<Cata
         : languageCode
           ? { languageCode }
           : {}),
-      ...(!useDemoCatalog || needsMetadataFilter
-        ? { sourceMetadata: { is: metadataFilter } }
-        : {}),
+      ...(needsMetadataFilter ? { sourceMetadata: { is: metadataFilter } } : {}),
       ...(categoryId ? { category: { canonicalKey: categoryId } } : {}),
       ...(filters.publishYear ? { publishYear: filters.publishYear } : {}),
+      ...(filters.minPrice || filters.maxPrice
+        ? {
+            price: {
+              ...(filters.minPrice ? { gte: filters.minPrice } : {}),
+              ...(filters.maxPrice ? { lte: filters.maxPrice } : {}),
+            },
+          }
+        : {}),
+      ...(filters.inStock
+        ? { listings: { some: { status: "APPROVED", stock: { gt: 0 } } } }
+        : {}),
     };
 
     const [categoryRows, rankedSearch] = await Promise.all([
-      prisma.category.findMany({
-        where: {
-          parentId: null,
-          canonicalKey: { not: null },
-          books: { some: publicWhere },
-        },
-        orderBy: { name: "asc" },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          canonicalKey: true,
-          canonicalName: true,
-        },
-      }),
+      getCachedCatalogCategories(),
       query
         ? prisma.book
             .findMany({
@@ -201,7 +244,8 @@ export async function getCatalogData(filters: CatalogFilters = {}): Promise<Cata
             .then((books) => {
               const candidates = books.map((book) => ({
                   id: book.id,
-                  title: book.title,
+                  title: getVietnameseBookTitle(book.id, book.title),
+                  originalTitle: book.title,
                   authorName: book.authorName,
                   description: book.description,
                   categoryName: book.category.canonicalName ?? book.category.name,
@@ -275,17 +319,17 @@ export async function getCatalogData(filters: CatalogFilters = {}): Promise<Cata
         const isCurated = Boolean(book.sourceMetadata);
         return {
           id: book.id,
-          title: book.title,
+          title: getVietnameseBookTitle(book.id, book.title),
           author: book.authorName,
           // Mô tả nhập từ nguồn chỉ giữ để audit; giao diện công khai không sao chép nội dung đó.
           description: isCurated ? null : book.description,
           coverImage: normalizeBookCoverUrl(book.coverPath),
-          price: decimalToNumber(book.price) ?? 0,
+          price: normalizeBookPrice(book.price),
           rating: decimalToNumber(book.rating),
           sourceRating: book.sourceMetadata?.sourceRatingAverage ?? null,
           catalogSource: isCurated ? "CURATED_REAL" : "SYNTHETIC_DEMO",
-          metadataBadge: isCurated ? "Sách tuyển chọn" : "Sách đề xuất",
-          priceLabel: isCurated ? "Giá BookVerse" : null,
+          metadataBadge: isCurated ? "Sách tuyển chọn" : "Dữ liệu demo",
+          priceLabel: isCurated ? "Giá BookVerse" : "Giá demo",
           category: {
             id: book.category.id,
             name: book.category.canonicalName ?? book.category.name,

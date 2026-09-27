@@ -29,6 +29,29 @@ export function publicDemoBookWhere(): Prisma.BookWhereInput {
   };
 }
 
+export function isDemoCatalogExperienceEnabled(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return (
+    env.NODE_ENV !== "production" &&
+    env.BOOKVERSE_ALLOW_DEMO_CATALOG?.trim().toLowerCase() === "true"
+  );
+}
+
+/**
+ * Cho phép bản demo chạy trọn hành trình catalog → chi tiết → reader.
+ * Production luôn chỉ nhận catalog thật đã qua quality gate.
+ */
+export function publicExperienceBookWhere(): Prisma.BookWhereInput {
+  if (!isDemoCatalogExperienceEnabled()) return publicBookQualityWhere();
+  return { OR: [publicBookQualityWhere(), publicDemoBookWhere()] };
+}
+
 export function catalogBookQualityWhere(hasPublicRealCatalog: boolean): Prisma.BookWhereInput {
-  return hasPublicRealCatalog ? publicBookQualityWhere() : publicDemoBookWhere();
+  if (hasPublicRealCatalog || !isDemoCatalogExperienceEnabled()) {
+    return publicBookQualityWhere();
+  }
+
+  // Chỉ môi trường demo có flag rõ ràng mới dùng catalog tổng hợp và UI phải gắn nhãn.
+  return publicDemoBookWhere();
 }

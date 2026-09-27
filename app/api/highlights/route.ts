@@ -73,7 +73,7 @@ export async function GET(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: "Bạn cần đăng nhập để xem highlight.",
+          error: "Bạn cần đăng nhập để xem đoạn tô sáng.",
         },
         {
           status: 401,
@@ -138,7 +138,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         success: false,
-        error: "Không thể lấy danh sách highlight.",
+        error: "Không thể lấy danh sách đoạn tô sáng.",
         detail: process.env.NODE_ENV === "development" ? message : undefined,
       },
       {
@@ -156,7 +156,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: "Bạn cần đăng nhập để lưu highlight.",
+          error: "Bạn cần đăng nhập để lưu đoạn tô sáng.",
         },
         {
           status: 401,
@@ -183,7 +183,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: "Dữ liệu highlight không hợp lệ.",
+          error: "Dữ liệu đoạn tô sáng không hợp lệ.",
         },
         {
           status: 400,
@@ -212,7 +212,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: "Thiếu bookId hoặc nội dung highlight.",
+          error: "Thiếu bookId hoặc nội dung đoạn tô sáng.",
         },
         {
           status: 400,
@@ -224,7 +224,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: "Vị trí highlight không hợp lệ.",
+          error: "Vị trí đoạn tô sáng không hợp lệ.",
         },
         {
           status: 400,
@@ -301,7 +301,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         success: false,
-        error: "Không thể lưu highlight.",
+        error: "Không thể lưu đoạn tô sáng.",
         detail: process.env.NODE_ENV === "development" ? message : undefined,
       },
       {
@@ -316,7 +316,7 @@ export async function DELETE(request: Request) {
     const currentUser = await getCurrentUser();
 
     if (!currentUser) {
-      return NextResponse.json({ success: false, error: "Bạn cần đăng nhập để xóa highlight." }, { status: 401 });
+      return NextResponse.json({ success: false, error: "Bạn cần đăng nhập để xóa đoạn tô sáng." }, { status: 401 });
     }
 
     if (currentUser.isLocked) {
@@ -326,7 +326,7 @@ export async function DELETE(request: Request) {
     const highlightId = new URL(request.url).searchParams.get("id")?.trim();
 
     if (!highlightId) {
-      return NextResponse.json({ success: false, error: "Thiếu mã highlight." }, { status: 400 });
+      return NextResponse.json({ success: false, error: "Thiếu mã đoạn tô sáng." }, { status: 400 });
     }
 
     const highlight = await prisma.highlight.findFirst({
@@ -335,7 +335,7 @@ export async function DELETE(request: Request) {
     });
 
     if (!highlight) {
-      return NextResponse.json({ success: false, error: "Không tìm thấy highlight thuộc tài khoản này." }, { status: 404 });
+      return NextResponse.json({ success: false, error: "Không tìm thấy đoạn tô sáng thuộc tài khoản này." }, { status: 404 });
     }
 
     await prisma.$transaction([
@@ -358,7 +358,7 @@ export async function DELETE(request: Request) {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Lỗi không xác định.";
     console.error(`[api/highlights][DELETE] ${message}`);
-    return NextResponse.json({ success: false, error: "Không thể xóa highlight." }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Không thể xóa đoạn tô sáng." }, { status: 500 });
   }
 }
 
@@ -367,7 +367,7 @@ export async function PATCH(request: Request) {
     const currentUser = await getCurrentUser();
 
     if (!currentUser) {
-      return NextResponse.json({ success: false, error: "Bạn cần đăng nhập để sửa highlight." }, { status: 401 });
+      return NextResponse.json({ success: false, error: "Bạn cần đăng nhập để sửa đoạn tô sáng." }, { status: 401 });
     }
     if (currentUser.isLocked) {
       return NextResponse.json({ success: false, error: "Tài khoản của bạn đã bị khóa." }, { status: 403 });
@@ -378,7 +378,7 @@ export async function PATCH(request: Request) {
     const note = payload?.note?.trim() || null;
 
     if (!highlightId || (payload?.note?.length ?? 0) > 500) {
-      return NextResponse.json({ success: false, error: "Mã highlight hoặc ghi chú không hợp lệ." }, { status: 400 });
+      return NextResponse.json({ success: false, error: "Mã đoạn tô sáng hoặc ghi chú không hợp lệ." }, { status: 400 });
     }
 
     const existing = await prisma.highlight.findFirst({
@@ -387,7 +387,7 @@ export async function PATCH(request: Request) {
     });
 
     if (!existing) {
-      return NextResponse.json({ success: false, error: "Không tìm thấy highlight thuộc tài khoản này." }, { status: 404 });
+      return NextResponse.json({ success: false, error: "Không tìm thấy đoạn tô sáng thuộc tài khoản này." }, { status: 404 });
     }
 
     const updated = await prisma.highlight.update({ where: { id: existing.id }, data: { note } });

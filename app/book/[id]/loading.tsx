@@ -2,39 +2,51 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function BookDetailLoading() {
   return (
-    <main className="bv-page">
-      <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-        <section className="grid gap-8 lg:grid-cols-[1fr_2fr] lg:gap-12">
-          <aside className="space-y-4">
-            <Skeleton className="aspect-[2/3] w-full rounded-lg" />
-            <Skeleton className="h-12 w-full rounded-lg" />
-            <Skeleton className="h-12 w-full rounded-lg" />
+    <main className="bv-page relative min-h-screen pb-20 pt-6">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+        {/* Breadcrumb skeleton */}
+        <div className="mb-8 flex items-center justify-between">
+          <Skeleton className="h-9 w-64 rounded-full" />
+          <Skeleton className="h-7 w-24 rounded-full" />
+        </div>
+
+        {/* Primary grid */}
+        <section className="grid gap-8 lg:grid-cols-[360px_1fr] xl:grid-cols-[400px_1fr] lg:gap-12">
+          {/* Left Column */}
+          <aside className="space-y-6">
+            <div className="mx-auto max-w-[340px] sm:max-w-[380px] lg:max-w-none">
+              <Skeleton className="aspect-[2/3] w-full rounded-3xl" />
+            </div>
+            <Skeleton className="h-64 w-full rounded-3xl" />
           </aside>
 
-          <section className="rounded-lg border border-[#17191F]/10 bg-[#FFFDF8] p-6 shadow-[0_12px_34px_rgba(39,44,51,0.08)] sm:p-8">
-            <Skeleton className="h-7 w-40" />
-            <Skeleton className="mt-6 h-12 w-4/5" />
-            <Skeleton className="mt-4 h-6 w-56" />
-            <Skeleton className="mt-8 h-16 w-full rounded-lg" />
-
-            <div className="mt-8 space-y-4">
-              <Skeleton className="h-6 w-48" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-11/12" />
-              <Skeleton className="h-4 w-3/4" />
+          {/* Right Column */}
+          <div className="space-y-8">
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <Skeleton className="h-6 w-24 rounded-full" />
+                <Skeleton className="h-6 w-28 rounded-full" />
+              </div>
+              <Skeleton className="h-12 w-3/4 rounded-xl" />
+              <Skeleton className="h-5 w-48 rounded-lg" />
             </div>
 
-            <div className="mt-8 grid gap-4 sm:grid-cols-2">
-              {Array.from({ length: 6 }, (_, index) => (
-                <Skeleton className="h-20 rounded-lg" key={index} />
+            {/* 4 Metric cards */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton className="h-24 rounded-2xl" key={i} />
               ))}
             </div>
-          </section>
-        </section>
 
-        <section className="mt-12">
-          <Skeleton className="mb-5 h-8 w-72" />
-          <Skeleton className="h-40 w-full rounded-lg" />
+            {/* Purchasing Console */}
+            <Skeleton className="h-72 w-full rounded-3xl" />
+
+            {/* Synopsis */}
+            <Skeleton className="h-44 w-full rounded-3xl" />
+
+            {/* Specs */}
+            <Skeleton className="h-56 w-full rounded-3xl" />
+          </div>
         </section>
       </div>
     </main>

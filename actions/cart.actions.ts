@@ -8,6 +8,7 @@ import {
 } from "@prisma/client";
 import { checkoutOrder, CheckoutDomainError } from "@/lib/checkout-service";
 import { normalizeBookCoverUrl } from "@/lib/book-cover";
+import { getVietnameseBookTitle } from "@/lib/book-display-title";
 import { getCurrentUser, PermissionError, requireAuthenticatedUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
 import { validateRequestedQuantity } from "@/lib/stock-policy";
@@ -128,11 +129,11 @@ function getAvailabilityMessage(item: {
   } | null;
 }, userId: string): string | null {
   if (!item.listingId || !item.listing) {
-    return "Listing không còn tồn tại.";
+    return "tin bán sách không còn tồn tại.";
   }
 
   if (item.listing.status !== ListingStatus.APPROVED) {
-    return "Listing không còn ở trạng thái đã duyệt.";
+    return "tin bán sách không còn ở trạng thái đã duyệt.";
   }
 
   const quantityError = validateRequestedQuantity(item.quantity, item.listing.stock);
@@ -141,16 +142,16 @@ function getAvailabilityMessage(item: {
   }
 
   if (item.listing.bookId !== item.bookId) {
-    return "Listing không còn khớp với sách trong giỏ.";
+    return "tin bán sách không còn khớp với sách trong giỏ.";
   }
 
   if (item.listing.sellerId === userId) {
-    return "Bạn không thể mua listing do chính mình đăng.";
+    return "Bạn không thể mua tin bán sách do chính mình đăng.";
   }
 
   const listingPrice = decimalToNumber(item.listing.price);
   if (!Number.isFinite(listingPrice) || listingPrice <= 0) {
-    return "Giá listing không hợp lệ.";
+    return "Giá tin bán sách không hợp lệ.";
   }
 
   if (decimalToNumber(item.unitPrice) <= 0 || decimalToNumber(item.totalPrice) <= 0) {
@@ -175,11 +176,11 @@ function buildCheckoutIssues(items: CartItem[], shippingAddresses: CartShippingA
 
   const sellerIds = new Set(items.map((item) => item.seller?.id).filter(Boolean) as string[]);
   if (sellerIds.size > 1) {
-    issues.add("Giỏ hàng đang có nhiều seller. Demo Phase 4 chỉ cho checkout một seller mỗi đơn.");
+    issues.add("Giỏ hàng đang có nhiều seller. Demo Phase 4 chỉ cho thanh toán một seller mỗi đơn.");
   }
 
   if (shippingAddresses.length === 0) {
-    issues.add("Bạn cần thêm địa chỉ giao hàng trước khi checkout.");
+    issues.add("Bạn cần thêm địa chỉ giao hàng trước khi thanh toán.");
   }
 
   return Array.from(issues);
@@ -309,20 +310,21 @@ export async function getCartPageData(): Promise<CartPageData> {
       unitPrice: decimalToNumber(item.unitPrice),
       totalPrice: decimalToNumber(item.totalPrice),
       listingId: item.listingId,
-      listingTitle: item.listing?.title ?? null,
+      // Listing.title là snapshot do seller nhập; giao diện dùng tên chuẩn theo bookId.
+      listingTitle: getVietnameseBookTitle(item.book.id, item.book.title),
       listingStatus: item.listing?.status ?? null,
       stock: item.listing?.stock ?? 0,
       condition: item.listing?.condition ?? null,
       book: {
         id: item.book.id,
-        title: item.book.title,
+        title: getVietnameseBookTitle(item.book.id, item.book.title),
         author: item.book.authorName,
         coverImage: normalizeBookCoverUrl(item.book.coverPath),
       },
       seller: item.listing?.seller ?? null,
       availability: {
         ok: !getAvailabilityMessage(item, userId),
-        message: getAvailabilityMessage(item, userId) ?? "Có thể checkout.",
+        message: getAvailabilityMessage(item, userId) ?? "Có thể thanh toán.",
       },
     }));
     const selectedShippingAddressId =
@@ -544,7 +546,7 @@ export async function checkoutCart(
     return {
       success: true,
       message: receipt.replayed
-        ? `Checkout đã được xử lý trước đó. Mã đơn: ${receipt.orderId}`
+        ? `thanh toán đã được xử lý trước đó. Mã đơn: ${receipt.orderId}`
         : `Đã tạo đơn hàng. Mã đơn: ${receipt.orderId}`,
       orderId: receipt.orderId,
     };

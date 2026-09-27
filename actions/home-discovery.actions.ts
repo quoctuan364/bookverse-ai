@@ -1,6 +1,9 @@
 "use server";
 
+import { unstable_cache } from "next/cache";
 import { normalizeBookCoverUrl } from "@/lib/book-cover";
+import { getVietnameseBookTitle } from "@/lib/book-display-title";
+import { normalizeBookPrice } from "@/lib/book-display-price";
 import {
   rankTrendingBooks,
   uniqueRecentlyViewedBookIds,
@@ -8,7 +11,11 @@ import {
 } from "@/lib/home-discovery";
 import { getCurrentUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
-import { publicBookQualityWhere } from "@/lib/public-book-policy";
+import {
+  catalogBookQualityWhere,
+  isDemoCatalogExperienceEnabled,
+  publicBookQualityWhere,
+} from "@/lib/public-book-policy";
 
 type DecimalLike = {
   toNumber: () => number;
@@ -63,30 +70,36 @@ export interface HomePlatformStats {
  * Các con số trên trang chủ được đếm trực tiếp từ database để không hiển thị
  * số liệu quảng cáo giả trong buổi demo.
  */
-export async function getHomePlatformStats(): Promise<HomePlatformStats | null> {
+async function _getHomePlatformStats(): Promise<HomePlatformStats | null> {
   try {
+    const hasPublicRealCatalog =
+      (await prisma.book.findFirst({ where: publicBookQualityWhere(), select: { id: true } })) !==
+      null;
+    const publicWhere = catalogBookQualityWhere(hasPublicRealCatalog);
     const [activeBooks, readableBooks, categories, approvedListings, spotlightBooks] =
       await Promise.all([
-        prisma.book.count({ where: { status: "ACTIVE", deletedAt: null } }),
+        prisma.book.count({ where: publicWhere }),
         prisma.book.count({
           where: {
-            status: "ACTIVE",
-            deletedAt: null,
+            ...publicWhere,
             chunks: { some: {} },
           },
         }),
         prisma.category.count({
           where: {
-            books: { some: { status: "ACTIVE", deletedAt: null } },
+            books: { some: publicWhere },
           },
         }),
         prisma.listing.count({
-          where: { status: "APPROVED", stock: { gt: 0 } },
+          where: {
+            status: "APPROVED",
+            stock: { gt: 0 },
+            book: { is: publicWhere },
+          },
         }),
         prisma.book.findMany({
           where: {
-            status: "ACTIVE",
-            deletedAt: null,
+            ...publicWhere,
             chunks: { some: {} },
           },
           orderBy: [{ rating: "desc" }, { title: "asc" }],
@@ -107,7 +120,7 @@ export async function getHomePlatformStats(): Promise<HomePlatformStats | null> 
       approvedListings,
       spotlightBooks: spotlightBooks.map((book) => ({
         id: book.id,
-        title: book.title,
+        title: getVietnameseBookTitle(book.id, book.title),
         author: book.authorName,
         coverImage: normalizeBookCoverUrl(book.coverPath),
       })),
@@ -119,10 +132,32 @@ export async function getHomePlatformStats(): Promise<HomePlatformStats | null> 
   }
 }
 
-function decimalToNumber(value: DecimalLike | number | string): number {
-  if (typeof value === "number") return value;
-  if (typeof value === "string") return Number(value);
-  return value.toNumber();
+/**
+ * Số liệu thống kê trang chủ được cache 5 phút — không cần real-time.
+ */
+const getCachedHomePlatformStats = unstable_cache(
+  async (catalogMode: "demo" | "real" | "public") => {
+    void catalogMode; // Tham số được unstable_cache dùng để phân biệt bộ dữ liệu.
+    return _getHomePlatformStats();
+  },
+  ["home-platform-stats"],
+  { revalidate: 300, tags: ["home-shelves"] },
+);
+
+/**
+ * Chế độ catalog là một phần của khóa cache. Nhờ vậy số lượng sách không bị
+ * giữ ở 0 khi chuyển từ cấu hình production sang môi trường demo.
+ */
+export async function getHomePlatformStats(): Promise<HomePlatformStats | null> {
+  const hasPublicRealCatalog =
+    (await prisma.book.findFirst({ where: publicBookQualityWhere(), select: { id: true } })) !==
+    null;
+  const catalogMode = hasPublicRealCatalog
+    ? "real"
+    : isDemoCatalogExperienceEnabled()
+      ? "demo"
+      : "public";
+  return getCachedHomePlatformStats(catalogMode);
 }
 
 const bookSelect = {
@@ -154,11 +189,11 @@ function serializeBook(
 ): HomeDiscoveryBook {
   return {
     id: book.id,
-    title: book.title,
+    title: getVietnameseBookTitle(book.id, book.title),
     author: book.authorName,
     category: book.category?.name ?? null,
     coverImage: normalizeBookCoverUrl(book.coverPath),
-    price: decimalToNumber(book.price),
+    price: normalizeBookPrice(book.price),
     availableListingId: book.listings[0]?.id ?? null,
     isFavorite: favoriteBookIds.has(book.id),
   };
@@ -170,7 +205,10 @@ export async function getHomeDiscoveryData(): Promise<HomeDiscoveryData> {
     const userId = currentUser && !currentUser.isLocked ? currentUser.id : null;
     const now = new Date();
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1_000);
-    const publicWhere = publicBookQualityWhere();
+    const hasPublicRealCatalog =
+      (await prisma.book.findFirst({ where: publicBookQualityWhere(), select: { id: true } })) !==
+      null;
+    const publicWhere = catalogBookQualityWhere(hasPublicRealCatalog);
 
     const [continueProgress, recentSignals, weeklySignals] = await Promise.all([
       userId
@@ -305,7 +343,7 @@ export async function getHomeDiscoveryData(): Promise<HomeDiscoveryData> {
           trendScore: signal?.score ?? null,
           trendLabel: signal
             ? "Đang được quan tâm trong 7 ngày"
-            : "Nổi bật trong catalog BookVerse",
+            : "Nổi bật trong danh mục sách BookVerse",
         };
       }),
       isPersonalized: Boolean(userId),

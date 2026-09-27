@@ -30,18 +30,23 @@ export interface RevenueChartPoint {
 interface DashboardChartsProps {
   readingData: ReadingChartPoint[];
   revenueData: RevenueChartPoint[];
+  showRevenue?: boolean;
 }
 
 const tooltipStyle = {
-  background: "#102B2A",
-  border: "1px solid rgba(255, 255, 255, 0.16)",
+  background: "#FFFDF8",
+  border: "1px solid rgba(29, 36, 51, 0.16)",
   borderRadius: "12px",
-  color: "#FFFDF8",
+  color: "#17202A",
 };
 
 const labelStyle = {
-  color: "#D9EEEA",
+  color: "#17202A",
   fontWeight: 700,
+};
+
+const tooltipItemStyle = {
+  color: "#17202A",
 };
 
 const axisTick = {
@@ -55,7 +60,7 @@ const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   style: "currency",
 });
 
-export function DashboardCharts({ readingData, revenueData }: DashboardChartsProps) {
+export function DashboardCharts({ readingData, revenueData, showRevenue = true }: DashboardChartsProps) {
   const readingSummary = useMemo(
     () =>
       readingData.reduce(
@@ -83,34 +88,34 @@ export function DashboardCharts({ readingData, revenueData }: DashboardChartsPro
   );
 
   return (
-    <div className="grid gap-5 xl:grid-cols-2">
+    <div className={`grid min-w-0 gap-5 ${showRevenue ? "xl:grid-cols-2" : ""}`}>
       <section
         aria-labelledby="reading-chart-title"
-        className="rounded-2xl border border-[#176B62]/15 bg-white p-5 shadow-[0_16px_45px_rgba(23,107,98,0.08)]"
+        className="min-w-0 overflow-hidden rounded-2xl border border-bv-primary/15 bg-white p-4 shadow-[0_16px_45px_rgba(23,107,98,0.08)] sm:p-5"
       >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#176B62]">Nhịp đọc 14 ngày</p>
-            <h2 className="mt-2 text-xl font-black text-[#17202A]" id="reading-chart-title">Thói quen đọc sách</h2>
-            <p className="mt-1 text-sm leading-6 text-[#66706B]">Phút đọc và số trang đã chạm theo từng ngày.</p>
+            <p className="text-sm font-bold uppercase tracking-[0.16em] text-bv-primary">Nhịp đọc 14 ngày</p>
+            <h2 className="mt-2 text-xl font-black text-bv-heading" id="reading-chart-title">Thói quen đọc sách</h2>
+            <p className="mt-1 text-sm leading-6 text-bv-text-muted">Phút đọc và số trang đã chạm theo từng ngày.</p>
           </div>
-          <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="grid grid-cols-3 gap-1 text-center sm:gap-2">
             <div className="rounded-xl bg-[#FFF4DD] px-3 py-2">
               <p className="text-lg font-black text-[#8A5A00]">{readingSummary.minutes}</p>
               <p className="text-[11px] font-bold uppercase text-[#7A6540]">Phút</p>
             </div>
-            <div className="rounded-xl bg-[#E6F3F0] px-3 py-2">
-              <p className="text-lg font-black text-[#176B62]">{readingSummary.pages}</p>
+            <div className="rounded-xl bg-bv-mint px-3 py-2">
+              <p className="text-lg font-black text-bv-primary">{readingSummary.pages}</p>
               <p className="text-[11px] font-bold uppercase text-[#456862]">Trang</p>
             </div>
             <div className="rounded-xl bg-[#F2EEE6] px-3 py-2">
-              <p className="text-lg font-black text-[#17202A]">{readingSummary.sessions}</p>
-              <p className="text-[11px] font-bold uppercase text-[#66706B]">Phiên</p>
+              <p className="text-lg font-black text-bv-heading">{readingSummary.sessions}</p>
+              <p className="text-[11px] font-bold uppercase text-[#5F6877]">Phiên</p>
             </div>
           </div>
         </div>
 
-        <div className="mt-6 h-72 sm:h-80" role="img" aria-label="Biểu đồ vùng thói quen đọc trong 14 ngày">
+        <div className="mt-6 h-72 min-w-0 sm:h-80" role="img" aria-label="Biểu đồ vùng thói quen đọc trong 14 ngày">
           <ResponsiveContainer height="100%" width="100%">
             <AreaChart data={readingData} margin={{ bottom: 0, left: -10, right: 8, top: 12 }}>
               <defs>
@@ -122,7 +127,11 @@ export function DashboardCharts({ readingData, revenueData }: DashboardChartsPro
               <CartesianGrid stroke="#E7E0D5" strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="label" tick={axisTick} tickLine={false} />
               <YAxis tick={axisTick} tickLine={false} width={36} />
-              <Tooltip contentStyle={tooltipStyle} labelStyle={labelStyle} />
+              <Tooltip
+                contentStyle={tooltipStyle}
+                itemStyle={tooltipItemStyle}
+                labelStyle={labelStyle}
+              />
               <Area
                 dataKey="minutes"
                 fill="url(#readingMinutesGradient)"
@@ -144,17 +153,18 @@ export function DashboardCharts({ readingData, revenueData }: DashboardChartsPro
         </div>
       </section>
 
+      {showRevenue ? (
       <section
         aria-labelledby="revenue-chart-title"
-        className="rounded-2xl border border-[#C65D43]/15 bg-white p-5 shadow-[0_16px_45px_rgba(198,93,67,0.08)]"
+        className="min-w-0 overflow-hidden rounded-2xl border border-bv-accent/15 bg-white p-4 shadow-[0_16px_45px_rgba(198,93,67,0.08)] sm:p-5"
       >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#C65D43]">Kết quả 30 ngày</p>
-            <h2 className="mt-2 text-xl font-black text-[#17202A]" id="revenue-chart-title">Doanh thu chợ sách</h2>
-            <p className="mt-1 text-sm leading-6 text-[#66706B]">Các đơn đã thanh toán, đang giao hoặc hoàn tất.</p>
+            <p className="text-sm font-bold uppercase tracking-[0.16em] text-bv-accent">Kết quả 30 ngày</p>
+            <h2 className="mt-2 text-xl font-black text-bv-heading" id="revenue-chart-title">Doanh thu chợ sách</h2>
+            <p className="mt-1 text-sm leading-6 text-bv-text-muted">Các đơn đã thanh toán, đang giao hoặc hoàn tất.</p>
           </div>
-          <div className="rounded-xl border border-[#C65D43]/15 bg-[#FFF0EB] px-4 py-3 text-right">
+          <div className="rounded-xl border border-bv-accent/15 bg-[#FFF0EB] px-4 py-3 text-right">
             <p className="text-lg font-black text-[#B44F37]">{currencyFormatter.format(revenueSummary.revenue)}</p>
             <p className="text-xs font-bold text-[#765B54]">
               {revenueSummary.orders} đơn / {revenueSummary.items} sản phẩm
@@ -179,14 +189,16 @@ export function DashboardCharts({ readingData, revenueData }: DashboardChartsPro
                   name === "Doanh thu" ? currencyFormatter.format(Number(value)) : value,
                   name,
                 ]}
+                itemStyle={tooltipItemStyle}
                 labelStyle={labelStyle}
               />
-              <Bar dataKey="revenue" fill="#C65D43" name="Doanh thu" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="revenue" fill="#A94432" name="Doanh thu" radius={[8, 8, 0, 0]} />
               <Bar dataKey="orders" fill="#0F766E" name="Số đơn" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </section>
+      ) : null}
     </div>
   );
 }

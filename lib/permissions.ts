@@ -1,4 +1,5 @@
 import { UserRole } from "@prisma/client";
+import { cache } from "react";
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 
@@ -17,7 +18,7 @@ export class PermissionError extends Error {
   }
 }
 
-export async function getCurrentUser(): Promise<CurrentUserSession | null> {
+export const getCurrentUser = cache(async (): Promise<CurrentUserSession | null> => {
   const session = await auth();
   const sessionUser = session?.user;
 
@@ -43,7 +44,7 @@ export async function getCurrentUser(): Promise<CurrentUserSession | null> {
     console.warn("[permissions] Database không khả dụng; chuyển sang chế độ khách.");
     return null;
   }
-}
+});
 
 export async function requireAuthenticatedUser(): Promise<CurrentUserSession> {
   const user = await getCurrentUser();
@@ -79,12 +80,10 @@ export async function requireAdminUser(): Promise<CurrentUserSession> {
   return user;
 }
 
+/**
+ * @deprecated Under Unified User Model, all members have seller permissions.
+ * Use requireAuthenticatedUser() instead. Kept for legacy backward compatibility.
+ */
 export async function requireSellerUser(): Promise<CurrentUserSession> {
-  const user = await requireAuthenticatedUser();
-
-  if (user.role !== UserRole.SELLER && user.role !== UserRole.ADMIN) {
-    throw new PermissionError("Chỉ người bán hoặc quản trị viên được thực hiện thao tác này.");
-  }
-
-  return user;
+  return requireAuthenticatedUser();
 }

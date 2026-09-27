@@ -2,7 +2,7 @@ import { BookOpen } from "lucide-react";
 
 function SkeletonCard() {
   return (
-    <div className="overflow-hidden rounded-2xl border border-[#1D2433]/8 bg-white">
+    <div className="overflow-hidden rounded-2xl border border-bv-ink/8 bg-white">
       <div className="aspect-[2/3] animate-pulse bg-[#E8E3D8]" />
       <div className="space-y-3 p-4">
         <div className="h-5 w-4/5 animate-pulse rounded-full bg-[#E8E3D8]" />
@@ -16,14 +16,14 @@ function SkeletonCard() {
 export default function Loading() {
   return (
     <main aria-busy="true" aria-live="polite" className="bv-page min-h-[70vh]">
-      <section className="border-b border-[#1D2433]/8 bg-[#FFFDF8]/70">
+      <section className="border-b border-bv-ink/8 bg-bv-ivory/70">
         <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-8 sm:px-6 lg:px-8">
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#DDF0EB] text-[#176B62]">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#DDF0EB] text-bv-primary">
             <BookOpen className="h-5 w-5" aria-hidden="true" />
           </span>
           <div>
-            <p className="font-black text-[#1D2433]">BookVerse đang chuẩn bị nội dung</p>
-            <p className="text-sm text-[#687083]">Đang tải dữ liệu mới nhất, vui lòng chờ một chút.</p>
+            <p className="font-black text-bv-ink">Đợi BookVerse một chút nhé</p>
+            <p className="text-sm text-bv-text-subtle">Đang mở trang và chuẩn bị những cuốn sách dành cho bạn.</p>
           </div>
         </div>
       </section>

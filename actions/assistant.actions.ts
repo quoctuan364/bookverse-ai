@@ -1,7 +1,10 @@
 "use server";
 
 import { normalizeBookCoverUrl } from "@/lib/book-cover";
+import { getVietnameseBookTitle } from "@/lib/book-display-title";
+import { normalizeBookPrice } from "@/lib/book-display-price";
 import prisma from "@/lib/prisma";
+import { publicExperienceBookWhere } from "@/lib/public-book-policy";
 
 type DecimalLike = {
   toNumber: () => number;
@@ -45,7 +48,7 @@ function buildReason(query: string, category: string, rating: number | null): st
     return rating ? `Sách nổi bật trong ${category}, rating ${rating.toFixed(1)}/5.` : `Sách nổi bật trong ${category}.`;
   }
 
-  return `Phù hợp với nhu cầu "${query}" nhờ chủ đề ${category} và metadata trong catalog.`;
+  return `Phù hợp với nhu cầu "${query}" nhờ chủ đề ${category} và thông tin mô tả trong danh mục sách.`;
 }
 
 /**
@@ -59,6 +62,7 @@ export async function askBookAssistant(query: string): Promise<AssistantResponse
     const books = await prisma.book.findMany({
       where: cleanQuery
         ? {
+            ...publicExperienceBookWhere(),
             OR: [
               {
                 title: {
@@ -98,7 +102,7 @@ export async function askBookAssistant(query: string): Promise<AssistantResponse
               },
             ],
           }
-        : {},
+        : publicExperienceBookWhere(),
       orderBy: [
         {
           rating: "desc",
@@ -122,10 +126,10 @@ export async function askBookAssistant(query: string): Promise<AssistantResponse
 
       return {
         id: book.id,
-        title: book.title,
+        title: getVietnameseBookTitle(book.id, book.title),
         author: book.authorName,
         coverImage: normalizeBookCoverUrl(book.coverPath),
-        price: decimalToNumber(book.price) ?? 0,
+        price: normalizeBookPrice(book.price),
         category: book.category.name,
         rating,
         reason: buildReason(cleanQuery, book.category.name, rating),
@@ -144,7 +148,7 @@ export async function askBookAssistant(query: string): Promise<AssistantResponse
     return {
       query: cleanQuery,
       answer: cleanQuery
-        ? `Mình tìm thấy ${suggestions.length} sách phù hợp với nhu cầu "${cleanQuery}". Ưu tiên mở sách có rating cao và còn listing marketplace nếu bạn muốn demo mua hàng.`
+        ? `Mình tìm thấy ${suggestions.length} sách phù hợp với nhu cầu "${cleanQuery}". Ưu tiên mở sách có rating cao và còn tin bán sách marketplace nếu bạn muốn demo mua hàng.`
         : "Dưới đây là các sách nổi bật để bạn bắt đầu. Nhập nhu cầu cụ thể để trợ lý lọc sát hơn.",
       suggestions,
     };

@@ -9,8 +9,8 @@ from ai_service.evaluation.human_relevance import (
 def test_prepare_blinded_assignment_deduplicates_shared_book() -> None:
     public, secret = prepare_blinded_assignments(
         [
-            {"participant_code": "P01", "algorithm": "content", "rank": 1, "book_id": "B1"},
-            {"participant_code": "P01", "algorithm": "behavior", "rank": 2, "book_id": "B1"},
+            {"participant_code": "P01", "algorithm": "content", "rank": 1, "book_id": "B1", "book_title": "Sách một", "author_name": "Tác giả A"},
+            {"participant_code": "P01", "algorithm": "behavior", "rank": 2, "book_id": "B1", "book_title": "Sách một", "author_name": "Tác giả A"},
             {"participant_code": "P01", "algorithm": "hybrid", "rank": 1, "book_id": "B2"},
         ],
         seed=20260730,
@@ -18,6 +18,9 @@ def test_prepare_blinded_assignment_deduplicates_shared_book() -> None:
     assert len(public) == 2
     assert len(secret) == 2
     assert all("algorithm" not in row for row in public)
+    public_book = next(row for row in public if row["book_id"] == "B1")
+    assert public_book["book_title"] == "Sách một"
+    assert public_book["author_name"] == "Tác giả A"
     shared = next(row for row in secret if row["book_id"] == "B1")
     assert "content" in shared["algorithm_ranks_json"]
     assert "behavior" in shared["algorithm_ranks_json"]

@@ -12,8 +12,11 @@ COPY app ./app
 COPY actions ./actions
 COPY components ./components
 COPY config ./config
+COPY data ./data
+COPY hooks ./hooks
 COPY lib ./lib
 COPY shared ./shared
+COPY stores ./stores
 COPY public ./public
 COPY auth.ts ./
 COPY middleware.ts* ./
@@ -31,6 +34,7 @@ COPY --from=builder /app/package-lock.json ./package-lock.json
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/data ./data
 COPY --from=builder /app/prisma ./prisma
 COPY scripts/validate-production-env.mjs ./scripts/validate-production-env.mjs
 COPY scripts/prepare_demo_reader.mjs ./scripts/prepare_demo_reader.mjs

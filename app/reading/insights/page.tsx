@@ -35,7 +35,7 @@ export default async function ReadingInsightsPage() {
   const metrics = [
     {
       icon: Flame,
-      label: "Streak hiện tại",
+      label: "Chuỗi ngày đọc liên tiếp",
       value: `${data.currentStreak} ngày`,
       note: `Kỷ lục ${data.longestStreak} ngày`,
     },
@@ -63,16 +63,16 @@ export default async function ReadingInsightsPage() {
     <main className="bv-page">
       <section className="bv-hero">
         <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-          <p className="inline-flex items-center gap-2 text-sm font-black uppercase tracking-[0.16em] text-[#F2C14E]">
+          <p className="inline-flex items-center gap-2 text-sm font-black uppercase tracking-[0.16em] text-bv-gold">
             <BarChart3 className="h-4 w-4" aria-hidden="true" />
-            Reading Insights
+            Thống kê thói quen đọc
           </p>
           <div className="mt-3 flex flex-wrap items-end justify-between gap-5">
             <div>
               <h1 className="bv-editorial text-4xl font-bold sm:text-6xl">
                 Nhịp đọc của {data.readerName}
               </h1>
-              <p className="mt-3 max-w-2xl leading-7 text-[#EAF5F1]">
+              <p className="mt-3 max-w-2xl leading-7 text-bv-mint-soft">
                 Số liệu được tổng hợp từ tiến độ và phiên đọc đã lưu, giúp bạn duy trì
                 thói quen thay vì chạy theo con số ảo.
               </p>
@@ -92,10 +92,10 @@ export default async function ReadingInsightsPage() {
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {metrics.map(({ icon: Icon, label, value, note }) => (
             <article className="bv-card rounded-2xl p-5" key={label}>
-              <Icon className="h-6 w-6 text-[#176B62]" aria-hidden="true" />
-              <p className="mt-4 text-sm font-bold text-[#66706B]">{label}</p>
-              <p className="mt-1 text-2xl font-black text-[#17202A]">{value}</p>
-              <p className="mt-2 text-xs leading-5 text-[#66706B]">{note}</p>
+              <Icon className="h-6 w-6 text-bv-primary" aria-hidden="true" />
+              <p className="mt-4 text-sm font-bold text-bv-text-muted">{label}</p>
+              <p className="mt-1 text-2xl font-black text-bv-heading">{value}</p>
+              <p className="mt-2 text-xs leading-5 text-bv-text-muted">{note}</p>
             </article>
           ))}
         </div>
@@ -104,14 +104,14 @@ export default async function ReadingInsightsPage() {
           <section className="bv-card rounded-2xl p-5 sm:p-7" aria-labelledby="weekly-chart-title">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-black uppercase tracking-[0.14em] text-[#C65D43]">
+                <p className="text-sm font-black uppercase tracking-[0.14em] text-bv-accent">
                   7 ngày gần nhất
                 </p>
-                <h2 className="mt-1 text-2xl font-black text-[#17202A]" id="weekly-chart-title">
+                <h2 className="mt-1 text-2xl font-black text-bv-heading" id="weekly-chart-title">
                   {formatMinutes(data.weeklyMinutes)} đã đọc
                 </h2>
               </div>
-              <span className="rounded-full bg-[#E6F3F0] px-3 py-1 text-sm font-black text-[#176B62]">
+              <span className="rounded-full bg-bv-mint px-3 py-1 text-sm font-black text-bv-primary">
                 {data.weeklyGoalProgress}% mục tiêu tuần
               </span>
             </div>
@@ -122,51 +122,51 @@ export default async function ReadingInsightsPage() {
                 const reachedGoal = day.minutes >= data.dailyGoalMinutes;
                 return (
                   <div className="flex min-w-0 flex-col items-center justify-end" key={day.dateKey}>
-                    <span className="mb-2 text-xs font-bold tabular-nums text-[#536071]">
+                    <span className="mb-2 text-xs font-bold tabular-nums text-bv-text">
                       {day.minutes}
                     </span>
                     <span
                       className={`w-full max-w-12 rounded-t-lg transition-all duration-200 ${
-                        reachedGoal ? "bg-[#176B62]" : "bg-[#D8CDBB]"
+                        reachedGoal ? "bg-bv-primary" : "bg-[#D8CDBB]"
                       }`}
                       style={{ height }}
                       title={`${day.label}: ${day.minutes} phút, ${day.sessions} phiên`}
                     />
-                    <span className="mt-2 truncate text-[11px] font-bold text-[#66706B] sm:text-xs">
+                    <span className="mt-2 truncate text-[11px] font-bold text-bv-text-muted sm:text-xs">
                       {day.label}
                     </span>
                   </div>
                 );
               })}
             </div>
-            <p className="mt-5 flex items-center gap-2 text-sm text-[#66706B]">
-              <span className="h-3 w-3 rounded-sm bg-[#176B62]" aria-hidden="true" />
+            <p className="mt-5 flex items-center gap-2 text-sm text-bv-text-muted">
+              <span className="h-3 w-3 rounded-sm bg-bv-primary" aria-hidden="true" />
               Cột xanh: đạt mục tiêu {data.dailyGoalMinutes} phút/ngày.
             </p>
           </section>
 
           <section className="bv-card rounded-2xl p-5 sm:p-7">
-            <p className="text-sm font-black uppercase tracking-[0.14em] text-[#C65D43]">
+            <p className="text-sm font-black uppercase tracking-[0.14em] text-bv-accent">
               Chủ đề đọc nhiều
             </p>
-            <h2 className="mt-1 text-2xl font-black text-[#17202A]">Phân bổ thời gian</h2>
+            <h2 className="mt-1 text-2xl font-black text-bv-heading">Phân bổ thời gian</h2>
             <div className="mt-6 space-y-5">
               {data.favoriteCategories.map((category) => (
                 <div key={category.name}>
                   <div className="flex justify-between gap-3 text-sm">
                     <span className="truncate font-bold text-[#364152]">{category.name}</span>
-                    <span className="shrink-0 tabular-nums text-[#66706B]">{category.minutes} phút</span>
+                    <span className="shrink-0 tabular-nums text-bv-text-muted">{category.minutes} phút</span>
                   </div>
                   <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#E8E1D5]">
                     <div
-                      className="h-full rounded-full bg-[#C65D43]"
+                      className="h-full rounded-full bg-bv-accent"
                       style={{ width: `${Math.max(category.percent, 3)}%` }}
                     />
                   </div>
                 </div>
               ))}
               {data.favoriteCategories.length === 0 ? (
-                <p className="rounded-xl border border-dashed p-5 text-sm leading-6 text-[#66706B]">
+                <p className="rounded-xl border border-dashed p-5 text-sm leading-6 text-bv-text-muted">
                   Chưa có đủ phiên đọc để phân tích chủ đề. Hãy mở một cuốn sách và bắt đầu.
                 </p>
               ) : null}
@@ -177,12 +177,12 @@ export default async function ReadingInsightsPage() {
         <section className="mt-8">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <p className="text-sm font-black uppercase tracking-[0.14em] text-[#C65D43]">
-                Tiếp tục hành trình
+              <p className="text-sm font-black uppercase tracking-[0.14em] text-bv-accent">
+                Đọc tiếp
               </p>
-              <h2 className="mt-1 text-3xl font-black text-[#17202A]">Sách đang đọc</h2>
+              <h2 className="mt-1 text-3xl font-black text-bv-heading">Sách đang đọc</h2>
             </div>
-            <Link className="inline-flex min-h-11 items-center font-black text-[#176B62]" href="/reading/challenges">
+            <Link className="inline-flex min-h-11 items-center font-black text-bv-primary" href="/reading/challenges">
               <Trophy className="mr-2 h-4 w-4" aria-hidden="true" />
               Xem thử thách
             </Link>
@@ -199,15 +199,15 @@ export default async function ReadingInsightsPage() {
                   title={book.title}
                 />
                 <div className="min-w-0 flex-1">
-                  <h3 className="line-clamp-2 font-black text-[#17202A]">{book.title}</h3>
-                  <p className="mt-1 truncate text-sm text-[#66706B]">{book.author}</p>
+                  <h3 className="line-clamp-2 font-black text-bv-heading">{book.title}</h3>
+                  <p className="mt-1 truncate text-sm text-bv-text-muted">{book.author}</p>
                   <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#E8E1D5]">
-                    <div className="h-full rounded-full bg-[#176B62]" style={{ width: `${Math.min(100, book.progressPercent)}%` }} />
+                    <div className="h-full rounded-full bg-bv-primary" style={{ width: `${Math.min(100, book.progressPercent)}%` }} />
                   </div>
-                  <p className="mt-2 text-xs font-bold text-[#66706B]">
+                  <p className="mt-2 text-xs font-bold text-bv-text-muted">
                     {Math.round(book.progressPercent)}% · Trang {book.currentPage}
                   </p>
-                  <Link className="mt-2 inline-flex min-h-11 items-center font-black text-[#176B62]" href={`/read/${book.id}`}>
+                  <Link className="mt-2 inline-flex min-h-11 items-center font-black text-bv-primary" href={`/read/${book.id}`}>
                     <BookCheck className="mr-2 h-4 w-4" aria-hidden="true" />
                     Đọc tiếp
                   </Link>
@@ -216,10 +216,10 @@ export default async function ReadingInsightsPage() {
             ))}
           </div>
           {data.recentBooks.length === 0 ? (
-            <div className="mt-5 rounded-2xl border border-dashed border-[#176B62]/30 bg-white p-8 text-center">
-              <BookOpen className="mx-auto h-9 w-9 text-[#176B62]" aria-hidden="true" />
-              <p className="mt-3 font-black text-[#17202A]">Bạn chưa bắt đầu cuốn sách nào.</p>
-              <Link className="mt-3 inline-flex min-h-11 items-center font-black text-[#176B62]" href="/read">
+            <div className="mt-5 rounded-2xl border border-dashed border-bv-primary/30 bg-white p-8 text-center">
+              <BookOpen className="mx-auto h-9 w-9 text-bv-primary" aria-hidden="true" />
+              <p className="mt-3 font-black text-bv-heading">Bạn chưa bắt đầu cuốn sách nào.</p>
+              <Link className="mt-3 inline-flex min-h-11 items-center font-black text-bv-primary" href="/read">
                 Vào kho đọc
               </Link>
             </div>

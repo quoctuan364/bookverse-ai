@@ -4,11 +4,17 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { EditionType, HighlightColor, InteractionType, TargetType } from "@prisma/client";
+import {
+  selectPreferredBookChunks,
+  usesBookVerseOriginalV2,
+} from "@/lib/book-content-version";
+import { getVietnameseBookTitle } from "@/lib/book-display-title";
 import { TAXONOMY_VERSION } from "@/lib/interaction-taxonomy";
 import { getCurrentUser, requireAuthenticatedUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
 import { decideReadingAccess } from "@/lib/reading-access-policy";
 import { getBookReadingAccess } from "@/lib/membership-access";
+import { logResearchInteraction } from "@/actions/tracking.actions";
 
 export type ReaderActionType = "READ" | "BOOKMARK";
 
@@ -34,6 +40,7 @@ export interface ReaderInitialState {
   progressPercent: number;
   bookmarks: number[];
   highlights: ReaderHighlight[];
+  isAuthenticated: boolean;
 }
 
 export interface ReaderPageContent {
@@ -63,6 +70,11 @@ export interface ReaderBookContent {
   purchaseUrl: string;
   canPurchaseEbook: boolean;
   hasDigitalAsset: boolean;
+}
+
+export interface ReaderPageData {
+  initialState: ReaderInitialState | null;
+  readerContent: ReaderBookContent;
 }
 
 async function getCurrentUserId(): Promise<string> {
@@ -170,17 +182,17 @@ async function getFallbackContent(bookId: string): Promise<ReaderBookContent> {
     },
   });
 
-  const title = book?.title ?? `Sách ${bookId}`;
+  const title = getVietnameseBookTitle(bookId, book?.title);
   const author = book?.authorName ?? "BookVerse";
   const description =
     book?.description ??
-    "Nội dung đọc trực tuyến đang được mô phỏng vì chưa tìm thấy file ebook tương ứng.";
+    "Nội dung đọc trực tuyến đang được mô phỏng vì chưa tìm thấy file sách điện tử tương ứng.";
   const seedText = [
     title,
     `Tác giả: ${author}`,
     book?.category.name ? `Thể loại: ${book.category.name}` : "",
     description,
-    "BookVerse AI ghi nhận tiến độ đọc, phiên đọc, bookmark và highlight để phục vụ hệ gợi ý cá nhân hóa.",
+    "BookVerse AI ghi nhận tiến độ đọc, phiên đọc, đánh dấu trang và đoạn tô sáng để phục vụ hệ gợi ý cá nhân hóa.",
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -195,7 +207,7 @@ async function getFallbackContent(bookId: string): Promise<ReaderBookContent> {
         isLocked: false,
       },
     ],
-    sourceLabel: "Nội dung fallback từ metadata sách",
+    sourceLabel: "Nội dung fallback từ thông tin mô tả sách",
     ebookUrl: null,
     access: "PREVIEW",
     visiblePageCount: 1,
@@ -207,7 +219,10 @@ async function getFallbackContent(bookId: string): Promise<ReaderBookContent> {
   };
 }
 
-export async function getReaderBookContent(bookId: string): Promise<ReaderBookContent> {
+async function getReaderBookContentForUser(
+  bookId: string,
+  userId: string | null,
+): Promise<ReaderBookContent> {
   try {
     const cleanBookId = bookId.trim();
 
@@ -215,9 +230,7 @@ export async function getReaderBookContent(bookId: string): Promise<ReaderBookCo
       return getFallbackContent("unknown-book");
     }
 
-    const currentUser = await getCurrentUser();
-    const userId = currentUser && !currentUser.isLocked ? currentUser.id : null;
-    const [ebookEdition, readingAccess, chunks] = await Promise.all([
+    const [ebookEdition, readingAccess, storedChunks] = await Promise.all([
       prisma.bookEdition.findFirst({
         where: {
           bookId: cleanBookId,
@@ -250,6 +263,7 @@ export async function getReaderBookContent(bookId: string): Promise<ReaderBookCo
           { chunkIndex: "asc" },
         ],
         select: {
+          id: true,
           chapterNumber: true,
           chapterTitle: true,
           pageNumber: true,
@@ -258,6 +272,8 @@ export async function getReaderBookContent(bookId: string): Promise<ReaderBookCo
         },
       }),
     ]);
+    const chunks = selectPreferredBookChunks(storedChunks);
+    const usesOriginalV2 = usesBookVerseOriginalV2(chunks);
 
     if (chunks.length > 0) {
       const hasFullAccess = readingAccess.hasAccess;
@@ -302,10 +318,14 @@ export async function getReaderBookContent(bookId: string): Promise<ReaderBookCo
         })),
         chapters,
         sourceLabel: hasFullAccess
-          ? readingAccess.source === "MEMBERSHIP"
-            ? "Ebook BookVerse · Quyền hội viên"
-            : "Ebook BookVerse · Đã mua"
-          : `Bản đọc thử · ${visibleChunks.length}/${chunks.length} phần (tối đa 10%)`,
+          ? usesOriginalV2
+            ? readingAccess.source === "MEMBERSHIP"
+              ? "Nội dung nguyên bản BookVerse v2 · Quyền hội viên"
+              : "Nội dung nguyên bản BookVerse v2 · Đã mua"
+            : readingAccess.source === "MEMBERSHIP"
+              ? "sách điện tử BookVerse · Quyền hội viên"
+              : "sách điện tử BookVerse · Đã mua"
+          : `${usesOriginalV2 ? "Đọc thử nội dung BookVerse v2" : "Bản đọc thử"} · ${visibleChunks.length}/${chunks.length} phần (tối đa 10%)`,
         ebookUrl: null,
         access: hasFullAccess ? "FULL" : "PREVIEW",
         visiblePageCount: visibleChunks.length,
@@ -349,7 +369,7 @@ export async function getReaderBookContent(bookId: string): Promise<ReaderBookCo
           chapters: [
             {
               chapterNumber: 1,
-              chapterTitle: "Nội dung Ebook",
+              chapterTitle: "Nội dung sách điện tử",
               startPage: 1,
               isLocked: false,
             },
@@ -357,8 +377,8 @@ export async function getReaderBookContent(bookId: string): Promise<ReaderBookCo
           sourceLabel:
             accessDecision.access === "FULL"
               ? readingAccess.source === "MEMBERSHIP"
-                ? `Ebook hội viên: ${fileName}`
-                : `Ebook đã mua: ${fileName}`
+                ? `sách điện tử hội viên: ${fileName}`
+                : `sách điện tử đã mua: ${fileName}`
               : `Bản đọc thử · ${visiblePages.length}/${pages.length} trang`,
           // Không trả URL file cho bản đọc thử để tránh tải trực tiếp toàn bộ Ebook.
           ebookUrl:
@@ -399,16 +419,23 @@ export async function getReaderBookContent(bookId: string): Promise<ReaderBookCo
       hasDigitalAsset: Boolean(ebookEdition?.digitalAsset),
     };
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Không thể tải nội dung ebook.";
+    const message = error instanceof Error ? error.message : "Không thể tải nội dung sách điện tử.";
     console.error(`[getReaderBookContent] ${message}`);
     return getFallbackContent(bookId);
   }
 }
 
-export async function getReaderInitialState(bookId: string): Promise<ReaderInitialState | null> {
+export async function getReaderBookContent(bookId: string): Promise<ReaderBookContent> {
+  const currentUser = await getCurrentUser();
+  const userId = currentUser && !currentUser.isLocked ? currentUser.id : null;
+  return getReaderBookContentForUser(bookId, userId);
+}
+
+async function getReaderInitialStateForUser(
+  bookId: string,
+  userId: string | null,
+): Promise<ReaderInitialState | null> {
   try {
-    const currentUser = await getCurrentUser();
-    const userId = currentUser && !currentUser.isLocked ? currentUser.id : null;
     const cleanBookId = bookId.trim();
 
     if (!cleanBookId) {
@@ -432,12 +459,13 @@ export async function getReaderInitialState(bookId: string): Promise<ReaderIniti
     if (!userId) {
       return {
         bookId: book.id,
-        title: book.title,
+        title: getVietnameseBookTitle(book.id, book.title),
         currentPage: 1,
         currentChapter: 1,
         progressPercent: 0,
         bookmarks: [],
         highlights: [],
+        isAuthenticated: false,
       };
     }
 
@@ -489,18 +517,44 @@ export async function getReaderInitialState(bookId: string): Promise<ReaderIniti
 
     return {
       bookId: book.id,
-      title: book.title,
+      title: getVietnameseBookTitle(book.id, book.title),
       currentPage: Math.max(1, progress?.currentPage ?? 1),
       currentChapter: Math.max(1, progress?.currentChapter ?? 1),
       progressPercent: progress?.progressPercent ?? 0,
       bookmarks: bookmarks.map((bookmark) => bookmark.pageNumber),
       highlights,
+      isAuthenticated: true,
     };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Không thể tải trạng thái đọc.";
     console.error(`[getReaderInitialState] ${message}`);
     return null;
   }
+}
+
+export async function getReaderInitialState(bookId: string): Promise<ReaderInitialState | null> {
+  const currentUser = await getCurrentUser();
+  const userId = currentUser && !currentUser.isLocked ? currentUser.id : null;
+  return getReaderInitialStateForUser(bookId, userId);
+}
+
+/**
+ * Nạp toàn bộ dữ liệu mở Reader trong một server action.
+ * Trước đây trình duyệt phải gửi hai request action riêng sau khi hydrate;
+ * gộp lại giúp giảm một vòng mạng và vẫn chạy các truy vấn độc lập song song.
+ */
+export async function getReaderPageData(bookId: string): Promise<ReaderPageData> {
+  const currentUser = await getCurrentUser();
+  const userId = currentUser && !currentUser.isLocked ? currentUser.id : null;
+  const [initialState, readerContent] = await Promise.all([
+    getReaderInitialStateForUser(bookId, userId),
+    getReaderBookContentForUser(bookId, userId),
+  ]);
+
+  return {
+    initialState,
+    readerContent,
+  };
 }
 
 export async function saveReadingProgress(
@@ -620,7 +674,7 @@ export async function toggleBookmark(
       return { success: true, message: "Đã bỏ đánh dấu trang." };
     }
 
-    await prisma.bookmark.create({
+    const bookmark = await prisma.bookmark.create({
       data: {
         userId,
         bookId: cleanBookId,
@@ -630,9 +684,18 @@ export async function toggleBookmark(
 
     await logInteraction(cleanBookId, "BOOKMARK");
 
+    // Research tracking (chỉ ghi khi user đã consent, await sau khi bookmark tạo thành công)
+    await logResearchInteraction({
+      eventType: "BOOKMARK",
+      bookId: cleanBookId,
+      sourcePage: "reader",
+      eventValue: safePageNumber,
+      idempotencyKey: `bookmark:${bookmark.id}`,
+    });
+
     return { success: true, message: "Đã đánh dấu trang." };
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Không thể cập nhật bookmark.";
+    const message = error instanceof Error ? error.message : "Không thể cập nhật đánh dấu trang.";
     console.error(`[toggleBookmark] ${message}`);
     return { success: false, message };
   }
@@ -655,7 +718,7 @@ export async function saveHighlight(
     if (!cleanBookId || !cleanText) {
       return {
         success: false,
-        message: "Vui lòng nhập nội dung highlight.",
+        message: "Vui lòng nhập nội dung đoạn tô sáng.",
       };
     }
 
@@ -701,10 +764,10 @@ export async function saveHighlight(
 
     return {
       success: true,
-      message: "Đã lưu highlight.",
+      message: "Đã lưu đoạn tô sáng.",
     };
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Không thể lưu highlight.";
+    const message = error instanceof Error ? error.message : "Không thể lưu đoạn tô sáng.";
     console.error(`[saveHighlight] ${message}`);
     return { success: false, message };
   }

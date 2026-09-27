@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =============================================
+   BookVerse AI — Premium Design System v2
+   Nâng cấp: glow, shimmer, depth, micro-animations
+   ============================================= */
+
 :root {
   --background: 36 33% 96%;
   --foreground: 226 30% 15%;
@@ -10,17 +15,84 @@
   --ring: 168 54% 28%;
   --radius: 0.875rem;
   --bv-ink: #1d2433;
-  --bv-muted: #687083;
+  --bv-muted: #596477;
   --bv-brand: #176b62;
   --bv-brand-dark: #104c47;
-  --bv-coral: #c65d43;
+  --bv-coral: #a94432;
   --bv-gold: #bd8419;
   --bv-paper: #faf8f2;
   --bv-surface: #ffffff;
+  /* Gradient neon dùng cho ring/glow effects */
+  --bv-glow: rgba(23, 107, 98, 0.28);
+  --bv-glow-gold: rgba(242, 193, 78, 0.32);
+  --bv-glow-accent: rgba(169, 68, 50, 0.24);
+
+  /* Animation easing */
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 * {
   border-color: hsl(var(--border));
+}
+
+/* =============================================
+   Keyframe Animations
+   ============================================= */
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  33% { transform: translateY(-12px) rotate(1deg); }
+  66% { transform: translateY(-5px) rotate(-1deg); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 20px var(--bv-glow), 0 10px 30px rgba(23, 107, 98, 0.15); }
+  50% { box-shadow: 0 0 35px var(--bv-glow), 0 15px 40px rgba(23, 107, 98, 0.25); }
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes orb-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -20px) scale(1.05); }
+  66% { transform: translate(-20px, 15px) scale(0.97); }
+}
+
+@keyframes slide-up-fade {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Utility classes */
+.animate-float { animation: float 4s ease-in-out infinite; }
+.animate-float-slow { animation: float-slow 7s ease-in-out infinite; }
+.animate-glow-pulse { animation: glow-pulse 2.8s ease-in-out infinite; }
+.animate-slide-up { animation: slide-up-fade 0.45s var(--ease-smooth) both; }
+.animate-scale-in { animation: scale-in 0.35s var(--ease-spring) both; }
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent 25%, rgba(255,255,255,0.5) 50%, transparent 75%);
+  background-size: 200% auto;
+  animation: shimmer 2s linear infinite;
 }
 
 html {
@@ -71,6 +143,13 @@ select {
   color: #104c47;
 }
 
+/* Vùng chọn trong trình đọc dùng màu thương hiệu và chữ trắng để luôn đủ tương phản. */
+.bv-reader [data-reader-block-id]::selection,
+.bv-reader [data-reader-block-id] *::selection {
+  background: #176b62;
+  color: #fffdf8;
+}
+
 a {
   text-underline-offset: 4px;
 }
@@ -87,6 +166,7 @@ details[open] > .bookverse-mobile-nav-panel {
   min-height: 100vh;
   background:
     radial-gradient(circle at 100% 0%, rgba(207, 233, 227, 0.68), transparent 26rem),
+    radial-gradient(circle at 0% 80%, rgba(242, 193, 78, 0.08), transparent 30rem),
     linear-gradient(180deg, #faf8f2 0%, #f4f1e9 100%);
 }
 
@@ -97,6 +177,8 @@ details[open] > .bookverse-mobile-nav-panel {
   background:
     radial-gradient(circle at 83% 15%, rgba(228, 190, 112, 0.35), transparent 17rem),
     linear-gradient(110deg, #104c47 0%, #176b62 58%, #2c8177 100%);
+  background-size: 200% 200%;
+  animation: gradient-shift 12s ease infinite;
   color: #fffdf8;
 }
 
@@ -108,6 +190,7 @@ details[open] > .bookverse-mobile-nav-panel {
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 999px;
   content: "";
+  pointer-events: none;
 }
 
 .bv-home-hero {
@@ -118,7 +201,34 @@ details[open] > .bookverse-mobile-nav-panel {
     radial-gradient(circle at 86% 10%, rgba(242, 193, 78, 0.38), transparent 20rem),
     radial-gradient(circle at 8% 82%, rgba(198, 93, 67, 0.24), transparent 22rem),
     linear-gradient(118deg, #073b37 0%, #105b54 48%, #22786e 100%);
+  background-size: 200% 200%;
+  animation: gradient-shift 14s ease infinite;
   color: #fffdf8;
+}
+
+/* Animated orb trong hero — thêm thở động */
+.bv-home-hero-orb-1 {
+  position: absolute;
+  top: -8rem;
+  right: -6rem;
+  width: 32rem;
+  height: 32rem;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(242, 193, 78, 0.22) 0%, transparent 70%);
+  animation: orb-drift 10s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.bv-home-hero-orb-2 {
+  position: absolute;
+  bottom: -12rem;
+  left: -8rem;
+  width: 28rem;
+  height: 28rem;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(198, 93, 67, 0.18) 0%, transparent 70%);
+  animation: orb-drift 13s ease-in-out infinite reverse;
+  pointer-events: none;
 }
 
 .bv-home-hero::before {
@@ -130,6 +240,7 @@ details[open] > .bookverse-mobile-nav-panel {
   border: 1px solid rgba(255, 255, 255, 0.13);
   border-radius: 999px;
   content: "";
+  pointer-events: none;
 }
 
 .bv-home-grid {
@@ -141,37 +252,178 @@ details[open] > .bookverse-mobile-nav-panel {
     linear-gradient(90deg, rgba(255, 255, 255, 0.22) 1px, transparent 1px);
   background-size: 52px 52px;
   mask-image: linear-gradient(to right, transparent, black 58%);
+  pointer-events: none;
+}
+
+.bv-book-shelf {
+  /* Kệ có nút điều hướng và hỗ trợ vuốt nên không hiển thị thanh cuộn hệ thống. */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+  overscroll-behavior-inline: contain;
+}
+
+.bv-book-shelf::-webkit-scrollbar {
+  display: none;
+}
+
+.bv-book-shelf > * {
+  scroll-snap-align: start;
+}
+
+.bv-book-shelf:focus-visible {
+  border-radius: 1rem;
+  outline: 3px solid rgba(15, 118, 110, 0.38);
+  outline-offset: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bv-book-shelf {
+    transition: none;
+  }
 }
 
 .bv-membership-showcase {
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   background:
-    radial-gradient(circle at 85% 20%, rgba(242, 193, 78, 0.18), transparent 18rem),
+    radial-gradient(circle at 85% 20%, rgba(242, 193, 78, 0.22), transparent 18rem),
+    radial-gradient(circle at 15% 75%, rgba(44, 129, 119, 0.35), transparent 20rem),
     linear-gradient(125deg, #102f2d 0%, #104c47 52%, #176b62 100%);
-  box-shadow: 0 28px 75px rgba(16, 76, 71, 0.22);
+  background-size: 200% 200%;
+  animation: gradient-shift 12s ease infinite;
+  box-shadow:
+    0 28px 75px rgba(16, 76, 71, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .bv-panel,
 .bv-card {
-  border: 1px solid rgba(29, 36, 51, 0.1);
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 14px 38px rgba(37, 49, 56, 0.08);
+  border: 1px solid rgba(29, 36, 51, 0.09);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow:
+    0 1px 3px rgba(37, 49, 56, 0.06),
+    0 14px 38px rgba(37, 49, 56, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transition: box-shadow 0.25s var(--ease-smooth), transform 0.25s var(--ease-smooth), border-color 0.2s;
+}
+
+.bv-card:hover {
+  box-shadow:
+    0 4px 8px rgba(37, 49, 56, 0.06),
+    0 22px 50px rgba(23, 107, 98, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  border-color: rgba(23, 107, 98, 0.2);
 }
 
 .bv-subtle-card {
   border: 1px solid rgba(29, 36, 51, 0.08);
-  background: rgba(255, 255, 255, 0.54);
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.bv-subtle-card:hover {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(23, 107, 98, 0.18);
 }
 
 .bv-chip {
   border: 1px solid #b8dbd5;
-  background: #edf8f5;
+  background: linear-gradient(135deg, #edf8f5, #e4f5f1);
   color: #176b62;
+  transition: all 0.18s var(--ease-smooth);
+}
+
+.bv-chip:hover {
+  background: linear-gradient(135deg, #d7f0ea, #cceae3);
+  border-color: #8ecfc7;
+  box-shadow: 0 2px 8px rgba(23, 107, 98, 0.15);
+}
+
+/* Glow button — dùng cho CTA chính */
+.bv-btn-glow {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s var(--ease-bounce), box-shadow 0.2s var(--ease-smooth);
+}
+
+.bv-btn-glow::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 60%);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.bv-btn-glow:hover::before {
+  opacity: 1;
+}
+
+.bv-btn-glow:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 38px var(--bv-glow);
+}
+
+.bv-btn-glow:active {
+  transform: translateY(0);
+}
+
+/* Glass card — glassmorphism nhẹ cho modal/sidebar */
+.bv-glass {
+  background: rgba(250, 248, 242, 0.82);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 8px 32px rgba(37, 49, 56, 0.1);
+}
+
+/* Gradient border effect */
+.bv-gradient-border {
+  position: relative;
+  background: white;
+  border-radius: 1.25rem;
+}
+
+.bv-gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #176b62, #f2c14e, #176b62);
+  background-size: 200% 200%;
+  animation: gradient-shift 4s ease infinite;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.bv-gradient-border:hover::before {
+  opacity: 1;
 }
 
 .bv-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(23, 107, 98, 0.5) transparent;
+  scrollbar-color: rgba(23, 107, 98, 0.35) transparent;
+}
+
+.bv-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.bv-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.bv-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(23, 107, 98, 0.25);
+  border-radius: 9999px;
+}
+
+.bv-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(23, 107, 98, 0.45);
 }
 
 .bv-skip-link {
@@ -220,6 +472,11 @@ details[open] > .bookverse-mobile-nav-panel {
   background-color: #f7f5ef !important;
 }
 
+/* Khu hội viên dùng nền tối: giữ lớp kính mờ để chữ sáng đạt đủ tương phản. */
+.bv-membership-showcase .bg-white\/\[0\.08\] {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
 .border-white\/10,
 .border-white\/12 {
   border-color: rgba(29, 36, 51, 0.1) !important;
@@ -237,7 +494,7 @@ details[open] > .bookverse-mobile-nav-panel {
 
 .text-zinc-400,
 .text-zinc-500 {
-  color: #687083 !important;
+  color: #596477 !important;
 }
 
 /* Seller trước đây dùng panel tối; khi chuyển sang mặt sáng cần đổi riêng chữ trắng
@@ -260,7 +517,14 @@ main[class*="linear-gradient(180deg"] {
   color: #1d2433 !important;
 }
 
-/* Reader có chrome tối riêng; tách scope để không bị lớp tương thích màn hình cũ ghi đè. */
+/* Không gian đọc dùng nền giấy trung tính; panel công cụ và thanh chuyển trang vẫn tối để dễ nhận biết. */
+main.bv-reader {
+  background:
+    radial-gradient(circle at top right, rgba(207, 233, 227, 0.72), transparent 30rem),
+    linear-gradient(180deg, #f8f6f0 0%, #efebe2 100%) !important;
+  color: #1d2433 !important;
+}
+
 .bv-reader .bv-reader-chrome {
   background-color: rgba(2, 6, 23, 0.96) !important;
   color: #f4f4f5 !important;
@@ -299,6 +563,10 @@ main[class*="linear-gradient(180deg"] {
   color: #e4e4e7 !important;
 }
 
+.bv-reader [data-reader-theme="dark"] .bg-white\/\[0\.06\] {
+  background-color: rgba(255, 255, 255, 0.07) !important;
+}
+
 .bv-reader [data-reader-theme="sepia"] {
   color: #302414 !important;
 }
@@ -307,12 +575,20 @@ main[class*="linear-gradient(180deg"] {
   color: #372815 !important;
 }
 
+.bv-reader [data-reader-theme="sepia"] .bg-white\/\[0\.06\] {
+  background-color: rgba(48, 36, 20, 0.08) !important;
+}
+
+.bv-reader [data-reader-theme="light"] .bg-white\/\[0\.06\] {
+  background-color: rgba(29, 36, 51, 0.06) !important;
+}
+
 .bv-reader .bv-reader-preview [class*="text-amber-100"] {
   color: #fde68a !important;
 }
 
 .bv-reader .bv-reader-full.text-emerald-100 {
-  color: #14532d !important;
+  color: #d1fae5 !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -325,3 +601,56 @@ main[class*="linear-gradient(180deg"] {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* =============================================
+   Reader Highlight Tools — panel nằm ngoài bv-reader-chrome
+   nên cần override riêng để giữ nền tối, chữ sáng
+   ============================================= */
+.bv-reader section.mt-5 .bg-slate-950\/70,
+.bv-reader section.mt-5 .bg-slate-950\/72 {
+  background-color: rgba(2, 6, 23, 0.94) !important;
+  color: #f4f4f5 !important;
+  box-shadow: 0 14px 48px rgba(0, 0, 0, 0.28) !important;
+}
+
+.bv-reader section.mt-5 .text-zinc-100,
+.bv-reader section.mt-5 .text-zinc-50 {
+  color: #f4f4f5 !important;
+}
+
+.bv-reader section.mt-5 .text-zinc-200,
+.bv-reader section.mt-5 .text-zinc-300 {
+  color: #d4d4d8 !important;
+}
+
+.bv-reader section.mt-5 .text-zinc-400,
+.bv-reader section.mt-5 .text-zinc-500 {
+  color: #a1a1aa !important;
+}
+
+.bv-reader section.mt-5 .bg-white\/\[0\.05\],
+.bv-reader section.mt-5 .bg-white\/\[0\.06\],
+.bv-reader section.mt-5 .bg-white\/\[0\.07\] {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.bv-reader section.mt-5 .border-white\/10 {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+/* Ẩn Navbar và Footer trên toàn bộ trang đọc sách để trải nghiệm đọc toàn màn hình */
+body:has(.bv-reader) .bv-navbar,
+body:has(.bv-reader) .bv-footer {
+  display: none !important;
+}
+
+/* Ẩn Footer trên trang trợ lý toàn màn hình và khóa cuộn ngoài để không bị giật cuộn */
+body:has(.bv-assistant-page) .bv-footer {
+  display: none !important;
+}
+
+body:has(.bv-assistant-page) {
+  overflow: hidden !important;
+}
+
+

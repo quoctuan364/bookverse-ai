@@ -10,6 +10,7 @@ import {
 } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
+import { getVietnameseBookTitle } from "@/lib/book-display-title";
 import { recordAuditLog } from "@/lib/audit";
 import { createNotification } from "@/lib/notifications";
 import {
@@ -19,11 +20,10 @@ import {
   parseMembershipSandboxOutcome,
 } from "@/lib/membership-payment-sandbox";
 import { requireAdminUser, requireAuthenticatedUser } from "@/lib/permissions";
+import { publicExperienceBookWhere } from "@/lib/public-book-policy";
 
-const readableBookWhere: Prisma.BookWhereInput = {
-  status: "ACTIVE",
-  deletedAt: null,
-};
+// Kho đọc công khai chỉ dùng catalog thật có bìa local đã kiểm duyệt.
+const readableBookWhere: Prisma.BookWhereInput = publicExperienceBookWhere();
 
 export async function getMembershipPlans() {
   const [plans, readableBookCount] = await Promise.all([
@@ -138,7 +138,7 @@ export async function createMembershipPaymentIntent(
   if (!paymentMethod || !isMembershipSandboxRequestId(cleanRequestId)) {
     return {
       success: false,
-      message: "Thông tin thanh toán sandbox không hợp lệ. Vui lòng tải lại trang.",
+      message: "Thông tin thanh toán thử nghiệm không hợp lệ. Vui lòng tải lại trang.",
     };
   }
 
@@ -191,7 +191,7 @@ export async function createMembershipPaymentIntent(
 
   return {
     success: true,
-    message: "Đã tạo giao dịch sandbox.",
+    message: "Đã tạo giao dịch thử nghiệm.",
     paymentId: payment.id,
     status: payment.status,
   };
@@ -236,7 +236,7 @@ export async function completeMembershipSandboxPayment(
     include: { plan: true },
   });
   if (!payment) {
-    return { success: false, message: "Không tìm thấy giao dịch sandbox." };
+    return { success: false, message: "Không tìm thấy giao dịch thử nghiệm." };
   }
   if (
     payment.status === MembershipPaymentStatus.PAID_DEMO &&
@@ -279,7 +279,7 @@ export async function completeMembershipSandboxPayment(
     revalidatePath("/profile/membership/payments");
     return {
       success: false,
-      message: "Thanh toán sandbox đã thất bại theo kịch bản thử nghiệm.",
+      message: "Thanh toán thử nghiệm đã thất bại theo kịch bản thử nghiệm.",
     };
   }
 
@@ -363,7 +363,7 @@ export async function completeMembershipSandboxPayment(
     revalidatePath("/profile/membership/payments");
     return {
       success: true,
-      message: "Thanh toán sandbox thành công.",
+      message: "Thanh toán thử nghiệm thành công.",
       subscriptionId: result.id,
     };
   } catch (error) {
@@ -556,7 +556,15 @@ export async function getMembershipBooks(page = 1) {
     }),
     prisma.book.count({ where }),
   ]);
-  return { books, total, page: safePage, pageSize };
+  return {
+    books: books.map((book) => ({
+      ...book,
+      title: getVietnameseBookTitle(book.id, book.title),
+    })),
+    total,
+    page: safePage,
+    pageSize,
+  };
 }
 
 export interface ReadingLibraryQuery {
@@ -608,7 +616,18 @@ export async function getReadingLibrary(input: ReadingLibraryQuery = {}) {
     }),
   ]);
 
-  return { books, total, categories, page, pageSize, query, category };
+  return {
+    books: books.map((book) => ({
+      ...book,
+      title: getVietnameseBookTitle(book.id, book.title),
+    })),
+    total,
+    categories,
+    page,
+    pageSize,
+    query,
+    category,
+  };
 }
 
 export async function createMembershipPlan(formData: FormData) {
@@ -684,6 +703,44 @@ export async function toggleMembershipPlanActive(planId: string) {
   revalidatePath("/membership");
   revalidatePath("/admin/membership-plans");
   return { success: true, message: plan.isActive ? "Đã tạm ngừng gói." : "Đã mở bán lại gói." };
+}
+
+export async function deleteMembershipPlan(planId: string) {
+  await requireAdminUser();
+  const cleanPlanId = planId.trim();
+  const plan = await prisma.membershipPlan.findUnique({
+    where: { id: cleanPlanId },
+    include: {
+      _count: {
+        select: {
+          subscriptions: true,
+          payments: true,
+        },
+      },
+    },
+  });
+  if (!plan) return { success: false, message: "Không tìm thấy gói." };
+
+  if (plan._count.subscriptions > 0 || plan._count.payments > 0) {
+    // Không xóa cứng gói đang có lịch sử đăng ký, chuyển sang ẩn
+    await prisma.membershipPlan.update({
+      where: { id: cleanPlanId },
+      data: { isActive: false },
+    });
+    revalidatePath("/membership");
+    revalidatePath("/admin/membership-plans");
+    return {
+      success: true,
+      message: "Gói đã có lịch sử đăng ký nên được chuyển sang trạng thái tạm ngừng (ẩn gói) thay vì xóa vĩnh viễn.",
+    };
+  }
+
+  await prisma.membershipPlan.delete({
+    where: { id: cleanPlanId },
+  });
+  revalidatePath("/membership");
+  revalidatePath("/admin/membership-plans");
+  return { success: true, message: "Đã xóa gói hội viên." };
 }
 
 export async function getAdminSubscriptions(query = "", page = 1) {
@@ -763,6 +820,116 @@ export async function updateSubscriptionStatus(subscriptionId: string, status: S
   return { success: true, message: "Đã cập nhật thuê bao." };
 }
 
+export async function extendSubscriptionDays(subscriptionId: string, days = 30) {
+  try {
+    await requireAdminUser();
+    const sub = await prisma.subscription.findUnique({
+      where: { id: subscriptionId.trim() },
+      select: { id: true, endsAt: true, plan: { select: { name: true } }, user: { select: { name: true } } },
+    });
+    if (!sub) return { success: false, message: "Không tìm thấy gói thuê bao." };
+
+    const currentEnds = sub.endsAt > new Date() ? sub.endsAt : new Date();
+    const nextEnds = new Date(currentEnds);
+    nextEnds.setDate(nextEnds.getDate() + days);
+
+    await prisma.subscription.update({
+      where: { id: sub.id },
+      data: {
+        endsAt: nextEnds,
+        status: SubscriptionStatus.ACTIVE,
+      },
+    });
+
+    revalidatePath("/admin/subscriptions");
+    return {
+      success: true,
+      message: `Đã gia hạn thêm ${days} ngày cho độc giả ${sub.user.name}. Hạn mới: ${nextEnds.toLocaleDateString("vi-VN")}.`,
+    };
+  } catch (error: unknown) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Không thể gia hạn thuê bao.",
+    };
+  }
+}
+
+export async function adminGrantSubscription(formData: FormData) {
+  try {
+    await requireAdminUser();
+    const email = String(formData.get("email") ?? "").trim().toLowerCase();
+    const planId = String(formData.get("planId") ?? "").trim();
+    const customDays = Number(formData.get("durationDays") ?? 0);
+
+    if (!email) return { success: false, message: "Vui lòng nhập email độc giả." };
+    if (!planId) return { success: false, message: "Vui lòng chọn gói hội viên." };
+
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, name: true, email: true },
+    });
+    if (!user) {
+      return { success: false, message: `Không tìm thấy tài khoản với email "${email}".` };
+    }
+
+    const plan = await prisma.membershipPlan.findUnique({
+      where: { id: planId },
+    });
+    if (!plan) {
+      return { success: false, message: "Không tìm thấy gói hội viên đã chọn." };
+    }
+
+    const durationDays = customDays > 0 ? customDays : plan.durationDays;
+    const now = new Date();
+
+    const activeSub = await prisma.subscription.findFirst({
+      where: {
+        userId: user.id,
+        status: SubscriptionStatus.ACTIVE,
+        endsAt: { gt: now },
+      },
+      orderBy: { endsAt: "desc" },
+    });
+
+    const startsAt = activeSub ? activeSub.endsAt : now;
+    const endsAt = new Date(startsAt);
+    endsAt.setDate(endsAt.getDate() + durationDays);
+
+    const subscription = await prisma.subscription.create({
+      data: {
+        userId: user.id,
+        planId: plan.id,
+        status: SubscriptionStatus.ACTIVE,
+        startsAt,
+        endsAt,
+      },
+    });
+
+    await prisma.membershipPayment.create({
+      data: {
+        userId: user.id,
+        planId: plan.id,
+        subscriptionId: subscription.id,
+        amount: plan.price,
+        status: MembershipPaymentStatus.PAID_DEMO,
+        paymentMethod: PaymentMethod.WALLET_DEMO,
+        transactionRef: `GRANT-${Date.now().toString().slice(-8)}`,
+      },
+    });
+
+    revalidatePath("/admin/subscriptions");
+    return {
+      success: true,
+      message: `Đã cấp gói "${plan.name}" (${durationDays} ngày) cho độc giả ${user.name} (${user.email ?? ""}) thành công! Hạn dùng: ${endsAt.toLocaleDateString("vi-VN")}`,
+    };
+  } catch (error: unknown) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Không thể cấp gói hội viên.",
+    };
+  }
+}
+
 export async function refundMembershipSandboxPayment(
   paymentId: string,
   reasonValue: string,
@@ -830,7 +997,7 @@ export async function refundMembershipSandboxPayment(
         userId: payment.userId,
         type: NotificationType.SYSTEM,
         title: "Giao dịch hội viên đã được hoàn tiền",
-        message: `Gói ${payment.plan.name} đã được hoàn tiền Sandbox. Lý do: ${reason}`,
+        message: `Gói ${payment.plan.name} đã được hoàn tiền thử nghiệm. Lý do: ${reason}`,
         href: "/profile/membership/payments",
       },
       tx,
@@ -857,7 +1024,7 @@ export async function refundMembershipSandboxPayment(
   revalidatePath("/profile/membership");
   revalidatePath("/profile/membership/payments");
   return result
-    ? { success: true, message: "Đã hoàn tiền Sandbox và hủy kỳ liên quan." }
+    ? { success: true, message: "Đã hoàn tiền thử nghiệm và hủy kỳ liên quan." }
     : { success: false, message: "Giao dịch đã được xử lý bởi yêu cầu khác." };
 }
 

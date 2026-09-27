@@ -13,7 +13,7 @@
     "LOCAL_VALID",
     "VALID_LOCAL_NORMALIZED",
     "REMOTE_URL_LOAD_SUCCESS",
-    "BOOKVERSE_DEMO_FALLBACK"
+    "NEUTRAL_MISSING_COVER"
   ],
   "sourceDatasetIsReadOnly": true
 }

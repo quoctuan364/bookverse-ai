@@ -230,8 +230,13 @@ model User {
   recommendationRequests  RecommendationRequest[]
   recommendationTelemetry RecommendationTelemetryEvent[]
   chatbotFeedback         ChatbotFeedback[]
+  marketplaceBuyerChats   MarketplaceConversation[]      @relation("MarketplaceBuyer")
+  marketplaceSellerChats  MarketplaceConversation[]      @relation("MarketplaceSeller")
+  marketplaceMessages     MarketplaceMessage[]
   subscriptions           Subscription[]
   membershipPayments      MembershipPayment[]
+  researchConsents        UserResearchConsent[]
+  interactionLogs         UserInteractionLog[]
   createdAt               DateTime                       @default(now())
   updatedAt               DateTime                       @updatedAt
 
@@ -597,35 +602,36 @@ model GoldCatalogRecord {
 }
 
 model Listing {
-  id              String           @id
+  id              String                    @id
   sellerId        String
   bookId          String?
   editionId       String?
   title           String
   description     String?
-  condition       ListingCondition @default(GOOD)
-  price           Decimal          @db.Decimal(12, 2)
-  status          ListingStatus    @default(PENDING_REVIEW)
+  condition       ListingCondition          @default(GOOD)
+  price           Decimal                   @db.Decimal(12, 2)
+  status          ListingStatus             @default(PENDING_REVIEW)
   rejectionReason String?
   moderationNote  String?
   reviewedAt      DateTime?
   hiddenAt        DateTime?
-  reportCount     Int              @default(0)
-  views           Int              @default(0)
-  cartAdds        Int              @default(0)
-  purchases       Int              @default(0)
-  stock           Int              @default(1)
+  reportCount     Int                       @default(0)
+  views           Int                       @default(0)
+  cartAdds        Int                       @default(0)
+  purchases       Int                       @default(0)
+  stock           Int                       @default(1)
   soldAt          DateTime?
-  tags            String[]         @default([])
-  hasCover        Boolean          @default(false)
+  tags            String[]                  @default([])
+  hasCover        Boolean                   @default(false)
   targetAudience  String?
-  seller          User             @relation("SellerListings", fields: [sellerId], references: [id])
-  book            Book?            @relation(fields: [bookId], references: [id], onDelete: SetNull)
-  edition         BookEdition?     @relation(fields: [editionId], references: [id], onDelete: SetNull)
+  seller          User                      @relation("SellerListings", fields: [sellerId], references: [id])
+  book            Book?                     @relation(fields: [bookId], references: [id], onDelete: SetNull)
+  edition         BookEdition?              @relation(fields: [editionId], references: [id], onDelete: SetNull)
   images          ListingImage[]
+  conversations   MarketplaceConversation[]
   orderItems      OrderItem[]
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
 
   @@index([sellerId])
   @@index([bookId])
@@ -676,6 +682,39 @@ model ListingImage {
   createdAt DateTime @default(now())
 
   @@index([listingId])
+}
+
+model MarketplaceConversation {
+  id        String               @id @default(cuid())
+  listingId String
+  buyerId   String
+  sellerId  String
+  listing   Listing              @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyer     User                 @relation("MarketplaceBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
+  seller    User                 @relation("MarketplaceSeller", fields: [sellerId], references: [id], onDelete: Cascade)
+  messages  MarketplaceMessage[]
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  @@unique([listingId, buyerId])
+  @@index([buyerId, updatedAt])
+  @@index([sellerId, updatedAt])
+  @@map("marketplace_conversations")
+}
+
+model MarketplaceMessage {
+  id             String                  @id @default(cuid())
+  conversationId String
+  senderId       String
+  content        String                  @db.Text
+  readAt         DateTime?
+  conversation   MarketplaceConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User                    @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  createdAt      DateTime                @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+  @@map("marketplace_messages")
 }
 
 model Order {
@@ -1192,4 +1231,82 @@ model InteractionEvent {
   @@index([bookId])
   @@index([actionType])
   @@map("interaction_events")
+}
+
+// ==================== RESEARCH COLLECTION (additive, không ghi đè dữ liệu cũ) ====================
+
+// Phân loại event theo spec thu thập tương tác người dùng thật
+enum UserInteractionEventType {
+  IMPRESSION
+  VIEW
+  RECOMMENDATION_CLICK
+  SEARCH
+  FAVORITE
+  BOOKMARK
+  ADD_TO_CART
+  PURCHASE
+  RATING
+
+  @@map("user_interaction_event_type")
+}
+
+// Bảng lưu trạng thái đồng ý tham gia nghiên cứu của từng người dùng
+model UserResearchConsent {
+  id             String   @id @default(cuid())
+  userId         String
+  consentVersion String   // Ví dụ: "v1"
+  consented      Boolean
+  // IP không lưu để bảo vệ quyền riêng tư; chỉ dùng server timestamp
+  consentedAt    DateTime @default(now())
+  revokedAt      DateTime?
+  metadata       Json?    // Thông tin không định danh: device class, locale
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, consentVersion])
+  @@index([userId, consented])
+  @@index([consentVersion, consented])
+  @@map("user_research_consents")
+}
+
+// Bảng ghi tương tác cho nghiên cứu — CHỈ ghi khi user đã đồng ý (consented=true)
+// Không ghi mật khẩu, email, nội dung riêng tư vào metadata
+// book_id có thể null cho event SEARCH (không có sách cụ thể)
+model UserInteractionLog {
+  id                        String                   @id @default(cuid())
+  // userId null = user chưa đăng nhập (chỉ dùng anonymousId)
+  userId                    String?
+  // anonymousId dùng cho user chưa đăng nhập hoặc khi muốn ẩn danh
+  anonymousId               String?
+  bookId                    String?
+  eventType                 UserInteractionEventType
+  // Giá trị số học tùy theo event, ví dụ: rating 1-5, scroll % ...
+  eventValue                Float?
+  // Trang nguồn: home, book_detail, search, cart, ...
+  sourcePage                String?
+  // Liên kết với RecommendationRequest để audit impression → click
+  recommendationRequestId   String?
+  // Model gợi ý đã sinh ra item này, ví dụ: fastapi_hybrid_v2
+  recommendationModel       String?
+  // Vị trí trong danh sách gợi ý (1-indexed)
+  position                  Int?
+  // Phiên bản consent đã được đồng ý — bắt buộc, dùng để truy nguồn
+  consentVersion            String
+  // Idempotency key để chống ghi trùng từ client retry
+  idempotencyKey            String?                  @unique
+  // Metadata bổ sung (device, locale, ...) — không chứa PII
+  metadata                  Json?
+  // Timestamp phía server (không dùng client time)
+  createdAt                 DateTime                 @default(now())
+  // Quan hệ
+  user                      User?                    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([anonymousId, createdAt])
+  @@index([bookId, eventType])
+  @@index([eventType, createdAt])
+  @@index([recommendationRequestId])
+  @@index([consentVersion, eventType])
+  @@map("user_interaction_logs")
 }

@@ -5,6 +5,16 @@ from functools import lru_cache
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
+if "DATABASE_URL" not in os.environ:
+    env_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+    if os.path.exists(env_file):
+        with open(env_file, "r", encoding="utf-8") as _f:
+            for _line in _f:
+                _line = _line.strip()
+                if _line and not _line.startswith("#") and "=" in _line:
+                    _k, _v = _line.split("=", 1)
+                    os.environ.setdefault(_k.strip(), _v.strip().strip('"').strip("'"))
+
 import pandas as pd
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,16 +23,26 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
 
-from ai_service.catalog_scope import build_synthetic_catalog_predicate
+from ai_service.catalog_scope import build_recommendation_catalog_predicate
 from ai_service.evaluation.taxonomy import map_legacy_interaction_event
+from ai_service.evaluation.dynamic_alpha import (
+    get_dynamic_weights,
+    weights_to_dict,
+    PRODUCTION_WEIGHTS,
+)
+from ai_service.preference_profile import build_declared_category_scores
 
 
 MAX_RECOMMENDATIONS = 10
 logger = logging.getLogger("bookverse.ai")
 
-READING_CATEGORY_WEIGHT = 12.0
-READING_AUTHOR_WEIGHT = 6.0
-PURCHASE_CATEGORY_WEIGHT = 8.0
+# Feature flag: activates dynamic alpha tier-based weighting.
+# Default: false (không thay đổi production behavior cho đến khi có bằng chứng rõ ràng hơn).
+HYBRID_DYNAMIC_ALPHA_ENABLED = os.getenv("HYBRID_DYNAMIC_ALPHA", "false").lower() == "true"
+
+READING_CATEGORY_WEIGHT = PRODUCTION_WEIGHTS.reading_category  # 12.0
+READING_AUTHOR_WEIGHT = PRODUCTION_WEIGHTS.reading_author       # 6.0
+PURCHASE_CATEGORY_WEIGHT = PRODUCTION_WEIGHTS.purchase_category # 8.0
 POPULARITY_WEIGHT = 3.0
 
 # Các biểu thức này chỉ đọc metadata Category và vẫn chạy với schema demo cũ.
@@ -147,11 +167,11 @@ def _has_source_metadata_table(database_url: str) -> bool:
         engine.dispose()
 
 
-def synthetic_catalog_predicate(table_alias: str = "b") -> str:
+def recommendation_catalog_predicate(table_alias: str = "b") -> str:
     database_url = os.getenv("DATABASE_URL", "").strip()
     if not database_url:
         raise RuntimeError("DATABASE_URL is required for catalog scope checks.")
-    return build_synthetic_catalog_predicate(
+    return build_recommendation_catalog_predicate(
         table_alias,
         _has_source_metadata_table(database_url),
     )
@@ -171,7 +191,7 @@ def min_max_normalize(series: pd.Series) -> pd.Series:
 
 
 def get_books() -> pd.DataFrame:
-    catalog_predicate = synthetic_catalog_predicate()
+    catalog_predicate = recommendation_catalog_predicate()
     return read_dataframe(
         f"""
         SELECT
@@ -184,13 +204,13 @@ def get_books() -> pd.DataFrame:
         FROM "Book" b
         JOIN "Category" c ON c.id = b."categoryId"
         {CATEGORY_PARENT_JOIN_SQL}
-        WHERE {catalog_predicate}
+        WHERE {catalog_predicate} AND b.status = 'ACTIVE' AND b."deletedAt" IS NULL AND b."isPubliclyVisible" = true
         """
     )
 
 
 def get_user_reading_sessions(user_id: str) -> pd.DataFrame:
-    catalog_predicate = synthetic_catalog_predicate()
+    catalog_predicate = recommendation_catalog_predicate()
     return read_dataframe(
         f"""
         SELECT
@@ -215,7 +235,7 @@ def get_user_reading_sessions(user_id: str) -> pd.DataFrame:
 
 
 def get_user_bookmarks(user_id: str) -> pd.DataFrame:
-    catalog_predicate = synthetic_catalog_predicate()
+    catalog_predicate = recommendation_catalog_predicate()
     return read_dataframe(
         f"""
         SELECT
@@ -239,7 +259,7 @@ def get_user_bookmarks(user_id: str) -> pd.DataFrame:
 
 
 def get_user_interaction_events(user_id: str) -> pd.DataFrame:
-    catalog_predicate = synthetic_catalog_predicate()
+    catalog_predicate = recommendation_catalog_predicate()
     interactions = read_dataframe(
         f"""
         SELECT
@@ -268,7 +288,18 @@ def get_user_interaction_events(user_id: str) -> pd.DataFrame:
         map_legacy_interaction_event
     )
     interactions = interactions[
-        interactions["actionType"].isin({"READING_START", "BOOKMARK_ADD", "BOOK_VIEW"})
+        interactions["actionType"].isin(
+            {
+                "BOOK_VIEW",
+                "READING_START",
+                "READING_PROGRESS",
+                "READING_COMPLETE",
+                "READING_HIGHLIGHT",
+                "BOOKMARK_ADD",
+                "FAVORITE_ADD",
+                "CART_ADD",
+            }
+        )
     ]
     if interactions.empty:
         return interactions
@@ -285,7 +316,7 @@ def get_user_interaction_events(user_id: str) -> pd.DataFrame:
 
 
 def get_user_purchases(user_id: str) -> pd.DataFrame:
-    catalog_predicate = synthetic_catalog_predicate()
+    catalog_predicate = recommendation_catalog_predicate()
     return read_dataframe(
         f"""
         SELECT
@@ -300,7 +331,10 @@ def get_user_purchases(user_id: str) -> pd.DataFrame:
         JOIN "Book" b ON b.id = oi."bookId"
         JOIN "Category" c ON c.id = b."categoryId"
         {CATEGORY_PARENT_JOIN_SQL}
-        WHERE o."buyerId" = :user_id AND {catalog_predicate}
+        WHERE
+          o."buyerId" = :user_id
+          AND o.status IN ('PAID', 'PAID_DEMO', 'SHIPPED', 'COMPLETED')
+          AND {catalog_predicate}
         GROUP BY
           oi."bookId", b.title, b."authorName",
           {CATEGORY_FEATURE_SQL}, {CATEGORY_NAME_SQL}
@@ -309,8 +343,24 @@ def get_user_purchases(user_id: str) -> pd.DataFrame:
     )
 
 
+def get_user_declared_category_scores(user_id: str) -> dict[str, float]:
+    profile = read_dataframe(
+        'SELECT "preferredGenres" FROM "Profile" WHERE "userId" = :user_id LIMIT 1',
+        {"user_id": user_id},
+    )
+    if profile.empty:
+        return {}
+
+    preferences = profile.iloc[0].get("preferredGenres")
+    if preferences is None:
+        return {}
+    if isinstance(preferences, str):
+        preferences = [preferences]
+    return build_declared_category_scores(preferences)
+
+
 def get_global_popularity() -> pd.DataFrame:
-    catalog_predicate = synthetic_catalog_predicate()
+    catalog_predicate = recommendation_catalog_predicate()
     return read_dataframe(
         f"""
         SELECT
@@ -346,7 +396,7 @@ def get_global_popularity() -> pd.DataFrame:
           FROM "OrderItem"
           GROUP BY "bookId"
         ) oi ON oi."bookId" = b.id
-        WHERE {catalog_predicate}
+        WHERE {catalog_predicate} AND b.status = 'ACTIVE' AND b."deletedAt" IS NULL AND b."isPubliclyVisible" = true
         """
     )
 
@@ -382,7 +432,16 @@ def build_reading_preference_scores(
             add_score(author_scores, str(getattr(row, "authorName")), score * 0.6)
 
     if not interaction_events.empty:
-        event_weights = {"READING_START": 3.0, "BOOKMARK_ADD": 4.0, "BOOK_VIEW": 1.0}
+        event_weights = {
+            "BOOK_VIEW": 1.0,
+            "READING_START": 3.0,
+            "READING_PROGRESS": 4.0,
+            "READING_COMPLETE": 6.0,
+            "READING_HIGHLIGHT": 5.0,
+            "BOOKMARK_ADD": 6.0,
+            "FAVORITE_ADD": 7.0,
+            "CART_ADD": 5.0,
+        }
         for row in interaction_events.itertuples(index=False):
             action_type = str(getattr(row, "actionType"))
             event_count = float(getattr(row, "eventCount") or 0)
@@ -445,7 +504,17 @@ def build_excluded_book_ids(
 
     if not interaction_events.empty:
         read_or_bookmarked = interaction_events[
-            interaction_events["actionType"].isin(["READING_START", "BOOKMARK_ADD"])
+            interaction_events["actionType"].isin(
+                [
+                    "READING_START",
+                    "READING_PROGRESS",
+                    "READING_COMPLETE",
+                    "READING_HIGHLIGHT",
+                    "BOOKMARK_ADD",
+                    "FAVORITE_ADD",
+                    "CART_ADD",
+                ]
+            )
         ]
         excluded_book_ids.update(read_or_bookmarked["bookId"].dropna().astype(str).tolist())
 
@@ -529,6 +598,10 @@ def rank_hybrid_recommendations(
     reading_author_scores: dict[str, float],
     purchase_category_scores: dict[str, float],
     purchase_evidence_by_category: dict[str, str],
+    rc_weight: float = READING_CATEGORY_WEIGHT,
+    ra_weight: float = READING_AUTHOR_WEIGHT,
+    pc_weight: float = PURCHASE_CATEGORY_WEIGHT,
+    pop_weight: float = POPULARITY_WEIGHT,
 ) -> list[dict[str, Any]]:
     normalized_reading_categories = normalize_score_map(reading_category_scores)
     normalized_reading_authors = normalize_score_map(reading_author_scores)
@@ -537,15 +610,15 @@ def rank_hybrid_recommendations(
     ranked = books.copy()
     ranked["readingScore"] = ranked.apply(
         lambda row: (
-            normalized_reading_categories.get(str(row["categoryId"]), 0.0) * READING_CATEGORY_WEIGHT
-            + normalized_reading_authors.get(str(row["authorName"]), 0.0) * READING_AUTHOR_WEIGHT
+            normalized_reading_categories.get(str(row["categoryId"]), 0.0) * rc_weight
+            + normalized_reading_authors.get(str(row["authorName"]), 0.0) * ra_weight
         ),
         axis=1,
     )
     ranked["purchaseScore"] = ranked["categoryId"].astype(str).map(
-        lambda category_id: normalized_purchase_categories.get(category_id, 0.0) * PURCHASE_CATEGORY_WEIGHT
+        lambda category_id: normalized_purchase_categories.get(category_id, 0.0) * pc_weight
     )
-    ranked["popularityScore"] = ranked["popularityNorm"] * POPULARITY_WEIGHT
+    ranked["popularityScore"] = ranked["popularityNorm"] * pop_weight
     ranked["score"] = (
         ranked["readingScore"] + ranked["purchaseScore"] + ranked["popularityScore"]
     ).round(4)
@@ -625,9 +698,39 @@ def recommend_books(user_id: str) -> list[dict[str, Any]]:
             bookmarks=bookmarks,
             interaction_events=interaction_events,
         )
+        for category_id, score in get_user_declared_category_scores(clean_user_id).items():
+            add_score(reading_category_scores, category_id, score)
         purchase_category_scores = build_purchase_category_scores(purchases)
         purchase_evidence_by_category = get_purchase_evidence_by_category(purchases)
 
+        # Feature flag: dùng dynamic alpha khi bật, giữ production weights khi tắt
+        interaction_count = (
+            len(reading_sessions)
+            + len(bookmarks)
+            + len(interaction_events)
+            + len(purchases)
+        )
+
+        if HYBRID_DYNAMIC_ALPHA_ENABLED:
+            weights = get_dynamic_weights(interaction_count)
+            logger.debug(
+                "dynamic_alpha tier=%s interaction_count=%d",
+                weights.tier,
+                interaction_count,
+            )
+            return rank_hybrid_recommendations(
+                books=candidate_books,
+                reading_category_scores=reading_category_scores,
+                reading_author_scores=reading_author_scores,
+                purchase_category_scores=purchase_category_scores,
+                purchase_evidence_by_category=purchase_evidence_by_category,
+                rc_weight=weights.reading_category,
+                ra_weight=weights.reading_author,
+                pc_weight=weights.purchase_category,
+                pop_weight=weights.popularity,
+            )
+
+        # Production path: weights cố định, không thay đổi
         return rank_hybrid_recommendations(
             books=candidate_books,
             reading_category_scores=reading_category_scores,

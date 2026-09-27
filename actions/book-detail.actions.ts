@@ -2,10 +2,13 @@
 
 import { InteractionType, ListingStatus, TargetType } from "@prisma/client";
 import { normalizeBookCoverUrl } from "@/lib/book-cover";
+import { getVietnameseBookTitle } from "@/lib/book-display-title";
+import { normalizeBookPrice } from "@/lib/book-display-price";
 import { TAXONOMY_VERSION } from "@/lib/interaction-taxonomy";
 import { getCurrentUser, PermissionError, requireAuthenticatedUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
-import { publicBookQualityWhere, publicDemoBookWhere } from "@/lib/public-book-policy";
+import { publicExperienceBookWhere } from "@/lib/public-book-policy";
+import { logResearchInteraction } from "@/actions/tracking.actions";
 
 type DecimalLike = {
   toNumber: () => number;
@@ -44,6 +47,9 @@ export interface BookDetail {
   } | null;
   isFavorite: boolean;
   isInMembership: boolean;
+  catalogSource: "CURATED_REAL" | "SYNTHETIC_DEMO";
+  metadataBadge: string;
+  priceLabel: string;
   reviews: BookDetailReview[];
   sourceMetadata: {
     languages: string[];
@@ -98,7 +104,7 @@ export async function getBookById(id: string): Promise<BookDetail | null> {
   try {
     const currentUser = await getCurrentUser();
     const userId = currentUser && !currentUser.isLocked ? currentUser.id : null;
-    const visibilityWhere = id.startsWith("RB") ? publicBookQualityWhere() : publicDemoBookWhere();
+    const visibilityWhere = publicExperienceBookWhere();
     const book = await prisma.book.findFirst({
       where: {
         AND: [{ id }, visibilityWhere],
@@ -169,12 +175,12 @@ export async function getBookById(id: string): Promise<BookDetail | null> {
 
     return {
       id: book.id,
-      title: book.title,
+      title: getVietnameseBookTitle(book.id, book.title),
       author: book.authorName,
         // Không phát lại mô tả nhập từ nguồn trên giao diện công khai.
         description: book.sourceMetadata ? null : book.description,
       coverImage: normalizeBookCoverUrl(book.coverPath),
-      price: decimalToNumber(book.price) ?? 0,
+      price: normalizeBookPrice(book.price),
       rating: decimalToNumber(book.rating),
       pages: book.pages,
       publishYear: book.publishYear,
@@ -183,13 +189,16 @@ export async function getBookById(id: string): Promise<BookDetail | null> {
       availableListing: book.listings[0]
         ? {
             id: book.listings[0].id,
-            price: decimalToNumber(book.listings[0].price) ?? 0,
+            price: normalizeBookPrice(book.listings[0].price),
             condition: book.listings[0].condition,
           }
         : null,
       isFavorite: Boolean(favorite),
       // Mọi đầu sách đang hoạt động đều thuộc kho đọc của gói hội viên.
       isInMembership: book.status === "ACTIVE" && !book.deletedAt,
+      catalogSource: book.sourceMetadata ? "CURATED_REAL" : "SYNTHETIC_DEMO",
+      metadataBadge: book.sourceMetadata ? "Sách tuyển chọn" : "Dữ liệu demo",
+      priceLabel: book.sourceMetadata ? "Giá bán" : "Giá demo",
       reviews: book.reviews.map((review) => ({
         id: review.id,
         rating: review.rating,
@@ -213,6 +222,8 @@ export async function getRelatedBooks(
   isCurated: boolean,
 ): Promise<RelatedBook[]> {
   try {
+    // Giữ tham số để tương thích với lời gọi cũ; catalog công khai nay luôn là catalog thật.
+    void isCurated;
     const currentUser = await getCurrentUser();
     const userId = currentUser && !currentUser.isLocked ? currentUser.id : null;
     const books = await prisma.book.findMany({
@@ -220,7 +231,7 @@ export async function getRelatedBooks(
         AND: [
           { id: { not: bookId } },
           { categoryId },
-          isCurated ? publicBookQualityWhere() : publicDemoBookWhere(),
+          publicExperienceBookWhere(),
         ],
       },
       orderBy: [
@@ -268,17 +279,19 @@ export async function getRelatedBooks(
     });
 
     return books.map((book) => {
-      const catalogSource = book.sourceMetadata ? "CURATED_REAL" : "SYNTHETIC_DEMO";
+      const catalogSource = book.sourceMetadata
+        ? ("CURATED_REAL" as const)
+        : ("SYNTHETIC_DEMO" as const);
 
       return {
         id: book.id,
-        title: book.title,
+        title: getVietnameseBookTitle(book.id, book.title),
         author: book.authorName,
         coverImage: normalizeBookCoverUrl(book.coverPath),
-        price: decimalToNumber(book.price) ?? 0,
+        price: normalizeBookPrice(book.price),
         category: book.category.name,
         catalogSource,
-        metadataBadge: catalogSource === "CURATED_REAL" ? "Sách tuyển chọn" : undefined,
+        metadataBadge: catalogSource === "CURATED_REAL" ? "Sách tuyển chọn" : "Dữ liệu demo",
         priceLabel: catalogSource === "CURATED_REAL" ? "Giá BookVerse" : undefined,
         availableListingId: book.listings[0]?.id ?? null,
         isFavorite: book.favoriteBooks.length > 0,
@@ -368,7 +381,7 @@ export async function createBookReview(
       },
     });
 
-    await prisma.$transaction([
+    const [review] = await prisma.$transaction([
       existingReview
         ? prisma.review.update({
             where: {
@@ -417,6 +430,15 @@ export async function createBookReview(
     ]);
 
     await refreshBookRating(cleanBookId);
+
+    // Research tracking: chỉ gửi rating số (1-5), không gửi reviewText (tránh PII, await sau khi lưu review thành công)
+    await logResearchInteraction({
+      eventType: "RATING",
+      bookId: cleanBookId,
+      eventValue: safeRating,
+      sourcePage: "book_detail",
+      idempotencyKey: `rating:${review.id}:${review.updatedAt ? review.updatedAt.getTime() : "v1"}`,
+    });
 
     return {
       success: true,

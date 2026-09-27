@@ -4,16 +4,18 @@ import {
   AlertTriangle,
   ArrowLeft,
   BookCheck,
-  BookOpen,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Eye,
   EyeOff,
   FileWarning,
   ImageOff,
-  Languages,
   Search,
   ShieldCheck,
 } from "lucide-react";
+
+import { buildCatalogPaginationItems } from "@/lib/catalog-pagination";
 
 import {
   getDataQualityPageData,
@@ -23,6 +25,7 @@ import {
   type DataQualityIssueFilter,
 } from "@/actions/data-quality.actions";
 import { DataQualitySubmitButton } from "@/components/admin/DataQualitySubmitButton";
+import { AdminSubNav } from "@/components/admin/AdminSubNav";
 import { BookCover } from "@/components/shared/BookCover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -112,15 +115,15 @@ function metricCard(
       ? "border-emerald-200 bg-emerald-50/70"
       : tone === "warn"
         ? "border-amber-200 bg-amber-50/70"
-        : "border-[#D8D0C2] bg-[#FFFDF8]";
+        : "border-bv-border bg-bv-ivory";
   return (
     <article className={`rounded-xl border p-4 shadow-[0_8px_24px_rgba(39,44,51,0.06)] ${toneClass}`}>
-      <div className="flex items-center justify-between gap-3 text-[#0F766E]">
-        <p className="text-xs font-black uppercase tracking-[0.12em] text-[#66706B]">{label}</p>
+      <div className="flex items-center justify-between gap-3 text-bv-focus">
+        <p className="text-xs font-black uppercase tracking-[0.12em] text-bv-text-muted">{label}</p>
         {icon}
       </div>
-      <p className="mt-3 text-3xl font-black tracking-tight text-[#17202A]">{value}</p>
-      <p className="mt-1 text-xs font-medium leading-5 text-[#66706B]">{hint}</p>
+      <p className="mt-3 text-3xl font-black tracking-tight text-bv-heading">{value}</p>
+      <p className="mt-1 text-xs font-medium leading-5 text-bv-text-muted">{hint}</p>
     </article>
   );
 }
@@ -155,37 +158,32 @@ export default async function DataQualityAdminPage({
     page: Number(params?.page ?? "1"),
   });
   const { metrics } = data;
+  const paginationItems = buildCatalogPaginationItems(data.page, data.totalPages);
 
   return (
-    <main className="min-h-screen bg-[#F7F4ED] text-[#17202A]">
-      <section className="border-b border-white/10 bg-[#0F3F3C] text-[#FFFDF8]">
+    <main className="min-h-screen bg-bv-surface text-bv-heading">
+      <AdminSubNav />
+      <section className="border-b border-white/10 bg-[#0F3F3C] text-bv-ivory">
         <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
           <Link
-            className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/20 px-3 text-sm font-bold transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F2C14E]"
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/20 px-3 text-sm font-bold transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bv-gold"
             href="/admin"
           >
             <ArrowLeft aria-hidden="true" className="h-4 w-4" />
-            Admin Center
+            Bảng điều hành Admin
           </Link>
           <div className="mt-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p className="inline-flex items-center gap-2 text-sm font-black uppercase tracking-[0.14em] text-[#F2C14E]">
+              <p className="inline-flex items-center gap-2 text-sm font-black uppercase tracking-[0.14em] text-bv-gold">
                 <ShieldCheck aria-hidden="true" className="h-4 w-4" />
-                Data Quality Admin
+                Kiểm duyệt &amp; Chuẩn hóa sách
               </p>
               <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-5xl">
-                Chất lượng dữ liệu sách
+                Kiểm duyệt &amp; Chuẩn hóa sách
               </h1>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-[#EAF5F1]">
-                Theo dõi catalog RBxxxxx, sửa ngôn ngữ và chỉ duyệt bán những sách có bìa local
-                hợp lệ.
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-bv-mint-soft">
+                Rà soát sách thiếu thông tin (ảnh bìa, ngôn ngữ, mô tả), chuẩn hóa dữ liệu và duyệt hiển thị công khai trên sàn.
               </p>
-            </div>
-            <div className="rounded-xl border border-white/15 bg-white/10 px-4 py-3">
-              <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#B8D5CF]">
-                Độ phủ bìa thật
-              </p>
-              <p className="mt-1 text-3xl font-black">{metrics.coverCompletionRate}%</p>
             </div>
           </div>
         </div>
@@ -205,23 +203,17 @@ export default async function DataQualityAdminPage({
           </div>
         ) : null}
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          {metricCard("Tổng sách", metrics.totalBooks.toLocaleString("vi-VN"), `${metrics.publiclyVisible.toLocaleString("vi-VN")} đang công khai`, <BookOpen aria-hidden="true" className="h-5 w-5" />)}
-          {metricCard("Tiếng Việt", metrics.vietnameseBooks.toLocaleString("vi-VN"), `${metrics.englishBooks.toLocaleString("vi-VN")} sách tiếng Anh`, <Languages aria-hidden="true" className="h-5 w-5" />)}
-          {metricCard("Bìa đã duyệt", metrics.verifiedCovers.toLocaleString("vi-VN"), `${metrics.needsCoverReview.toLocaleString("vi-VN")} cần review`, <BookCheck aria-hidden="true" className="h-5 w-5" />, metrics.needsCoverReview === 0 ? "good" : "warn")}
-          {metricCard("Thiếu ISBN", metrics.missingIsbn.toLocaleString("vi-VN"), "Cần bổ sung để định danh ấn bản", <FileWarning aria-hidden="true" className="h-5 w-5" />, metrics.missingIsbn > 0 ? "warn" : "good")}
-          {metricCard("Thiếu metadata", (metrics.missingDescription + metrics.missingLanguage).toLocaleString("vi-VN"), `${metrics.missingDescription} thiếu mô tả · ${metrics.missingLanguage} thiếu ngôn ngữ`, <ImageOff aria-hidden="true" className="h-5 w-5" />, "warn")}
-        </div>
 
-        <form className="grid gap-3 rounded-xl border border-[#D8D0C2] bg-[#FFFDF8] p-4 shadow-[0_10px_28px_rgba(39,44,51,0.06)] md:grid-cols-[1fr_220px_auto]" method="get">
+
+        <form className="grid gap-3 rounded-xl border border-bv-border bg-bv-ivory p-4 shadow-[0_10px_28px_rgba(39,44,51,0.06)] md:grid-cols-[1fr_220px_auto]" method="get">
           <label className="relative block">
             <span className="sr-only">Tìm sách cần kiểm tra</span>
-            <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#66706B]" />
+            <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-bv-text-muted" />
             <Input className="h-11 pl-10" defaultValue={query} name="q" placeholder="Mã sách, tiêu đề hoặc tác giả..." />
           </label>
           <label>
             <span className="sr-only">Loại vấn đề dữ liệu</span>
-            <select className="h-11 w-full rounded-lg border border-[#D8D0C2] bg-white px-3 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E]" defaultValue={issue} name="issue">
+            <select className="h-11 w-full rounded-lg border border-bv-border bg-white px-3 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bv-focus" defaultValue={issue} name="issue">
               {ISSUE_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
@@ -230,15 +222,15 @@ export default async function DataQualityAdminPage({
           <Button className="h-11" type="submit">Lọc dữ liệu</Button>
         </form>
 
-        <section className="overflow-hidden rounded-xl border border-[#D8D0C2] bg-[#FFFDF8] shadow-[0_12px_34px_rgba(39,44,51,0.07)]">
+        <section className="overflow-hidden rounded-xl border border-bv-border bg-bv-ivory shadow-[0_12px_34px_rgba(39,44,51,0.07)]">
           <div className="flex flex-col gap-2 border-b border-[#E5DED2] px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-lg font-black">Danh sách cần xử lý</h2>
-              <p className="mt-1 text-sm text-[#66706B]">
-                {data.totalIssues.toLocaleString("vi-VN")} sách · Trang {data.page}/{data.totalPages}
+              <p className="mt-1 text-sm text-bv-text-muted">
+                Trang {data.page}/{data.totalPages} · Kết quả theo bộ lọc hiện tại
               </p>
             </div>
-            <p className="text-xs font-bold text-[#66706B]">
+            <p className="text-xs font-bold text-bv-text-muted">
               Duyệt hiển thị luôn kiểm tra lại file bìa trên máy chủ.
             </p>
           </div>
@@ -255,80 +247,88 @@ export default async function DataQualityAdminPage({
                   <tr>
                     <th className="px-4 py-3">Sách</th>
                     <th className="px-4 py-3">Ngôn ngữ</th>
-                    <th className="px-4 py-3">Metadata</th>
-                    <th className="px-4 py-3">Bìa</th>
-                    <th className="px-4 py-3">Công khai</th>
+                    <th className="px-4 py-3">Thông tin đặc tả</th>
+                    <th className="px-4 py-3">Kiểm duyệt bìa</th>
+                    <th className="px-4 py-3 text-right">Trạng thái hiển thị</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#E5DED2]">
                   {data.books.map((book) => {
                     const canApprove = book.coverReviewStatus === "VERIFIED_LOCAL";
                     return (
-                      <tr className="align-top transition-colors hover:bg-[#FAF8F2]" key={book.id}>
+                      <tr className="align-middle transition-colors hover:bg-[#FAF8F2]" key={book.id}>
                         <td className="px-4 py-4">
-                          <div className="flex w-72 gap-3">
+                          <div className="flex w-72 gap-3 items-center">
                             <BookCover
                               author={book.author}
                               bookId={book.id}
-                              className="h-[108px] w-[72px] shrink-0 rounded-md border border-[#D8D0C2]"
+                              className="h-[96px] w-[66px] shrink-0 rounded-md border border-bv-border object-cover shadow-xs"
                               src={book.coverPath}
                               title={book.title}
                             />
-                            <div className="min-w-0">
-                              <Link className="line-clamp-2 font-black text-[#17202A] hover:text-[#0F766E] hover:underline" href={`/book/${book.id}`}>
+                            <div className="min-w-0 flex-1">
+                              <Link className="line-clamp-2 font-bold text-bv-heading hover:text-bv-focus hover:underline" href={`/book/${book.id}`}>
                                 {book.title}
                               </Link>
-                              <p className="mt-1 text-xs font-bold text-[#0F766E]">{book.id}</p>
-                              <p className="mt-1 line-clamp-2 text-xs text-[#66706B]">{book.author}</p>
+                              <p className="mt-1 font-mono text-[11px] font-bold text-bv-focus">{book.id}</p>
+                              <p className="mt-1 line-clamp-1 text-xs text-bv-text-muted">{book.author}</p>
                             </div>
                           </div>
                         </td>
                         <td className="px-4 py-4">
-                          <form action={updateLanguageAction} className="w-48 space-y-2">
+                          <form action={updateLanguageAction} className="w-52">
                             <input name="bookId" type="hidden" value={book.id} />
-                            <select aria-label={`Ngôn ngữ của ${book.title}`} className="h-11 w-full rounded-lg border border-[#D8D0C2] bg-white px-3 text-xs font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E]" defaultValue={book.languageCode ?? ""} name="languageCode">
-                              <option disabled value="">Chưa xác định</option>
-                              {LANGUAGE_OPTIONS.map(([value, label]) => (
-                                <option key={value} value={value}>{label}</option>
-                              ))}
-                            </select>
-                            <DataQualitySubmitButton className="w-full border border-[#0F766E]/30 bg-[#EDF7F5] text-[#0F5F59] hover:bg-[#DDEFEA]">
-                              Sửa ngôn ngữ
-                            </DataQualitySubmitButton>
+                            <div className="flex items-center gap-1.5">
+                              <select
+                                aria-label={`Ngôn ngữ của ${book.title}`}
+                                className="h-9 flex-1 rounded-lg border border-bv-border bg-white px-2.5 text-xs font-bold text-bv-heading focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bv-focus"
+                                defaultValue={book.languageCode ?? ""}
+                                name="languageCode"
+                              >
+                                <option disabled value="">Chưa xác định</option>
+                                {LANGUAGE_OPTIONS.map(([value, label]) => (
+                                  <option key={value} value={value}>{label}</option>
+                                ))}
+                              </select>
+                              <DataQualitySubmitButton className="h-9 shrink-0 border border-bv-focus/30 bg-[#EDF7F5] px-2.5 text-[#0F5F59] hover:bg-[#DDEFEA]">
+                                Lưu
+                              </DataQualitySubmitButton>
+                            </div>
                           </form>
                         </td>
                         <td className="px-4 py-4">
-                          <div className="flex w-40 flex-wrap gap-2 text-xs font-bold">
-                            <span className={`rounded-full px-2.5 py-1 ${book.missingIsbn ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
-                              {book.missingIsbn ? "Thiếu ISBN" : `ISBN ${book.isbn}`}
+                          <div className="flex w-40 flex-col gap-1.5 text-xs font-bold">
+                            <span className={`inline-flex items-center rounded-md px-2.5 py-1 ${book.missingIsbn ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
+                              {book.missingIsbn ? "Thiếu ISBN" : `ISBN: ${book.isbn}`}
                             </span>
-                            <span className={`rounded-full px-2.5 py-1 ${book.missingDescription ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
-                              {book.missingDescription ? "Thiếu mô tả" : "Có mô tả"}
+                            <span className={`inline-flex items-center rounded-md px-2.5 py-1 ${book.missingDescription ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
+                              {book.missingDescription ? "Thiếu mô tả" : "Đầy đủ mô tả"}
                             </span>
                           </div>
                         </td>
                         <td className="px-4 py-4">
-                          <form action={updateCoverAction} className="w-56 space-y-2">
+                          <form action={updateCoverAction} className="w-44 space-y-2">
                             <input name="bookId" type="hidden" value={book.id} />
                             <input name="coverPath" type="hidden" value={book.coverPath} />
-                            <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-black ${canApprove ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}`}>
-                              {canApprove ? "VERIFIED_LOCAL" : "NEEDS_COVER_REVIEW"}
-                            </span>
-                            <p className="break-all text-[11px] leading-4 text-[#66706B]">{book.coverPath}</p>
-                            <DataQualitySubmitButton className="w-full border border-[#D8D0C2] bg-white text-[#17202A] hover:bg-[#F0ECE3]">
+                            <div>
+                              <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-black ${canApprove ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}`}>
+                                {canApprove ? "Bìa hợp lệ" : "Cần duyệt bìa"}
+                              </span>
+                            </div>
+                            <DataQualitySubmitButton className="h-8 rounded-lg border border-bv-border bg-white px-2.5 text-xs font-bold text-bv-heading shadow-xs hover:bg-[#F0ECE3]">
                               Cập nhật bìa
                             </DataQualitySubmitButton>
                           </form>
                         </td>
-                        <td className="px-4 py-4">
-                          <form action={visibilityAction} className="w-40">
+                        <td className="px-4 py-4 text-right">
+                          <form action={visibilityAction} className="inline-block w-36">
                             <input name="bookId" type="hidden" value={book.id} />
                             <input name="visible" type="hidden" value={book.isPubliclyVisible ? "false" : "true"} />
                             <DataQualitySubmitButton
-                              className={book.isPubliclyVisible ? "w-full border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" : "w-full bg-[#0F766E] text-white hover:bg-[#0F5F59]"}
+                              className={book.isPubliclyVisible ? "h-9 w-full border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" : "h-9 w-full bg-bv-focus text-white hover:bg-[#0F5F59]"}
                               disabled={!book.isPubliclyVisible && !canApprove}
                             >
-                              {book.isPubliclyVisible ? <><EyeOff aria-hidden="true" className="h-4 w-4" />Ẩn hiển thị</> : <><Eye aria-hidden="true" className="h-4 w-4" />Duyệt hiển thị</>}
+                              {book.isPubliclyVisible ? <><EyeOff aria-hidden="true" className="h-3.5 w-3.5" />Ẩn hiển thị</> : <><Eye aria-hidden="true" className="h-3.5 w-3.5" />Duyệt hiển thị</>}
                             </DataQualitySubmitButton>
                           </form>
                         </td>
@@ -340,17 +340,67 @@ export default async function DataQualityAdminPage({
             </div>
           )}
 
-          <nav aria-label="Phân trang chất lượng dữ liệu" className="flex items-center justify-between border-t border-[#E5DED2] p-4">
+          <nav aria-label="Phân trang kiểm duyệt sách" className="flex flex-wrap items-center justify-between gap-3 border-t border-[#E5DED2] bg-white px-6 py-4">
+            {/* Nút Trang trước */}
             {data.page > 1 ? (
-              <Link className="inline-flex min-h-11 items-center rounded-lg border border-[#D8D0C2] px-4 text-sm font-black hover:bg-[#F0ECE3]" href={buildPageHref({ page: data.page - 1, issue, query })}>
-                Trang trước
+              <Link
+                className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-bv-border bg-white px-4 text-xs font-bold text-bv-heading shadow-xs transition hover:bg-[#F0ECE3]"
+                href={buildPageHref({ page: data.page - 1, issue, query })}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                <span>Trang trước</span>
               </Link>
-            ) : <span />}
+            ) : (
+              <span className="inline-flex h-10 cursor-not-allowed items-center gap-1.5 rounded-lg border border-bv-border/50 bg-zinc-100/60 px-4 text-xs font-bold text-zinc-400">
+                <ChevronLeft className="h-4 w-4" />
+                <span>Trang trước</span>
+              </span>
+            )}
+
+            {/* Dãy số trang */}
+            <div className="flex flex-wrap items-center justify-center gap-1.5" aria-label="Danh sách số trang">
+              {paginationItems.map((item, idx) =>
+                typeof item === "number" ? (
+                  item === data.page ? (
+                    <span
+                      key={item}
+                      aria-current="page"
+                      className="inline-flex h-10 min-w-10 items-center justify-center rounded-lg bg-bv-primary px-3 text-xs font-black text-white shadow-xs"
+                    >
+                      {item}
+                    </span>
+                  ) : (
+                    <Link
+                      key={item}
+                      href={buildPageHref({ page: item, issue, query })}
+                      className="inline-flex h-10 min-w-10 items-center justify-center rounded-lg border border-bv-border bg-white px-3 text-xs font-bold text-bv-heading shadow-xs transition hover:border-bv-primary/40 hover:bg-[#F0ECE3]"
+                    >
+                      {item}
+                    </Link>
+                  )
+                ) : (
+                  <span key={`ellipsis-${idx}`} className="inline-flex h-10 min-w-6 items-center justify-center text-xs font-bold text-bv-text-muted">
+                    …
+                  </span>
+                )
+              )}
+            </div>
+
+            {/* Nút Trang sau */}
             {data.page < data.totalPages ? (
-              <Link className="inline-flex min-h-11 items-center rounded-lg bg-[#0F766E] px-4 text-sm font-black text-white hover:bg-[#0F5F59]" href={buildPageHref({ page: data.page + 1, issue, query })}>
-                Trang sau
+              <Link
+                className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-bv-focus px-4 text-xs font-bold text-white shadow-xs transition hover:bg-[#0F5F59]"
+                href={buildPageHref({ page: data.page + 1, issue, query })}
+              >
+                <span>Trang sau</span>
+                <ChevronRight className="h-4 w-4" />
               </Link>
-            ) : <span />}
+            ) : (
+              <span className="inline-flex h-10 cursor-not-allowed items-center gap-1.5 rounded-lg border border-bv-border/50 bg-zinc-100/60 px-4 text-xs font-bold text-zinc-400">
+                <span>Trang sau</span>
+                <ChevronRight className="h-4 w-4" />
+              </span>
+            )}
           </nav>
         </section>
       </section>

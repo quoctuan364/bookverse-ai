@@ -15,7 +15,7 @@ export default function CoverSystemPage() {
   return (
     <main className="min-h-screen bg-[#0B111A] px-4 py-10 text-white sm:px-8">
       <div className="mx-auto max-w-7xl">
-        <p className="text-xs font-bold uppercase tracking-[0.24em] text-amber-300">Generated demo asset</p>
+        <p className="text-xs font-bold uppercase tracking-[0.24em] text-amber-300">Ảnh minh họa cho bản demo</p>
         <h1 className="mt-3 text-3xl font-black sm:text-5xl">Hệ thống bìa BookVerse V2</h1>
         <p className="mt-4 max-w-3xl leading-7 text-zinc-300">
           Trang kiểm tra thiết kế tĩnh. Đây là artwork demo nguyên bản, không phải bìa nhà xuất bản và

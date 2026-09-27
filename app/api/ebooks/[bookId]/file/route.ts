@@ -17,7 +17,7 @@ export async function GET(_request: Request, context: EbookFileRouteContext) {
   const user = await getCurrentUser();
 
   if (!user || user.isLocked) {
-    return NextResponse.json({ error: "Bạn cần đăng nhập để mở Ebook." }, { status: 401 });
+    return NextResponse.json({ error: "Bạn cần đăng nhập để mở sách điện tử." }, { status: 401 });
   }
 
   const { bookId: rawBookId } = await context.params;
@@ -41,7 +41,7 @@ export async function GET(_request: Request, context: EbookFileRouteContext) {
 
   if (!readingAccess.hasAccess) {
     return NextResponse.json(
-      { error: "Bạn chưa mua Ebook hoặc chưa có gói hội viên phù hợp." },
+      { error: "Bạn chưa mua sách điện tử hoặc chưa có gói hội viên phù hợp." },
       { status: 403 },
     );
   }
@@ -72,5 +72,5 @@ export async function GET(_request: Request, context: EbookFileRouteContext) {
     });
   }
 
-  return NextResponse.json({ error: "Chưa tìm thấy file Ebook cho đầu sách này." }, { status: 404 });
+  return NextResponse.json({ error: "Chưa tìm thấy file sách điện tử cho đầu sách này." }, { status: 404 });
 }

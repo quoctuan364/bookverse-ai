@@ -23,6 +23,8 @@ export interface ReaderRagCitation {
   chapterTitle?: string;
 }
 
+export type ReaderRagRetrievalMethod = "keyword" | "bm25";
+
 const STOP_WORDS = new Set([
   "ai",
   "anh",
@@ -70,16 +72,20 @@ function stripVietnameseMarks(value: string): string {
     .replace(/đ/gu, "d");
 }
 
+function tokenizeReaderRagText(value: string): string[] {
+  return stripVietnameseMarks(normalizeReaderRagText(value))
+    .split(" ")
+    .filter(Boolean);
+}
+
 function queryTerms(query: string): string[] {
   return Array.from(
     new Set(
-      normalizeReaderRagText(query)
-        .split(" ")
+      tokenizeReaderRagText(query)
         .filter(
           (term) =>
             term.length >= 3 &&
-            !STOP_WORDS.has(term) &&
-            !STOP_WORDS.has(stripVietnameseMarks(term)),
+            !STOP_WORDS.has(term),
         ),
     ),
   );
@@ -94,6 +100,7 @@ export function rankReaderRagChunks(
   query: string,
   currentChapterNumber: number,
   take = 5,
+  method: ReaderRagRetrievalMethod = "bm25",
 ): ReaderRagChunk[] {
   const terms = queryTerms(query);
   const normalizedQuery = normalizeReaderRagText(query);
@@ -102,28 +109,83 @@ export function rankReaderRagChunks(
       stripVietnameseMarks(normalizedQuery),
     );
 
+  const documents = chunks.map((chunk) =>
+    tokenizeReaderRagText(`${chunk.chapterTitle} ${chunk.content}`),
+  );
+  const averageDocumentLength =
+    documents.reduce((total, tokens) => total + tokens.length, 0) /
+    Math.max(1, documents.length);
+  const documentFrequency = new Map(
+    terms.map((term) => [
+      term,
+      documents.filter((tokens) => tokens.includes(term)).length,
+    ]),
+  );
+
+  // Tham số BM25 chuẩn, cố định để benchmark có thể tái lập.
+  const k1 = 1.2;
+  const b = 0.75;
+
   return chunks
-    .map((chunk) => {
+    .map((chunk, chunkIndex) => {
       const normalizedContent = normalizeReaderRagText(
         `${chunk.chapterTitle} ${chunk.content}`,
       );
-      const contentTokens = normalizedContent.split(" ");
+      const contentTokens = documents[chunkIndex] ?? [];
       const lexicalScore = terms.reduce(
         (score, term) => score + countTokenOccurrences(contentTokens, term),
         0,
       );
+      const matchedTermCount = terms.filter((term) =>
+        contentTokens.includes(term),
+      ).length;
+      const bm25Score = terms.reduce((score, term) => {
+        const termFrequency = contentTokens.filter((token) => token === term).length;
+        if (termFrequency === 0) return score;
+
+        const frequency = documentFrequency.get(term) ?? 0;
+        const inverseDocumentFrequency = Math.log(
+          1 + (chunks.length - frequency + 0.5) / (frequency + 0.5),
+        );
+        const lengthNormalization =
+          termFrequency +
+          k1 *
+            (1 - b + b * (contentTokens.length / Math.max(1, averageDocumentLength)));
+        return (
+          score +
+          inverseDocumentFrequency *
+            ((termFrequency * (k1 + 1)) / lengthNormalization)
+        );
+      }, 0);
       const exactPhraseBonus =
-        normalizedQuery.length >= 12 && normalizedContent.includes(normalizedQuery) ? 8 : 0;
+        normalizedQuery.length >= 12 &&
+        stripVietnameseMarks(normalizedContent).includes(stripVietnameseMarks(normalizedQuery))
+          ? method === "bm25"
+            ? 2
+            : 8
+          : 0;
       const chapterBonus =
-        contextualRequest && chunk.chapterNumber === currentChapterNumber ? 2 : 0;
+        contextualRequest && chunk.chapterNumber === currentChapterNumber
+          ? method === "bm25"
+            ? 0.75
+            : 2
+          : 0;
+      const retrievalScore = method === "bm25" ? bm25Score : lexicalScore;
 
       return {
         chunk,
         lexicalScore,
-        score: lexicalScore + exactPhraseBonus + chapterBonus,
+        matchedTermCount,
+        score: retrievalScore + exactPhraseBonus + chapterBonus,
       };
     })
-    .filter((item) => item.lexicalScore > 0 || (contextualRequest && item.score > 0))
+    .filter((item) => {
+      const requiredMatches = terms.length <= 1 ? 1 : 2;
+      return (
+        item.matchedTermCount >= requiredMatches ||
+        (contextualRequest && item.score > 0)
+      );
+    })
     .sort(
       (left, right) =>
         right.score - left.score ||

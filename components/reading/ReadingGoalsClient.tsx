@@ -60,18 +60,18 @@ export function ReadingGoalsClient({
   return (
     <div className="grid gap-7 lg:grid-cols-[0.75fr_1.25fr]">
       <section className="bv-card rounded-2xl p-5 sm:p-7">
-        <h2 className="inline-flex items-center gap-2 text-2xl font-black text-[#17202A]">
-          <Target className="h-6 w-6 text-[#176B62]" aria-hidden="true" />
+        <h2 className="inline-flex items-center gap-2 text-2xl font-black text-bv-heading">
+          <Target className="h-6 w-6 text-bv-primary" aria-hidden="true" />
           Thiết lập mục tiêu
         </h2>
-        <p className="mt-2 text-sm leading-6 text-[#66706B]">
+        <p className="mt-2 text-sm leading-6 text-bv-text-muted">
           Thiết lập này chỉ lưu trên trình duyệt hiện tại, không thay đổi dữ liệu hồ sơ gốc.
         </p>
         <div className="mt-6 space-y-5">
           <label className="block font-bold text-[#364152]">
             Phút đọc mỗi tuần
             <input
-              className="mt-2 min-h-12 w-full rounded-lg border border-[#1D2433]/15 bg-white px-4 text-base outline-none focus-visible:ring-2 focus-visible:ring-[#176B62]"
+              className="mt-2 min-h-12 w-full rounded-lg border border-bv-ink/15 bg-white px-4 text-base outline-none focus-visible:ring-2 focus-visible:ring-bv-primary"
               min={10}
               onChange={(event) => setGoals((value) => ({ ...value, weeklyMinutes: Number(event.target.value) }))}
               step={10}
@@ -82,7 +82,7 @@ export function ReadingGoalsClient({
           <label className="block font-bold text-[#364152]">
             Số sách muốn hoàn thành trong năm
             <input
-              className="mt-2 min-h-12 w-full rounded-lg border border-[#1D2433]/15 bg-white px-4 text-base outline-none focus-visible:ring-2 focus-visible:ring-[#176B62]"
+              className="mt-2 min-h-12 w-full rounded-lg border border-bv-ink/15 bg-white px-4 text-base outline-none focus-visible:ring-2 focus-visible:ring-bv-primary"
               min={1}
               onChange={(event) => setGoals((value) => ({ ...value, yearlyBooks: Number(event.target.value) }))}
               type="number"
@@ -91,7 +91,7 @@ export function ReadingGoalsClient({
           </label>
         </div>
         <button
-          className="mt-6 inline-flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#176B62] px-5 font-black text-white transition hover:bg-[#104C47] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#176B62] focus-visible:ring-offset-2"
+          className="mt-6 inline-flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-bv-primary px-5 font-black text-white transition hover:bg-bv-primary-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bv-primary focus-visible:ring-offset-2"
           onClick={saveGoals}
           type="button"
         >
@@ -107,12 +107,12 @@ export function ReadingGoalsClient({
             <article className="bv-card rounded-2xl p-5 sm:p-7" key={card.label}>
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
-                  <p className="font-bold text-[#66706B]">{card.label}</p>
-                  <p className="mt-1 text-3xl font-black text-[#17202A]">
+                  <p className="font-bold text-bv-text-muted">{card.label}</p>
+                  <p className="mt-1 text-3xl font-black text-bv-heading">
                     {card.current} / {card.target} {card.unit}
                   </p>
                 </div>
-                <span className="rounded-full bg-[#E6F3F0] px-3 py-1 font-black text-[#176B62]">{percent}%</span>
+                <span className="rounded-full bg-bv-mint px-3 py-1 font-black text-bv-primary">{percent}%</span>
               </div>
               <div
                 aria-label={`Đã đạt ${percent}% ${card.label.toLowerCase()}`}
@@ -122,9 +122,9 @@ export function ReadingGoalsClient({
                 aria-valuemin={0}
                 aria-valuenow={percent}
               >
-                <div className="h-full rounded-full bg-[#176B62] transition-[width] duration-300" style={{ width: `${percent}%` }} />
+                <div className="h-full rounded-full bg-bv-primary transition-[width] duration-300" style={{ width: `${percent}%` }} />
               </div>
-              <p className="mt-3 text-sm text-[#66706B]">
+              <p className="mt-3 text-sm text-bv-text-muted">
                 {percent >= 100 ? "Bạn đã hoàn thành mục tiêu này." : `Còn ${Math.max(0, card.target - card.current)} ${card.unit} để về đích.`}
               </p>
             </article>

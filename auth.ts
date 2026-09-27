@@ -3,7 +3,15 @@ import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import type { Provider } from "next-auth/providers";
 import type { UserRole } from "@prisma/client";
-import { isGoogleAuthConfigured, parseVerifiedGoogleIdentity } from "@/lib/google-auth";
+import {
+  authLoginRateLimiter,
+  createLoginRateLimitKey,
+  readLoginClientIp,
+} from "@/lib/auth-rate-limit";
+
+// Hash giả giúp thời gian xử lý email không tồn tại gần với mật khẩu sai.
+const INVALID_PASSWORD_HASH =
+  "$2b$10$HU.Bd6NHdc8sda8MUj7bWekBtFc2tVIu14jbNrO6UWD9ZfT4Pjb0O";
 
 declare module "next-auth" {
   interface Session {
@@ -29,17 +37,24 @@ const providers: Provider[] = [
       email: { label: "Email", type: "email" },
       password: { label: "Mật khẩu", type: "password" },
     },
-    async authorize(credentials) {
+    async authorize(credentials, request) {
       const [{ default: bcrypt }, { default: prisma }] = await Promise.all([
         import("bcrypt"),
         import("@/lib/prisma"),
       ]);
       const email = readCredential(credentials?.email).toLowerCase();
-      const password = readCredential(credentials?.password);
+      // Mật khẩu phải giữ nguyên như khi đăng ký, kể cả khoảng trắng.
+      const password = typeof credentials?.password === "string" ? credentials.password : "";
 
       if (!email || !password) {
         return null;
       }
+
+      const rateLimitKey = createLoginRateLimitKey(
+        email,
+        readLoginClientIp(request.headers),
+      );
+      if (!authLoginRateLimiter.allow(rateLimitKey)) return null;
 
       const user = await prisma.user.findUnique({
         where: { email },
@@ -53,14 +68,15 @@ const providers: Provider[] = [
         },
       });
 
-      if (!user?.password || !user.email || user.isLocked) {
+      const passwordHash = user?.password ?? INVALID_PASSWORD_HASH;
+      const isValidPassword = await bcrypt.compare(password, passwordHash);
+
+      if (!user?.password || !user.email || user.isLocked || !isValidPassword) {
+        authLoginRateLimiter.recordFailure(rateLimitKey);
         return null;
       }
 
-      const isValidPassword = await bcrypt.compare(password, user.password);
-      if (!isValidPassword) {
-        return null;
-      }
+      authLoginRateLimiter.recordSuccess(rateLimitKey);
 
       await prisma.user.update({
         where: {
@@ -81,11 +97,15 @@ const providers: Provider[] = [
   }),
 ];
 
-if (isGoogleAuthConfigured()) {
+const googleClientId = process.env.AUTH_GOOGLE_ID?.trim();
+const googleClientSecret = process.env.AUTH_GOOGLE_SECRET?.trim();
+
+// Chỉ hiện đăng nhập Google khi máy chủ đã được cấp đủ khóa OAuth.
+if (googleClientId && googleClientSecret) {
   providers.push(
     Google({
-      clientId: process.env.AUTH_GOOGLE_ID,
-      clientSecret: process.env.AUTH_GOOGLE_SECRET,
+      clientId: googleClientId,
+      clientSecret: googleClientSecret,
     }),
   );
 }
@@ -99,76 +119,44 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   providers,
   callbacks: {
-    async signIn({ account, profile, user }) {
-      if (account?.provider !== "google") {
-        return true;
-      }
+    async signIn({ user, account, profile }) {
+      if (account?.provider !== "google") return true;
 
-      const identity = parseVerifiedGoogleIdentity(profile);
-      if (!identity) {
-        return false;
-      }
+      const email = user.email?.trim().toLowerCase();
+      const googleProfile = profile as { email_verified?: boolean } | undefined;
+      if (!email || googleProfile?.email_verified !== true) return false;
 
-      try {
-        const { default: prisma } = await import("@/lib/prisma");
-        const existingUser = await prisma.user.findUnique({
-          where: { email: identity.email },
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-            isLocked: true,
-          },
-        });
+      const { default: prisma } = await import("@/lib/prisma");
+      const existingUser = await prisma.user.findUnique({
+        where: { email },
+        select: { id: true, name: true, role: true, isLocked: true },
+      });
 
-        if (existingUser?.isLocked) {
-          return false;
-        }
+      if (existingUser?.isLocked) return false;
 
-        const localUser = existingUser
-          ? await prisma.user.update({
-              where: { id: existingUser.id },
-              data: {
-                lastActiveAt: new Date(),
-                profile: identity.picture
-                  ? {
-                      upsert: {
-                        create: { avatarUrl: identity.picture },
-                        update: { avatarUrl: identity.picture },
-                      },
-                    }
-                  : undefined,
-              },
-              select: { id: true, name: true, email: true, role: true },
-            })
-          : await prisma.user.create({
-              data: {
-                id: `USER-${crypto.randomUUID()}`,
-                email: identity.email,
-                name: identity.name,
-                role: "BUYER",
-                lastActiveAt: new Date(),
-                profile: identity.picture
-                  ? {
-                      create: { avatarUrl: identity.picture },
-                    }
-                  : undefined,
-              },
-              select: { id: true, name: true, email: true, role: true },
-            });
+      const databaseUser = existingUser
+        ? await prisma.user.update({
+            where: { id: existingUser.id },
+            data: {
+              lastActiveAt: new Date(),
+              name: existingUser.name || user.name || email.split("@")[0],
+            },
+            select: { id: true, role: true },
+          })
+        : await prisma.user.create({
+            data: {
+              id: `USER-${crypto.randomUUID()}`,
+              email,
+              name: user.name?.trim() || email.split("@")[0],
+              lastActiveAt: new Date(),
+            },
+            select: { id: true, role: true },
+          });
 
-        // Auth.js dùng đối tượng này ở callback JWT ngay sau khi đăng nhập.
-        user.id = localUser.id;
-        user.name = localUser.name;
-        user.email = localUser.email;
-        user.image = identity.picture;
-        user.role = localUser.role;
-        return true;
-      } catch {
-        console.error("[auth:google] Không thể đồng bộ tài khoản Google với tài khoản BookVerse.");
-        return false;
-      }
+      // JWT phải dùng mã người dùng nội bộ, không dùng mã tài khoản Google.
+      user.id = databaseUser.id;
+      user.role = databaseUser.role;
+      return true;
     },
     async jwt({ token, user }) {
       if (user?.id) {

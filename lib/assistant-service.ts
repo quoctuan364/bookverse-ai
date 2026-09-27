@@ -1,4 +1,4 @@
-import { BookStatus, ChatbotMessageRole, type Prisma } from "@prisma/client";
+import { ChatbotMessageRole } from "@prisma/client";
 
 import {
   ASSISTANT_CONTRACT_VERSION,
@@ -22,9 +22,23 @@ import {
   sanitizeAssistantLog,
 } from "@/lib/assistant-runtime";
 import { inferAssistantRequestedLanguage } from "@/lib/assistant-language";
+import { isAlternativeBookRequest, isBookContextFollowUp, selectContextBookIds } from "@/lib/assistant-book-context";
+import {
+  extractAssistantBookFilters,
+  rankAssistantBooks,
+} from "@/lib/assistant-book-search";
+import {
+  detectAssistantBookRanking,
+  type AssistantBookRankingKind,
+} from "@/lib/assistant-book-ranking";
+import { getVietnameseBookTitle, hasVietnameseBookTitle } from "@/lib/book-display-title";
+import { selectPreferredBookChunks } from "@/lib/book-content-version";
 import {
   classifyBookVerseIntent,
+  buildAssistantRetrievalQuery,
+  extractQuotedBookTitle,
   formatStoreFacts,
+  queryWantsAccountData,
   retrieveBookVerseKnowledge,
   shouldRetrieveBooks,
   type AssistantAccountContext,
@@ -33,19 +47,30 @@ import {
   type BookVerseKnowledgeArticle,
 } from "@/lib/assistant-knowledge";
 import type { CurrentUserSession } from "@/lib/permissions";
+import { getBookReadingAccess } from "@/lib/membership-access";
 import prisma from "@/lib/prisma";
+import { publicBookQualityWhere } from "@/lib/public-book-policy";
+import { decideReadingAccess } from "@/lib/reading-access-policy";
+import {
+  buildLocalGroundedReaderAnswer,
+  rankReaderRagChunks,
+} from "@/lib/reader-rag";
 
 const SYSTEM_PROMPT = `Bạn là Trợ lý AI của nhà sách BookVerse.
 Trả lời bằng tiếng Việt, rõ ràng, thân thiện và ưu tiên câu trả lời trực tiếp.
-Bạn có thể hỗ trợ: tìm sách, hội viên, đọc Ebook, thư viện cá nhân, đơn hàng, chợ sách, tài khoản và chính sách.
-Chỉ nhắc đến sách, số liệu, trạng thái tài khoản hoặc route có trong ngữ cảnh đã xác minh.
+Bạn có thể hỗ trợ mọi chức năng công khai của BookVerse: tìm và lọc sách, hội viên, đọc sách, thư viện, mục tiêu đọc, hồ sơ, ảnh đại diện, địa chỉ, thông báo, đơn hàng, chợ sách, người bán, cộng đồng và chính sách.
+Chỉ nhắc đến sách, số liệu, trạng thái tài khoản hoặc đường dẫn có trong ngữ cảnh đã xác minh.
 Không tự tạo mã sách, giá, đường dẫn, trạng thái đơn hoặc quyền hội viên.
 Nếu ngữ cảnh không đủ, hãy nói rõ điều chưa biết và hướng dẫn người dùng tới trang phù hợp.
+Khi có đường dẫn trong tri thức, hãy ghi đường dẫn đó nguyên dạng để giao diện biến thành nút điều hướng.
 Không gọi dữ liệu demo là giao dịch thật và không tuyên bố cá nhân hóa khi không có dữ liệu tài khoản.`;
 
 interface AssistantServiceInput {
   message: string;
   sessionId?: string;
+  contextBookIds?: string[];
+  focusedBookId?: string;
+  contextQuery?: string;
   currentUser: CurrentUserSession | null;
 }
 
@@ -75,6 +100,79 @@ interface AssistantGroundingContext {
   knowledge: BookVerseKnowledgeArticle[];
   store: AssistantStoreContext;
   account: AssistantAccountContext;
+  rankingKind: AssistantBookRankingKind | null;
+}
+
+const EMPTY_STORE_CONTEXT: AssistantStoreContext = {
+  activeBooks: 0,
+  readableBooks: 0,
+  categories: 0,
+  activePlans: 0,
+  approvedListings: 0,
+};
+
+const EMPTY_ACCOUNT_CONTEXT: AssistantAccountContext = {
+  authenticated: false,
+  displayName: null,
+  role: null,
+  membership: null,
+  cartItemCount: 0,
+  orderCount: 0,
+  readingBooks: 0,
+  completedBooks: 0,
+};
+
+async function getFocusedBookContentReply(
+  input: AssistantServiceInput,
+  focusedBookIsPublic: boolean,
+): Promise<ReplyResult | null> {
+  const focusedBookId = input.focusedBookId?.trim();
+  if (!focusedBookId || !focusedBookIsPublic) return null;
+
+  const storedChunks = await prisma.bookChunk.findMany({
+    where: { bookId: focusedBookId },
+    orderBy: [{ chapterNumber: "asc" }, { chunkIndex: "asc" }],
+    select: {
+      id: true,
+      chapterNumber: true,
+      chapterTitle: true,
+      pageNumber: true,
+      chunkIndex: true,
+      content: true,
+    },
+  });
+  const preferredChunks = selectPreferredBookChunks(storedChunks);
+  if (preferredChunks.length === 0) return null;
+
+  const readingAccess = await getBookReadingAccess(
+    input.currentUser && !input.currentUser.isLocked ? input.currentUser.id : null,
+    focusedBookId,
+  );
+  const accessDecision = decideReadingAccess({
+    totalPages: preferredChunks.length,
+    hasEntitlement: readingAccess.hasAccess,
+  });
+  const availableChunks = preferredChunks.slice(0, accessDecision.visiblePages);
+  const relevantChunks = rankReaderRagChunks(
+    availableChunks,
+    input.message,
+    availableChunks[0]?.chapterNumber ?? 1,
+    5,
+  );
+  if (relevantChunks.length === 0) return null;
+
+  const accessNotice = readingAccess.hasAccess
+    ? ""
+    : "Bạn đang hỏi trên phần đọc thử (tối đa 10% nội dung).\n\n";
+
+  return {
+    provider: "local",
+    model: "local-book-content-rag-v1",
+    answer: `${accessNotice}${buildLocalGroundedReaderAnswer(input.message, relevantChunks)}`,
+    mocked: false,
+    degraded: false,
+    errorCode: null,
+  };
 }
 
 export class AssistantServiceError extends Error {
@@ -115,7 +213,7 @@ function buildSystemPrompt(
       (book, index) =>
         `${index + 1}. ${book.title}\nTác giả: ${book.author}\nĐiểm phù hợp: ${book.score.toFixed(
           3,
-        )}\nMô tả: ${book.description ?? "Chưa có mô tả."}`,
+        )}\nGiá: ${book.price ?? "Chưa có"}\nSố trang: ${book.pages ?? "Chưa có"}\nNăm xuất bản: ${book.publishYear ?? "Chưa có"}\nNgôn ngữ: ${book.language ?? "Chưa có"}\nThể loại: ${book.category ?? "Chưa có"}\nĐiểm đánh giá: ${book.rating ?? "Chưa có"}\nMô tả: ${book.description ?? "Chưa có mô tả."}`,
     )
     .join("\n\n");
   const knowledgeContext = grounding.knowledge
@@ -150,88 +248,188 @@ function buildSystemPrompt(
       ? `Tri thức nghiệp vụ BookVerse đã xác minh:\n${knowledgeContext}`
       : "Không có bài tri thức nghiệp vụ khớp trực tiếp.",
     bookContext
-      ? `Ngữ cảnh catalog sách đã xác minh:\n${bookContext}`
+      ? `Thông tin kho sách đã xác minh:\n${bookContext}`
       : "Không có sách nào được truy xuất cho câu hỏi này. Không được tự đề xuất tên sách.",
   ].join("\n\n");
 }
 
-function normalizedSearchTerms(query: string): string[] {
-  const stopWords = new Set([
-    "ban",
-    "cho",
-    "cuon",
-    "cua",
-    "doc",
-    "goi",
-    "hay",
-    "minh",
-    "moi",
-    "mot",
-    "nguoi",
-    "sach",
-    "tieng",
-    "toi",
-    "tu",
-    "van",
-    "ve",
-    "viet",
-    "vietnamese",
-    "voi",
-    "english",
-  ]);
-  const terms = query
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .split(/\s+/)
-    .map((term) => term.trim())
-    .filter((term) => term.length >= 3 && !stopWords.has(term));
-  const normalizedQuery = query
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-  const semanticExpansions = normalizedQuery.match(/\bai\b/)
-    ? ["trí tuệ nhân tạo", "machine learning", "học máy", "chatbot"]
-    : [];
-  return Array.from(new Set([query, ...semanticExpansions, ...terms])).filter(Boolean);
-}
-
 function mapBook(
-  book: { id: string; title: string; authorName: string; description: string | null },
+  book: {
+    id: string;
+    title: string;
+    authorName: string;
+    description: string | null;
+    languageCode?: string | null;
+    price?: unknown;
+    pages?: number | null;
+    publishYear?: number | null;
+    rating?: unknown;
+    category?: { name: string; canonicalName?: string | null } | null;
+  },
   score: number,
+  options: { keepOriginalTitle?: boolean } = {},
 ): AssistantValidatedBook {
+  const finiteNumber = (value: unknown): number | null => {
+    if (value === null || value === undefined) return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  const languageLabels: Record<string, string> = {
+    vi: "Tiếng Việt",
+    en: "Tiếng Anh",
+    fr: "Tiếng Pháp",
+    de: "Tiếng Đức",
+    es: "Tiếng Tây Ban Nha",
+  };
   return {
     id: book.id,
-    title: book.title,
+    title: options.keepOriginalTitle ? book.title : getVietnameseBookTitle(book.id, book.title),
     author: book.authorName,
-    description: book.description,
+    // Không đẩy mô tả ngoại ngữ vào câu trả lời tiếng Việt. Nếu chưa có bản
+    // Việt hóa, trợ lý nói rõ là thiếu dữ liệu thay vì trộn ngôn ngữ.
+    description: book.languageCode && book.languageCode !== "vi" ? null : book.description,
     score: Number.isFinite(score) ? score : 0,
     href: `/book/${book.id}`,
+    price: finiteNumber(book.price),
+    pages: book.pages ?? null,
+    publishYear: book.publishYear ?? null,
+    language: book.languageCode ? (languageLabels[book.languageCode] ?? book.languageCode) : null,
+    category: book.category?.canonicalName ?? book.category?.name ?? null,
+    rating: finiteNumber(book.rating),
   };
 }
 
 async function keywordSearchBooks(query: string, take = 5): Promise<AssistantValidatedBook[]> {
   const requestedLanguage = inferAssistantRequestedLanguage(query);
-  const searchFilters: Prisma.BookWhereInput[] = normalizedSearchTerms(query).flatMap((value) => [
-    { title: { contains: value, mode: "insensitive" } },
-    { authorName: { contains: value, mode: "insensitive" } },
-    { description: { contains: value, mode: "insensitive" } },
-    { category: { name: { contains: value, mode: "insensitive" } } },
-    { tags: { some: { name: { contains: value, mode: "insensitive" } } } },
-  ]);
-
   const books = await prisma.book.findMany({
     where: {
-      status: BookStatus.ACTIVE,
+      ...publicBookQualityWhere(),
       ...(requestedLanguage ? { languageCode: requestedLanguage } : {}),
-      ...(searchFilters.length > 0 ? { OR: searchFilters } : {}),
     },
-    take,
     orderBy: [{ rating: "desc" }, { createdAt: "desc" }],
-    select: { id: true, title: true, authorName: true, description: true },
+    select: {
+      id: true,
+      title: true,
+      authorName: true,
+      description: true,
+      languageCode: true,
+      price: true,
+      pages: true,
+      publishYear: true,
+      rating: true,
+      category: { select: { name: true, canonicalName: true } },
+    },
   });
-  return books.map((book, index) => mapBook(book, Math.max(0.1, 0.75 - index * 0.08)));
+  const candidates = books.map((book) => ({
+    ...book,
+    price: Number(book.price),
+    rating: book.rating === null ? null : Number(book.rating),
+    originalTitle: book.title,
+    title: getVietnameseBookTitle(book.id, book.title),
+    categoryName: book.category.canonicalName ?? book.category.name,
+  }));
+  // Ưu tiên bản ghi tiếng Việt hoặc sách đã có tiêu đề tiếng Việt do BookVerse
+  // biên tập. Nếu nhóm ưu tiên không có kết quả đúng chủ đề, dùng tiêu đề gốc
+  // đã xác minh trong catalog thay vì báo nhầm rằng kho sách không có sách.
+  const filters = extractAssistantBookFilters(query);
+  const preferredCandidates = requestedLanguage
+    ? candidates
+    : candidates.filter(
+        (book) => book.languageCode === "vi" || hasVietnameseBookTitle(book.id),
+      );
+  const applyFilters = (items: typeof candidates) => items.filter((book) => {
+    const price = Number(book.price);
+    if (filters.maxPrice !== null && (!Number.isFinite(price) || price > filters.maxPrice)) return false;
+    if (filters.maxPages !== null && (book.pages === null || book.pages > filters.maxPages)) return false;
+    if (filters.minPublishYear !== null && (book.publishYear === null || book.publishYear < filters.minPublishYear)) return false;
+    return true;
+  });
+  const rankCandidates = (items: typeof candidates) =>
+    rankAssistantBooks(items, query).sort((left, right) => {
+      const a = byCandidateId(items, left.id);
+      const b = byCandidateId(items, right.id);
+      if (filters.preferLowPrice) return Number(a?.price ?? Infinity) - Number(b?.price ?? Infinity);
+      if (filters.preferShort) return (a?.pages ?? Infinity) - (b?.pages ?? Infinity);
+      return right.score - left.score;
+    });
+  let displayableCandidates = applyFilters(preferredCandidates);
+  let ranked = rankCandidates(displayableCandidates);
+  if (ranked.length === 0 && !requestedLanguage) {
+    displayableCandidates = applyFilters(candidates);
+    ranked = rankCandidates(displayableCandidates);
+  }
+  ranked = ranked.slice(0, take);
+  const byId = new Map(books.map((book) => [book.id, book]));
+  return ranked.flatMap((item) => {
+    const book = byId.get(item.id);
+    return book ? [mapBook(book, Math.min(1, item.score / 150), { keepOriginalTitle: requestedLanguage === "en" })] : [];
+  });
+}
+
+function byCandidateId<T extends { id: string }>(items: T[], id: string): T | undefined {
+  return items.find((item) => item.id === id);
+}
+
+async function findRankedBooks(
+  kind: AssistantBookRankingKind,
+  take = 5,
+): Promise<AssistantValidatedBook[]> {
+  const publicVietnameseWhere = { ...publicBookQualityWhere(), languageCode: "vi" };
+  let rankedIds: string[] = [];
+
+  if (kind === "BEST_SELLING") {
+    const rows = await prisma.orderItem.groupBy({
+      by: ["bookId"],
+      where: {
+        order: { status: { in: ["PAID", "PAID_DEMO", "SHIPPED", "COMPLETED"] } },
+        book: publicVietnameseWhere,
+      },
+      _sum: { quantity: true },
+      orderBy: { _sum: { quantity: "desc" } },
+      take,
+    });
+    rankedIds = rows.map((row) => row.bookId);
+  } else if (kind === "MOST_READ") {
+    const rows = await prisma.readingProgress.groupBy({
+      by: ["bookId"],
+      where: { progressPercent: { gt: 0 }, book: publicVietnameseWhere },
+      _count: { userId: true },
+      orderBy: { _count: { userId: "desc" } },
+      take,
+    });
+    rankedIds = rows.map((row) => row.bookId);
+  } else {
+    const rows = await prisma.book.findMany({
+      where: {
+        ...publicVietnameseWhere,
+        sourceMetadata: {
+          is: {
+            sourceRatingAverage: { not: null },
+            sourceRatingCount: { gte: 5 },
+          },
+        },
+      },
+      orderBy: [
+        { sourceMetadata: { sourceRatingAverage: { sort: "desc", nulls: "last" } } },
+        { sourceMetadata: { sourceRatingCount: { sort: "desc", nulls: "last" } } },
+        { id: "asc" },
+      ],
+      take,
+      select: { id: true },
+    });
+    rankedIds = rows.map((row) => row.id);
+  }
+
+  if (rankedIds.length === 0) return [];
+  const books = await prisma.book.findMany({
+    where: { ...publicVietnameseWhere, id: { in: rankedIds } },
+    select: { id: true, title: true, authorName: true, description: true, languageCode: true, price: true, pages: true, publishYear: true, rating: true, category: { select: { name: true, canonicalName: true } } },
+  });
+  const byId = new Map(books.map((book) => [book.id, book]));
+  return rankedIds.flatMap((id, index) => {
+    const book = byId.get(id);
+    return book ? [mapBook(book, Math.max(0, 1 - index * 0.1))] : [];
+  });
 }
 
 function providerTimeoutSignal(): AbortSignal {
@@ -292,8 +490,20 @@ function toVectorLiteral(embedding: number[]): string {
 }
 
 async function findRelevantBooks(query: string): Promise<RetrievalResult> {
+  const title = extractQuotedBookTitle(query);
+  if (title) {
+    const exactBooks = await prisma.book.findMany({
+      where: { ...publicBookQualityWhere(), title: { equals: title, mode: "insensitive" } },
+      take: 5,
+      select: { id: true, title: true, authorName: true, description: true, languageCode: true, price: true, pages: true, publishYear: true, rating: true, category: { select: { name: true, canonicalName: true } } },
+    });
+    if (exactBooks.length > 0) {
+      return { books: exactBooks.map((book) => mapBook(book, 1)), source: "keyword", degraded: false, errorCode: null };
+    }
+  }
   try {
     const requestedLanguage = inferAssistantRequestedLanguage(query);
+    const retrievalLanguage = requestedLanguage;
     const embedding = await createQueryEmbedding(query);
     if (!embedding) {
       return {
@@ -310,6 +520,7 @@ async function findRelevantBooks(query: string): Promise<RetrievalResult> {
         title: string;
         authorName: string;
         description: string | null;
+        languageCode: string | null;
         score: number;
       }>
     >(
@@ -319,6 +530,7 @@ async function findRelevantBooks(query: string): Promise<RetrievalResult> {
         b."title",
         b."authorName",
         b."description",
+        b."languageCode",
         1 - (be."embedding" <=> $1::vector) AS "score"
       FROM "book_embeddings" be
       INNER JOIN "Book" b ON b."id" = be."bookId"
@@ -328,12 +540,17 @@ async function findRelevantBooks(query: string): Promise<RetrievalResult> {
       LIMIT 5
       `,
       toVectorLiteral(embedding),
-      requestedLanguage,
+      retrievalLanguage,
     );
 
-    if (rows.length > 0) {
+    const displayableRows = requestedLanguage
+      ? rows
+      : rows.filter(
+          (row) => row.languageCode === "vi" || hasVietnameseBookTitle(row.id),
+        );
+    if (displayableRows.length > 0) {
       return {
-        books: rows.map((row) => mapBook(row, Number(row.score))),
+        books: displayableRows.map((row) => mapBook(row, Number(row.score), { keepOriginalTitle: requestedLanguage === "en" })),
         source: "vector",
         degraded: false,
         errorCode: null,
@@ -357,23 +574,29 @@ async function findRelevantBooks(query: string): Promise<RetrievalResult> {
 }
 
 async function getAssistantStoreContext(): Promise<AssistantStoreContext> {
+  const publicWhere = publicBookQualityWhere();
   const [activeBooks, readableBooks, categories, activePlans, approvedListings] =
     await Promise.all([
-      prisma.book.count({ where: { status: BookStatus.ACTIVE, deletedAt: null } }),
+      prisma.book.count({ where: publicWhere }),
       prisma.book.count({
         where: {
-          status: BookStatus.ACTIVE,
-          deletedAt: null,
+          ...publicWhere,
           chunks: { some: {} },
         },
       }),
       prisma.category.count({
         where: {
-          books: { some: { status: BookStatus.ACTIVE, deletedAt: null } },
+          books: { some: publicWhere },
         },
       }),
       prisma.membershipPlan.count({ where: { isActive: true } }),
-      prisma.listing.count({ where: { status: "APPROVED", stock: { gt: 0 } } }),
+      prisma.listing.count({
+        where: {
+          status: "APPROVED",
+          stock: { gt: 0 },
+          book: { is: publicWhere },
+        },
+      }),
     ]);
 
   return { activeBooks, readableBooks, categories, activePlans, approvedListings };
@@ -533,6 +756,18 @@ async function resolveReply(
   books: AssistantValidatedBook[],
   grounding: AssistantGroundingContext,
 ): Promise<ReplyResult> {
+  // Câu hỏi xếp hạng đã có phép tính và nguồn dữ liệu xác định ở phía máy chủ.
+  // Trả lời theo mẫu cố định để nhà cung cấp AI không đổi thứ tự hoặc thêm sách.
+  if (grounding.rankingKind) {
+    return {
+      provider: "local",
+      model: "local-bookverse-ranking-v1",
+      answer: buildGroundedLocalAnswer(message, books, grounding),
+      mocked: false,
+      degraded: false,
+      errorCode: null,
+    };
+  }
   const provider = resolveProvider();
   if (provider === "mock") {
     return {
@@ -547,7 +782,7 @@ async function resolveReply(
   if (provider === "local") {
     return {
       provider,
-      model: "local-bookverse-knowledge-v2",
+      model: "local-bookverse-knowledge-v4",
       answer: buildGroundedLocalAnswer(message, books, grounding),
       mocked: false,
       degraded: true,
@@ -574,7 +809,7 @@ async function resolveReply(
       console.error(`[assistant/provider] Dùng local fallback: ${sanitizeAssistantLog(error)}`);
       return {
         provider: "local",
-        model: "local-bookverse-knowledge-v2",
+        model: "local-bookverse-knowledge-v4",
         answer: buildGroundedLocalAnswer(message, books, grounding),
         mocked: false,
         degraded: true,
@@ -593,10 +828,11 @@ async function createOrContinueSession(input: AssistantServiceInput) {
   });
   if (lockedCode) throw failureForAccess(lockedCode);
 
-  return prisma.$transaction(async (tx) => {
+  // Ghi lồng nhau vẫn nguyên tử, không giữ một giao dịch tương tác qua nhiều
+  // lượt gọi JavaScript (dễ hết thời gian chờ khi máy chủ tải lại mã).
     let session: { id: string; userId: string | null } | null = null;
     if (requestedSessionId) {
-      session = await tx.chatbotSession.findUnique({
+      session = await prisma.chatbotSession.findUnique({
         where: { id: requestedSessionId },
         select: { id: true, userId: true },
       });
@@ -610,52 +846,112 @@ async function createOrContinueSession(input: AssistantServiceInput) {
       if (accessCode) throw failureForAccess(accessCode);
     }
 
-    const nextSession =
-      session ??
-      (await tx.chatbotSession.create({
+    const userMessage = {
+      role: ChatbotMessageRole.USER,
+      content: input.message,
+      metadata: { source: "assistant_contract", contractVersion: ASSISTANT_CONTRACT_VERSION },
+    };
+    if (session) {
+      return prisma.chatbotSession.update({
+        where: { id: session.id, userId: currentUserId },
+        data: { messages: { create: userMessage } },
+        select: { id: true, userId: true },
+      });
+    }
+    return prisma.chatbotSession.create({
         data: {
           userId: currentUserId,
           title: input.message.slice(0, 80),
           metadata: { source: "assistant_contract", contractVersion: ASSISTANT_CONTRACT_VERSION },
+          messages: { create: userMessage },
         },
         select: { id: true, userId: true },
-      }));
-
-    await tx.chatbotMessage.create({
-      data: {
-        sessionId: nextSession.id,
-        role: ChatbotMessageRole.USER,
-        content: input.message,
-        metadata: { source: "assistant_contract", contractVersion: ASSISTANT_CONTRACT_VERSION },
-      },
-    });
-    return nextSession;
-  });
+      });
 }
 
 export async function runAssistantMessage(
   input: AssistantServiceInput,
 ): Promise<AssistantSuccessResponse> {
   const session = await createOrContinueSession(input);
-  const intent = classifyBookVerseIntent(input.message);
+  const followUp = Boolean(input.focusedBookId) || isBookContextFollowUp(input.message);
+  const wantsAlternatives = isAlternativeBookRequest(input.message);
+  const rankingKind = detectAssistantBookRanking(input.message);
+  const intent = followUp || wantsAlternatives ? "DISCOVERY" : classifyBookVerseIntent(input.message);
   const knowledge = retrieveBookVerseKnowledge(input.message);
-  const needsBooks = shouldRetrieveBooks(input.message, intent);
-  const [recentMessages, retrieval, store, account] = await Promise.all([
-    prisma.chatbotMessage.findMany({
+  const needsBooks = followUp || Boolean(extractQuotedBookTitle(input.message)) || shouldRetrieveBooks(input.message, intent)
+    || /^(tom tat|gioi thieu)\b/.test(input.message.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase());
+  const recentMessagesPromise = prisma.chatbotMessage.findMany({
       where: { sessionId: session.id },
       orderBy: { createdAt: "desc" },
       take: 8,
-    }),
-    needsBooks
-      ? findRelevantBooks(input.message)
+    });
+  const recentMessages = await recentMessagesPromise;
+  const previousUserQueries = recentMessages
+    .filter((message) => message.role === ChatbotMessageRole.USER)
+    .slice(1)
+    .map((message) => message.content);
+  const contextSeedQuery = input.contextQuery ?? previousUserQueries.find(
+    (query) => !isBookContextFollowUp(query) && !isAlternativeBookRequest(query),
+  );
+  // ID từ khách chỉ là gợi ý công khai, luôn truy vấn lại theo chính sách hiển thị.
+  // Không cho khách đọc lịch sử của phiên khác để giữ ngữ cảnh.
+  const lastAssistant = recentMessages.find((message) => message.role === ChatbotMessageRole.ASSISTANT);
+  const metadata = lastAssistant?.metadata as { ragBookIds?: unknown } | null;
+  const savedIds = Array.isArray(metadata?.ragBookIds) ? metadata.ragBookIds.filter((id): id is string => typeof id === "string") : [];
+  const contextIds = input.focusedBookId
+    ? [input.focusedBookId]
+    : wantsAlternatives
+      ? (input.contextBookIds ?? savedIds).slice(0, 5)
+      : selectContextBookIds(input.message, input.contextBookIds ?? savedIds);
+  const contextBooks = contextIds.length ? await prisma.book.findMany({
+    where: { ...publicBookQualityWhere(), id: { in: contextIds } },
+    select: { id: true, title: true, authorName: true, description: true, languageCode: true, price: true, pages: true, publishYear: true, rating: true, category: { select: { name: true, canonicalName: true } } },
+  }) : [];
+  const orderedContextBooks = contextIds.flatMap((id) => {
+    const book = contextBooks.find((item) => item.id === id);
+    return book ? [mapBook(book, 1)] : [];
+  });
+  const retrievalQuery = buildAssistantRetrievalQuery(
+    input.message,
+    // Lượt hiện tại vừa được lưu khi tạo/tiếp tục session nên danh sách này
+    // chỉ còn các câu trước đó, mới nhất đứng trước.
+    previousUserQueries,
+  );
+  const needsStoreContext = intent === "CATALOG";
+  const needsAccountContext =
+    queryWantsAccountData(input.message) &&
+    ["MEMBERSHIP", "ORDERS", "ACCOUNT", "READING"].includes(intent);
+  const [retrieval, store, account] = await Promise.all([
+    rankingKind
+      ? findRankedBooks(rankingKind).then((books) => ({
+          books,
+          source: "keyword" as const,
+          degraded: false,
+          errorCode: null,
+        }))
+      : wantsAlternatives && contextSeedQuery
+      ? keywordSearchBooks(contextSeedQuery, 10).then((books) => ({
+          books: books.filter((book) => !contextIds.includes(book.id)).slice(0, 5),
+          source: "keyword" as const,
+          degraded: false,
+          errorCode: null,
+        }))
+      : followUp
+      ? Promise.resolve<RetrievalResult>({ books: orderedContextBooks, source: "keyword", degraded: false, errorCode: null })
+      : needsBooks
+      ? findRelevantBooks(retrievalQuery)
       : Promise.resolve<RetrievalResult>({
           books: [],
           source: "keyword",
           degraded: false,
           errorCode: null,
         }),
-    getAssistantStoreContext(),
-    getAssistantAccountContext(input.currentUser),
+    needsStoreContext
+      ? getAssistantStoreContext()
+      : Promise.resolve(EMPTY_STORE_CONTEXT),
+    needsAccountContext
+      ? getAssistantAccountContext(input.currentUser)
+      : Promise.resolve(EMPTY_ACCOUNT_CONTEXT),
   ]);
   const messages: ChatMessageForLlm[] = recentMessages
     .reverse()
@@ -670,15 +966,24 @@ export async function runAssistantMessage(
     knowledge,
     store,
     account,
+    rankingKind,
   };
-  const reply = await resolveReply(input.message, messages, retrieval.books, grounding);
+  const focusedContentReply = await getFocusedBookContentReply(
+    input,
+    Boolean(input.focusedBookId && orderedContextBooks.length > 0),
+  );
+  const reply =
+    focusedContentReply ??
+    (await resolveReply(input.message, messages, retrieval.books, grounding));
   const degraded = retrieval.degraded || reply.degraded;
   const errorCode = reply.errorCode ?? retrieval.errorCode;
 
-  const assistantMessage = await prisma.$transaction(async (tx) => {
-    const created = await tx.chatbotMessage.create({
+  const assistantMessageId = crypto.randomUUID();
+  await prisma.chatbotSession.update({
+      where: { id: session.id },
       data: {
-        sessionId: session.id,
+        messages: { create: {
+        id: assistantMessageId,
         role: ChatbotMessageRole.ASSISTANT,
         content: reply.answer,
         metadata: {
@@ -694,11 +999,7 @@ export async function runAssistantMessage(
           intent,
           accountContextUsed: account.authenticated,
         },
-      },
-    });
-    await tx.chatbotSession.update({
-      where: { id: session.id },
-      data: {
+        } },
         metadata: {
           source: "assistant_contract",
           contractVersion: ASSISTANT_CONTRACT_VERSION,
@@ -715,8 +1016,6 @@ export async function runAssistantMessage(
         },
       },
     });
-    return created;
-  });
 
   return {
     success: true,
@@ -729,7 +1028,7 @@ export async function runAssistantMessage(
     mocked: reply.mocked,
     degraded,
     sessionId: session.id,
-    assistantMessageId: assistantMessage.id,
+    assistantMessageId,
     errorCode,
   };
 }

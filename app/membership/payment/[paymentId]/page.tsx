@@ -1,12 +1,10 @@
+import Image from "next/image";
 import {
   AlertCircle,
   ArrowLeft,
-  Building2,
   CheckCircle2,
   Clock3,
-  QrCode,
   ShieldCheck,
-  WalletCards,
 } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -16,7 +14,7 @@ import {
   getMembershipSandboxPayment,
 } from "@/actions/membership.actions";
 import { SubmitButton } from "@/components/shared/SubmitButton";
-import { membershipSandboxMethodLabel } from "@/lib/membership-payment-sandbox";
+import { createDemoPaymentQr } from "@/lib/demo-payment-qr";
 
 export const dynamic = "force-dynamic";
 
@@ -60,14 +58,13 @@ export default async function MembershipPaymentPage({
 
   const isPending = payment.status === "PENDING";
   const isPaid = payment.status === "PAID_DEMO";
-  const PaymentIcon =
-    payment.paymentMethod === "BANK_TRANSFER_DEMO" ? Building2 : WalletCards;
+  const qrCode = await createDemoPaymentQr(payment.transactionRef, Number(payment.amount));
 
   return (
     <main className="bv-page min-h-[72vh]">
       <section className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
         <Link
-          className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm font-bold text-[#176B62] transition hover:bg-[#E6F3F0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#176B62]"
+          className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm font-bold text-bv-primary transition hover:bg-bv-mint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bv-primary"
           href={`/membership/checkout?planId=${encodeURIComponent(payment.plan.id)}`}
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
@@ -76,11 +73,11 @@ export default async function MembershipPaymentPage({
 
         <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <section className="bv-card overflow-hidden rounded-2xl" aria-labelledby="payment-title">
-            <div className="bg-[#104C47] p-6 text-white sm:p-8">
+            <div className="bg-bv-primary-dark p-6 text-white sm:p-8">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-xs font-black uppercase tracking-[0.12em]">
-                  <ShieldCheck className="h-4 w-4 text-[#F2C14E]" aria-hidden="true" />
-                  Cổng thanh toán Sandbox
+                  <ShieldCheck className="h-4 w-4 text-bv-gold" aria-hidden="true" />
+                  Thanh toán mô phỏng
                 </span>
                 <span className="inline-flex items-center gap-2 text-sm font-bold text-[#D9EEEA]">
                   <Clock3 className="h-4 w-4" aria-hidden="true" />
@@ -107,34 +104,53 @@ export default async function MembershipPaymentPage({
                 </div>
               ) : null}
 
-              <div className="grid gap-4 sm:grid-cols-[160px_1fr] sm:items-center">
+              <div className="grid gap-6 rounded-2xl border border-bv-ink/10 bg-[#FAF8F2] p-5 sm:grid-cols-[200px_1fr] sm:items-center">
                 <div
-                  aria-label="Mã QR thanh toán mô phỏng"
-                  className="flex aspect-square w-full max-w-40 items-center justify-center rounded-2xl border-8 border-white bg-[#F2F7F5] shadow-[0_8px_30px_rgba(23,107,98,0.18)]"
+                  aria-label="Mã QR thông tin giao dịch mô phỏng, không dùng để chuyển tiền"
+                  className="relative flex aspect-square w-full max-w-[200px] flex-col items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-white p-2 shadow-[0_10px_30px_rgba(23,107,98,0.16)]"
                 >
-                  <QrCode className="h-24 w-24 text-[#104C47]" aria-hidden="true" />
+                  <Image
+                    alt="Mã QR demo chứa mã giao dịch và số tiền; không phải mã thanh toán ngân hàng"
+                    className="h-full w-full object-contain"
+                    height={200}
+                    priority
+                    src={qrCode}
+                    width={200}
+                  />
                 </div>
-                <dl className="grid gap-3 text-sm">
-                  <div>
-                    <dt className="text-[#66706B]">Gói hội viên</dt>
-                    <dd className="mt-1 text-lg font-black text-[#17202A]">
-                      {payment.plan.name}
-                    </dd>
+                <div className="grid gap-3">
+                  <div className="rounded-xl border border-amber-300 bg-amber-50 p-3.5 text-sm leading-6 text-amber-950 shadow-xs">
+                    <p className="font-black">Mã QR chỉ để xem thông tin giao dịch demo</p>
+                    <p className="mt-1">Không liên kết ngân hàng, không nhận tiền và không thể dùng để thanh toán thật.</p>
                   </div>
-                  <div>
-                    <dt className="text-[#66706B]">Phương thức</dt>
-                    <dd className="mt-1 inline-flex items-center gap-2 font-bold text-[#17202A]">
-                      <PaymentIcon className="h-4 w-4 text-[#176B62]" aria-hidden="true" />
-                      {membershipSandboxMethodLabel(payment.paymentMethod)}
-                    </dd>
+                  <div className="rounded-xl border border-bv-primary/20 bg-white p-3.5 shadow-xs">
+                    <div className="flex items-center justify-between gap-2 border-b border-bv-ink/10 pb-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-bv-primary">Giao dịch</span>
+                      <span className="font-black text-bv-heading">THANH TOÁN THỬ NGHIỆM</span>
+                    </div>
                   </div>
-                  <div>
-                    <dt className="text-[#66706B]">Mã giao dịch</dt>
-                    <dd className="mt-1 break-all font-mono text-xs font-bold text-[#536071]">
-                      {payment.transactionRef}
-                    </dd>
-                  </div>
-                </dl>
+
+                  <dl className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <dt className="text-bv-text-muted">Gói hội viên</dt>
+                      <dd className="mt-0.5 text-sm font-black text-bv-heading">
+                        {payment.plan.name}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-bv-text-muted">Số tiền giao dịch demo</dt>
+                      <dd className="mt-0.5 text-sm font-black text-bv-primary">
+                        {money(payment.amount)}
+                      </dd>
+                    </div>
+                    <div className="col-span-2">
+                      <dt className="text-bv-text-muted">Mã giao dịch</dt>
+                      <dd className="mt-0.5 inline-block rounded-md bg-[#EDF8F5] px-2 py-1 font-mono text-xs font-black text-bv-primary">
+                        BOOKVERSE {payment.transactionRef.slice(-8).toUpperCase()}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
               </div>
 
               {isPending ? (
@@ -142,7 +158,7 @@ export default async function MembershipPaymentPage({
                   <form action={processPayment}>
                     <input name="outcome" type="hidden" value="success" />
                     <SubmitButton
-                      className="min-h-12 w-full cursor-pointer gap-2 bg-[#176B62] text-base font-black text-white hover:bg-[#104C47]"
+                      className="min-h-12 w-full cursor-pointer gap-2 bg-bv-primary text-base font-black text-white hover:bg-bv-primary-dark"
                       pendingLabel="Đang xác nhận..."
                     >
                       <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
@@ -192,23 +208,23 @@ export default async function MembershipPaymentPage({
 
           <aside
             aria-label="Tóm tắt giao dịch"
-            className="h-fit rounded-2xl border border-[#176B62]/20 bg-white p-5 shadow-[0_18px_55px_rgba(37,49,56,0.10)] sm:p-6"
+            className="h-fit rounded-2xl border border-bv-primary/20 bg-white p-5 shadow-[0_18px_55px_rgba(37,49,56,0.10)] sm:p-6"
           >
-            <p className="text-sm font-bold text-[#66706B]">Số tiền Sandbox</p>
-            <p className="mt-2 text-3xl font-black tabular-nums text-[#176B62]">
+            <p className="text-sm font-bold text-bv-text-muted">Số tiền giao dịch thử</p>
+            <p className="mt-2 text-3xl font-black tabular-nums text-bv-primary">
               {money(payment.amount)}
             </p>
-            <dl className="mt-5 space-y-3 border-y border-[#D8D0C2] py-4 text-sm">
+            <dl className="mt-5 space-y-3 border-y border-bv-border py-4 text-sm">
               <div className="flex justify-between gap-3">
-                <dt className="text-[#66706B]">Thời hạn</dt>
+                <dt className="text-bv-text-muted">Thời hạn</dt>
                 <dd className="font-bold">{payment.plan.durationDays} ngày</dd>
               </div>
               <div className="flex justify-between gap-3">
-                <dt className="text-[#66706B]">Trạng thái</dt>
-                <dd className="font-black text-[#C65D43]">{payment.status}</dd>
+                <dt className="text-bv-text-muted">Trạng thái</dt>
+                <dd className="font-black text-bv-accent">{payment.status}</dd>
               </div>
             </dl>
-            <p className="mt-4 text-xs leading-5 text-[#66706B]">
+            <p className="mt-4 text-xs leading-5 text-bv-text-muted">
               Dùng hai nút mô phỏng để trình bày cả nhánh thành công và thất bại
               với giảng viên.
             </p>

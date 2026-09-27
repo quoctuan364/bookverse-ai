@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 import taxonomyJson from "@/shared/interaction-taxonomy.v1.json";
 
 export type PrivacyClassification =
@@ -105,6 +103,8 @@ export function taxonomyManifest(): {
     ),
   );
   const payload = JSON.stringify({ version: TAXONOMY_VERSION, canonicalEvents, aliases });
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { createHash } = require("crypto");
   return {
     version: TAXONOMY_VERSION,
     canonicalEvents,

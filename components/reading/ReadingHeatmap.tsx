@@ -8,7 +8,7 @@ const colors = [
   "bg-[#B7D9D2]",
   "bg-[#72B8AA]",
   "bg-[#2F8D81]",
-  "bg-[#176B62]",
+  "bg-bv-primary",
 ];
 
 function formatDay(dateKey: string): string {
@@ -44,7 +44,7 @@ export function ReadingHeatmap({
           return (
             <span
               aria-label={label}
-              className={`h-4 w-4 rounded-[4px] ${colors[intensity]} outline-none ring-offset-2 transition hover:ring-2 hover:ring-[#176B62] focus-visible:ring-2 focus-visible:ring-[#176B62]`}
+              className={`h-4 w-4 rounded-[4px] ${colors[intensity]} outline-none ring-offset-2 transition hover:ring-2 hover:ring-bv-primary focus-visible:ring-2 focus-visible:ring-bv-primary`}
               key={day.dateKey}
               role="img"
               tabIndex={0}

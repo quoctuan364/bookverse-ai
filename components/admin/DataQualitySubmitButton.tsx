@@ -20,7 +20,7 @@ export function DataQualitySubmitButton({
 
   return (
     <button
-      className={`inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg px-3 text-xs font-black transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      className={`inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg px-3 text-xs font-black transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bv-focus focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
       disabled={disabled || pending}
       type="submit"
     >

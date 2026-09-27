@@ -2,8 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft, Send } from "lucide-react";
 import { ListingCondition } from "@prisma/client";
-import { createSellerListing, getSellerListingEditorData } from "@/actions/seller.actions";
+import { createSellerListing, getSellerGateData, getSellerListingEditorData } from "@/actions/seller.actions";
+import { ListingImageUploadField } from "@/components/seller/ListingImageUploadField";
+import { SubmitButton } from "@/components/shared/SubmitButton";
 import { Input } from "@/components/ui/input";
+import { prepareListingUpload, storeListingUpload } from "@/lib/listing-upload";
+import { MAX_LISTING_IMAGES } from "@/lib/listing-upload-policy";
 import {
   conditionLabel,
   primaryButton,
@@ -27,6 +31,29 @@ interface NewSellerListingPageProps {
 async function createListingAction(formData: FormData) {
   "use server";
 
+  const gate = await getSellerGateData();
+  if (!gate.authenticated || !gate.user) {
+    redirect("/login?callbackUrl=/seller/listings/new");
+  }
+  if (!gate.canSell) {
+    redirect(`/seller?error=${encodeURIComponent("Tài khoản chưa được phép bán sách.")}`);
+  }
+
+  const rawImageFiles = formData.getAll("imageFiles");
+  const imageFiles = rawImageFiles.filter((item): item is File => item instanceof File && item.size > 0);
+
+  const uploadedUrls: string[] = [];
+  for (const file of imageFiles.slice(0, MAX_LISTING_IMAGES)) {
+    try {
+      const prepared = await prepareListingUpload(file);
+      const url = await storeListingUpload(gate.user.id, prepared);
+      uploadedUrls.push(url);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Tệp ảnh không hợp lệ.";
+      redirect(`/seller/listings/new?error=${encodeURIComponent(msg)}`);
+    }
+  }
+
   const result = await createSellerListing({
     bookId: String(formData.get("bookId") ?? ""),
     title: String(formData.get("title") ?? ""),
@@ -34,7 +61,7 @@ async function createListingAction(formData: FormData) {
     price: String(formData.get("price") ?? ""),
     condition: String(formData.get("condition") ?? ""),
     targetAudience: String(formData.get("targetAudience") ?? ""),
-    imageUrl: String(formData.get("imageUrl") ?? ""),
+    imageUrls: uploadedUrls,
   });
 
   if (!result.success) {
@@ -43,7 +70,7 @@ async function createListingAction(formData: FormData) {
     }
 
     if (result.reason === "FORBIDDEN") {
-      redirect("/seller/apply");
+      redirect(`/seller?error=${encodeURIComponent(result.message)}`);
     }
 
     redirect(`/seller/listings/new?error=${encodeURIComponent(result.message)}`);
@@ -58,20 +85,20 @@ export default async function NewSellerListingPage({ searchParams }: NewSellerLi
   return (
     <main className="bv-page bv-seller">
       <SellerHero
-        description="Listing mới được tạo ở trạng thái chờ duyệt. Admin duyệt xong thì listing mới xuất hiện ở marketplace."
-        title="Tạo listing seller"
+        description="Mọi độc giả đã đăng nhập đều có thể đăng bán. Tin đủ tiêu đề, mô tả, giá và thông tin sách/ảnh sẽ được kiểm tra tự động rồi hiển thị ngay trên Chợ sách."
+        title="Đăng bán sách"
       />
 
-      {data.gate.status !== "SELLER" ? (
+      {!data.gate.canSell ? (
         <SellerGatePanel gate={data.gate} />
       ) : (
         <section className="mx-auto grid w-full max-w-5xl gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <SellerNav />
-          <form action={createListingAction} className="bv-card rounded-lg p-6">
-            <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <form action={createListingAction} className="bv-card rounded-2xl p-6 shadow-sm">
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-bv-ink/10 pb-5">
               <div>
-                <p className="text-sm font-black uppercase tracking-[0.16em] text-[#F2C14E]">Listing mới</p>
-                <h2 className="mt-2 text-2xl font-black text-white">Thông tin sách đăng bán</h2>
+                <p className="text-sm font-black uppercase tracking-[0.16em] text-bv-primary">Tin bán sách mới</p>
+                <h2 className="mt-1 text-2xl font-black text-bv-heading">Thông tin cuốn sách bạn muốn bán</h2>
               </div>
               <Link className={secondaryButton} href="/seller/listings">
                 <ArrowLeft className="h-4 w-4" aria-hidden="true" />
@@ -83,22 +110,29 @@ export default async function NewSellerListingPage({ searchParams }: NewSellerLi
 
             <div className="mt-5 grid gap-5">
               <div className="space-y-2">
-                <label className="text-sm font-bold text-white" htmlFor="bookId">
-                  Liên kết sách trong catalog
+                <label className="text-sm font-bold text-bv-heading" htmlFor="bookId">
+                  Chọn sách có sẵn trong BookVerse <span className="font-normal text-bv-text-muted">(không bắt buộc)</span>
                 </label>
-                <select className={selectClass} id="bookId" name="bookId">
-                  <option value="">Không liên kết sách có sẵn</option>
+                <p className="text-sm leading-6 text-bv-text-muted" id="bookId-help">
+                  Nếu tìm thấy đúng cuốn sách, hãy chọn để tin bán có tên tác giả, ảnh bìa và đường dẫn đến trang sách.
+                  Đây chỉ là ghép thông tin; cuốn sách cũ vẫn do bạn sở hữu và trực tiếp bán cho người mua.
+                </p>
+                <select aria-describedby="bookId-help bookId-note" className={selectClass} id="bookId" name="bookId">
+                  <option value="">Không tìm thấy sách - tôi sẽ nhập thông tin và tải ảnh riêng</option>
                   {data.bookOptions.map((book) => (
                     <option key={book.id} value={book.id}>
                       {book.title} - {book.author}
                     </option>
                   ))}
                 </select>
+                <p className="text-xs leading-5 text-bv-text-muted" id="bookId-note">
+                  Nếu bỏ qua mục này, bạn cần tải ít nhất một ảnh rõ bìa và tình trạng thực tế của sách.
+                </p>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-bold text-white" htmlFor="title">
-                  Tiêu đề listing
+                <label className="text-sm font-bold text-bv-heading" htmlFor="title">
+                  Tiêu đề tin bán sách
                 </label>
                 <Input
                   id="title"
@@ -111,14 +145,14 @@ export default async function NewSellerListingPage({ searchParams }: NewSellerLi
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-white" htmlFor="price">
-                    Giá bán
+                  <label className="text-sm font-bold text-bv-heading" htmlFor="price">
+                    Giá bán (VNĐ)
                   </label>
                   <Input id="price" min={1000} name="price" placeholder="120000" required type="number" />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-white" htmlFor="condition">
+                  <label className="text-sm font-bold text-bv-heading" htmlFor="condition">
                     Tình trạng
                   </label>
                   <select className={selectClass} defaultValue={ListingCondition.GOOD} id="condition" name="condition">
@@ -131,29 +165,24 @@ export default async function NewSellerListingPage({ searchParams }: NewSellerLi
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-white" htmlFor="targetAudience">
-                    Nhóm độc giả mục tiêu
-                  </label>
-                  <Input
-                    id="targetAudience"
-                    name="targetAudience"
-                    placeholder="Ví dụ: sinh viên CNTT, người mới đi làm"
-                  />
-                </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-bv-heading" htmlFor="targetAudience">
+                  Nhóm độc giả mục tiêu
+                </label>
+                <Input
+                  id="targetAudience"
+                  name="targetAudience"
+                  placeholder="Ví dụ: sinh viên CNTT, người mới đi làm"
+                />
+              </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-white" htmlFor="imageUrl">
-                    URL ảnh bìa hoặc ảnh tình trạng
-                  </label>
-                  <Input id="imageUrl" name="imageUrl" placeholder="https://... hoặc /covers/..." />
-                </div>
+              <div className="rounded-xl border border-bv-ink/10 bg-bv-surface/50 p-4 sm:p-5">
+                <ListingImageUploadField />
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-bold text-white" htmlFor="description">
-                  Mô tả
+                <label className="text-sm font-bold text-bv-heading" htmlFor="description">
+                  Mô tả chi tiết
                 </label>
                 <textarea
                   className={textareaClass}
@@ -166,11 +195,15 @@ export default async function NewSellerListingPage({ searchParams }: NewSellerLi
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end">
-              <button className={primaryButton} type="submit">
+            <div className="mt-6 flex justify-end border-t border-bv-ink/10 pt-5">
+              <SubmitButton
+                className={primaryButton}
+                pendingLabel="Đang tải ảnh và đăng tin..."
+                size="default"
+              >
                 <Send className="h-4 w-4" aria-hidden="true" />
-                Gửi duyệt listing
-              </button>
+                Đăng tin bán sách
+              </SubmitButton>
             </div>
           </form>
         </section>

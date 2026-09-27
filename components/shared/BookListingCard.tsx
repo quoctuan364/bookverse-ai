@@ -59,7 +59,7 @@ function getConditionLabel(condition: string): string {
     case "POOR":
       return "Cũ";
     case "DIGITAL":
-      return "Ebook";
+      return "sách điện tử";
     default:
       return "Đã dùng";
   }
@@ -71,7 +71,7 @@ function getScoreTone(score?: number): string {
   }
 
   if (score >= 85) {
-    return "text-[#F2C14E]";
+    return "text-bv-gold";
   }
 
   if (score >= 75) {
@@ -106,9 +106,9 @@ export function BookListingCard({ listing }: BookListingCardProps) {
             Chợ sách cũ
           </Badge>
           {listing.sellerQualityScore?.isHighQuality ? (
-            <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full border border-[#F2C14E]/35 bg-slate-950/76 px-3 py-1 text-xs font-black text-[#F2C14E] backdrop-blur-xl">
+            <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full border border-bv-gold/35 bg-slate-950/76 px-3 py-1 text-xs font-black text-bv-gold backdrop-blur-xl">
               <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-              Chất lượng cao theo quy tắc
+              Người bán uy tín
             </span>
           ) : null}
         </div>
@@ -125,7 +125,7 @@ export function BookListingCard({ listing }: BookListingCardProps) {
               <p className="mt-1 font-bold text-zinc-100">{getConditionLabel(listing.condition)}</p>
             </div>
             <div>
-              <p className="text-xs text-zinc-500">Điểm chất lượng</p>
+              <p className="text-xs text-zinc-500">Uy tín người bán</p>
               <p className={cn("mt-1 inline-flex items-center gap-1 font-black", getScoreTone(score))}>
                 <Star className="h-3.5 w-3.5" aria-hidden="true" />
                 {score !== undefined ? `${score}/100` : "Chưa có"}
@@ -141,7 +141,7 @@ export function BookListingCard({ listing }: BookListingCardProps) {
             </p>
           ) : null}
 
-          <p className="text-base font-black text-[#F2C14E]">{formatPrice(listing.price)}</p>
+          <p className="text-base font-black text-bv-gold">{formatPrice(listing.price)}</p>
         </div>
       </article>
     </Link>

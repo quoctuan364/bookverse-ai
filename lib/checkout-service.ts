@@ -15,6 +15,7 @@ import { grantEbookEntitlementsForOrder } from "@/lib/ebook-entitlement";
 import { createNotifications } from "@/lib/notifications";
 import prisma from "@/lib/prisma";
 import { validateRequestedQuantity } from "@/lib/stock-policy";
+import { logResearchInteraction } from "@/actions/tracking.actions";
 
 export type CheckoutErrorCode =
   | "AUTH_REQUIRED"
@@ -98,7 +99,7 @@ export async function checkoutOrder(command: CheckoutCommand): Promise<CheckoutR
   }
 
   try {
-    return await prisma.$transaction(
+    const receipt = await prisma.$transaction(
       async (tx) => {
         // Không tin riêng session: user luôn được đọc lại ngay trong transaction.
         const buyer = await tx.user.findUnique({
@@ -389,10 +390,38 @@ export async function checkoutOrder(command: CheckoutCommand): Promise<CheckoutR
           tx,
         );
 
-        return { orderId: order.id, replayed: false };
+        const itemsToLog =
+          checkoutStatus === OrderStatus.PAID_DEMO
+            ? sortedItems
+                .filter((item) => Boolean(item.bookId))
+                .map((item) => ({
+                  bookId: item.bookId as string,
+                  itemId: item.id,
+                  eventValue:
+                    (item.listing?.price ? decimalToNumber(item.listing.price) : decimalToNumber(item.unitPrice)) *
+                    item.quantity,
+                }))
+            : [];
+
+        return { orderId: order.id, replayed: false, itemsToLog };
       },
       { maxWait: 10_000, timeout: 30_000 },
     );
+
+    // Ghi research telemetry ngoài transaction sau khi commit thành công
+    if (!receipt.replayed && receipt.itemsToLog?.length) {
+      for (const item of receipt.itemsToLog) {
+        await logResearchInteraction({
+          eventType: "PURCHASE",
+          bookId: item.bookId,
+          sourcePage: "checkout",
+          eventValue: item.eventValue,
+          idempotencyKey: `purchase:${buyerId}:${receipt.orderId}:${item.itemId}:PAID_DEMO`,
+        });
+      }
+    }
+
+    return { orderId: receipt.orderId, replayed: receipt.replayed };
   } catch (error: unknown) {
     if (
       isUniqueConflict(error) ||

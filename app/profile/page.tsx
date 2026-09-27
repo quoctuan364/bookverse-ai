@@ -4,7 +4,7 @@ import {
   BadgeCheck,
   BookMarked,
   BookOpen,
-  ClipboardList,
+  CircleHelp,
   Highlighter,
   MapPin,
   ReceiptText,
@@ -110,16 +110,16 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
       <section className="bv-hero">
         <div className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_auto] lg:items-end lg:px-8">
           <div>
-            <p className="text-sm font-black uppercase tracking-[0.16em] text-[#F2C14E]">BookVerse Profile</p>
+            <p className="text-sm font-black uppercase tracking-[0.16em] text-bv-gold">Hồ sơ cá nhân</p>
             <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-5xl">{data.user.name}</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-[#EAF5F1]">
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-bv-mint-soft">
               {data.user.bio ??
                 data.user.persona ??
-                "Theo dõi lịch sử đọc, đơn hàng, listing và gợi ý AI của tài khoản hiện tại."}
+                "Xem sách đang đọc, đơn hàng và tin đăng của bạn."}
             </p>
           </div>
 
-          <div className="rounded-lg border border-white/20 bg-white/10 px-4 py-3 shadow-[0_12px_34px_rgba(0,0,0,0.12)] backdrop-blur">
+          <div className="rounded-3xl border border-white/20 bg-white/10 p-5 shadow-[0_12px_34px_rgba(0,0,0,0.12)] backdrop-blur-md">
             {data.user.avatarUrl ? (
               <img
                 alt={`Avatar của ${data.user.name}`}
@@ -127,24 +127,25 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                 src={data.user.avatarUrl}
               />
             ) : null}
-            <p className="text-xs uppercase text-[#D6A84F]">Vai trò</p>
-            <p className="mt-1 flex items-center gap-2 font-semibold">
-              <BadgeCheck className="h-4 w-4" aria-hidden="true" />
+            <p className="text-xs uppercase text-bv-gold">Vai trò</p>
+            <p className="mt-1 flex items-center gap-2 font-semibold text-white">
+              <BadgeCheck className="h-4 w-4 text-bv-gold" aria-hidden="true" />
               {getRoleLabel(data.user.role)}
             </p>
-            <p className="mt-1 text-sm text-[#EAF5F1]">{data.user.email ?? data.user.id}</p>
-            <div className="mt-3 grid grid-cols-2 gap-2">
+            <p className="mt-1 text-sm text-bv-mint-soft">{data.user.email ?? data.user.id}</p>
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
               {[
                 { href: "/profile/settings", label: "Cài đặt", icon: Settings },
                 { href: "/profile/security", label: "Bảo mật", icon: ShieldCheck },
                 { href: "/profile/addresses", label: "Địa chỉ", icon: MapPin },
                 { href: "/library", label: "Thư viện", icon: BookMarked },
+                { href: "/help", label: "Hướng dẫn", icon: CircleHelp },
               ].map((item) => {
                 const Icon = item.icon;
 
                 return (
                   <Link
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#D6A84F] px-3 py-2 text-sm font-black text-slate-950 transition hover:bg-[#F2C14E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-bv-gold px-3 py-2 text-sm font-black text-slate-950 transition hover:bg-bv-gold/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                     href={item.href}
                     key={item.href}
                   >
@@ -160,51 +161,68 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
 
       <section className="mx-auto grid w-full min-w-0 max-w-7xl grid-cols-1 gap-6 px-4 py-8 sm:px-6 lg:px-8">
         {params?.message ? (
-          <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
             {params.message}
           </div>
         ) : null}
 
         <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {data.metrics.map((metric) => (
-            <article className="bv-card min-w-0 rounded-lg p-5" key={metric.label}>
-              <p className="text-sm font-bold text-[#66706B]">{metric.label}</p>
-              <p className="mt-3 text-3xl font-black text-[#17202A]">
+            <article className="min-w-0 rounded-2xl border border-bv-ink/10 bg-white p-5 shadow-sm" key={metric.label}>
+              <p className="text-sm font-bold text-bv-text-muted">{metric.label}</p>
+              <p className="mt-3 text-3xl font-black text-bv-heading">
                 {metric.value.toLocaleString("vi-VN")}
               </p>
             </article>
           ))}
         </div>
 
-        {data.user.preferredGenres.length > 0 ? (
-          <section className="bv-card rounded-lg p-5">
-            <h2 className="text-lg font-black text-[#17202A]">Thể loại yêu thích</h2>
-            <div className="mt-3 flex flex-wrap gap-2">
+        <section className="rounded-2xl border border-bv-ink/10 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-black text-bv-heading">Thể loại yêu thích</h2>
+              <p className="mt-1 text-sm text-bv-text-muted">
+                Các thể loại bạn thường đọc.
+              </p>
+            </div>
+            <Link
+              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-bv-primary/20 px-4 text-sm font-black text-bv-primary transition hover:bg-bv-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bv-primary"
+              href="/profile/settings"
+            >
+              Chỉnh sửa sở thích
+            </Link>
+          </div>
+          {data.user.preferredGenres.length > 0 ? (
+            <div className="mt-4 flex flex-wrap gap-2">
               {data.user.preferredGenres.map((genre) => (
                 <span
-                  className="rounded-full bg-[#EAF2EF] px-3 py-1 text-sm font-bold text-[#0F3F3C]"
+                  className="rounded-full bg-bv-muted px-3.5 py-1.5 text-sm font-bold text-bv-primary"
                   key={genre}
                 >
                   {genre}
                 </span>
               ))}
             </div>
-          </section>
-        ) : null}
+          ) : (
+            <div className="mt-4 rounded-xl border border-dashed border-bv-primary/25 bg-bv-mint/40 px-4 py-4 text-sm text-bv-text-muted">
+              Bạn chưa chọn thể loại yêu thích. Chọn ít nhất một thể loại để nhận gợi ý phù hợp hơn.
+            </div>
+          )}
+        </section>
 
         {data.user.dailyReadingGoalMinutes || data.user.dailyReadingGoalPages ? (
-          <section className="bv-card rounded-lg p-5">
-            <h2 className="text-lg font-black text-[#17202A]">Mục tiêu đọc hằng ngày</h2>
+          <section className="rounded-2xl border border-bv-ink/10 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-black text-bv-heading">Mục tiêu đọc hằng ngày</h2>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-lg bg-[#F7F4ED] px-4 py-3">
-                <p className="text-sm text-[#66706B]">Số phút</p>
-                <p className="mt-1 text-2xl font-black text-[#F2C14E]">
+              <div className="rounded-xl border border-bv-ink/10 bg-bv-surface px-4 py-3">
+                <p className="text-sm text-bv-text-muted">Số phút</p>
+                <p className="mt-1 text-2xl font-black text-bv-accent">
                   {data.user.dailyReadingGoalMinutes ?? 0}
                 </p>
               </div>
-              <div className="rounded-lg bg-[#F7F4ED] px-4 py-3">
-                <p className="text-sm text-[#66706B]">Số trang</p>
-                <p className="mt-1 text-2xl font-black text-[#F2C14E]">
+              <div className="rounded-xl border border-bv-ink/10 bg-bv-surface px-4 py-3">
+                <p className="text-sm text-bv-text-muted">Số trang</p>
+                <p className="mt-1 text-2xl font-black text-bv-accent">
                   {data.user.dailyReadingGoalPages ?? 0}
                 </p>
               </div>
@@ -213,9 +231,9 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
         ) : null}
 
         <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          <section className="bv-card min-w-0 rounded-lg p-5">
-            <div className="mb-5 flex items-center gap-2 text-[#17202A]">
-              <BookOpen className="h-5 w-5" aria-hidden="true" />
+          <section className="min-w-0 rounded-2xl border border-bv-ink/10 bg-white p-6 shadow-sm">
+            <div className="mb-5 flex items-center gap-2 text-bv-heading">
+              <BookOpen className="h-5 w-5 text-bv-primary" aria-hidden="true" />
               <h2 className="text-xl font-black">Đang đọc</h2>
             </div>
 
@@ -223,7 +241,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
               <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
                 {data.reading.map((item) => (
                   <Link
-                    className="flex gap-4 rounded-lg bg-[#F7F4ED] p-3 transition hover:bg-[#EAF2EF]"
+                    className="flex gap-4 rounded-xl border border-bv-ink/10 bg-bv-surface p-3.5 transition hover:bg-bv-muted"
                     href={`/read/${item.bookId}`}
                     key={item.bookId}
                   >
@@ -231,23 +249,23 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                       alt={`Bìa sách ${item.title}`}
                       author={item.author}
                       bookId={item.bookId}
-                      className="h-[120px] w-20 shrink-0 rounded-lg object-cover shadow-[0_10px_22px_rgba(39,44,51,0.12)]"
+                      className="h-[120px] w-20 shrink-0 rounded-lg object-cover shadow-[0_6px_16px_rgba(39,44,51,0.08)]"
                       src={item.coverImage}
                       title={item.title}
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="line-clamp-2 font-black text-[#17202A]">{item.title}</p>
-                      <p className="mt-1 truncate text-sm font-medium text-[#66706B]">{item.author}</p>
-                      <p className="mt-2 text-sm font-medium text-[#66706B]">
+                      <p className="line-clamp-2 font-black text-bv-heading">{item.title}</p>
+                      <p className="mt-1 truncate text-sm font-medium text-bv-text-muted">{item.author}</p>
+                      <p className="mt-2 text-sm font-medium text-bv-text-muted">
                         Trang {item.currentPage} - {item.progressPercent.toFixed(0)}%
                       </p>
-                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#E1D8C8]">
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-bv-ink/10">
                         <div
-                          className="h-full rounded-full bg-[#0F766E]"
+                          className="h-full rounded-full bg-bv-primary"
                           style={{ width: `${Math.min(item.progressPercent, 100)}%` }}
                         />
                       </div>
-                      <p className="mt-2 text-xs text-[#66706B]">
+                      <p className="mt-2 text-xs text-bv-text-muted">
                         Lần đọc gần nhất: {formatDate(item.lastReadAt)}
                       </p>
                     </div>
@@ -255,15 +273,15 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                 ))}
               </div>
             ) : (
-              <p className="rounded-lg bg-[#F7F4ED] px-4 py-3 text-sm text-[#66706B]">
+              <p className="rounded-xl border border-dashed border-bv-ink/15 bg-bv-surface px-4 py-3 text-sm text-bv-text-muted">
                 Chưa có tiến độ đọc. Hãy mở một sách và đọc thử.
               </p>
             )}
           </section>
 
-          <section className="bv-card rounded-lg p-5">
-            <div className="mb-5 flex items-center gap-2 text-[#17202A]">
-              <Sparkles className="h-5 w-5" aria-hidden="true" />
+          <section className="rounded-2xl border border-bv-ink/10 bg-white p-6 shadow-sm">
+            <div className="mb-5 flex items-center gap-2 text-bv-heading">
+              <Sparkles className="h-5 w-5 text-bv-gold" aria-hidden="true" />
               <h2 className="text-xl font-black">Gợi ý đã lưu</h2>
             </div>
 
@@ -271,129 +289,117 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
               <div className="space-y-3">
                 {data.recommendations.map((item) => (
                   <Link
-                    className="block rounded-lg bg-[#F7F4ED] px-4 py-3 transition hover:bg-[#EAF2EF]"
+                    className="block rounded-xl border border-bv-ink/10 bg-bv-surface px-4 py-3 transition hover:bg-bv-muted"
                     href={`/book/${item.bookId}`}
                     key={item.id}
                   >
-                    <p className="line-clamp-1 font-black text-[#17202A]">{item.title}</p>
-                    <p className="mt-1 text-sm font-medium text-[#66706B]">{item.author}</p>
-                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-[#66706B]">
+                    <p className="line-clamp-1 font-black text-bv-heading">{item.title}</p>
+                    <p className="mt-1 text-sm font-medium text-bv-text-muted">{item.author}</p>
+                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-bv-text-muted">
                       {item.evidenceStatus === "VERIFIED_REAL_USER"
                         ? item.reason
-                        : "Chưa có bằng chứng cá nhân hóa đã được xác minh."}
+                        : "Chưa đủ dữ liệu để giải thích gợi ý này."}
                     </p>
                   </Link>
                 ))}
               </div>
             ) : (
-              <p className="rounded-lg bg-[#F7F4ED] px-4 py-3 text-sm text-[#66706B]">
-                Chưa có gợi ý được lưu. Mở trang chủ khi AI service chạy để sinh dữ liệu.
+              <p className="rounded-xl border border-dashed border-bv-ink/15 bg-bv-surface px-4 py-3 text-sm text-bv-text-muted">
+                Chưa có gợi ý nào được lưu.
               </p>
             )}
           </section>
         </div>
 
         <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-3">
-          <section className="bv-card rounded-lg p-5">
-            <div className="mb-5 flex items-center justify-between gap-3 text-[#17202A]">
-              <span className="flex items-center gap-2"><ReceiptText className="h-5 w-5" aria-hidden="true" /><h2 className="text-xl font-black">Đơn hàng</h2></span>
-              <Link className="inline-flex min-h-11 items-center text-sm font-bold text-[#176B62] hover:underline" href="/orders">Xem tất cả</Link>
+          <section className="rounded-2xl border border-bv-ink/10 bg-white p-6 shadow-sm">
+            <div className="mb-5 flex items-center justify-between gap-3 text-bv-heading">
+              <span className="flex items-center gap-2"><ReceiptText className="h-5 w-5 text-bv-primary" aria-hidden="true" /><h2 className="text-xl font-black">Đơn hàng</h2></span>
+              <Link className="inline-flex min-h-11 items-center text-sm font-bold text-bv-primary hover:underline" href="/orders">Xem tất cả</Link>
             </div>
             {data.orders.length > 0 ? (
               <div className="space-y-3">
                 {data.orders.map((order) => (
-                  <Link className="block rounded-lg bg-[#F7F4ED] px-4 py-3 transition hover:bg-[#EAF2EF]" href={`/orders/${order.id}`} key={order.id}>
+                  <Link className="block rounded-xl border border-bv-ink/10 bg-bv-surface px-4 py-3 transition hover:bg-bv-muted" href={`/orders/${order.id}`} key={order.id}>
                     <div className="flex items-center justify-between gap-3">
-                      <p className="font-black text-[#17202A]">{order.id}</p>
-                      <span className="rounded-full bg-[#EAF2EF] px-2 py-1 text-xs font-bold text-[#0F3F3C]">
+                      <p className="font-black text-bv-heading">{order.id}</p>
+                      <span className="rounded-full bg-bv-muted px-2.5 py-1 text-xs font-bold text-bv-primary">
                         {getOrderStatusLabel(order.status)}
                       </span>
                     </div>
-                    <p className="mt-2 line-clamp-2 text-sm text-[#66706B]">
-                      {order.books.join(", ") || "Không có item"}
+                    <p className="mt-2 line-clamp-2 text-sm text-bv-text-muted">
+                      {order.books.join(", ") || "Không có sản phẩm"}
                     </p>
-                    <p className="mt-2 font-black text-[#E76F51]">{formatPrice(order.totalAmount)}</p>
+                    <p className="mt-2 font-black text-bv-accent">{formatPrice(order.totalAmount)}</p>
                   </Link>
                 ))}
               </div>
             ) : (
-              <p className="rounded-lg bg-[#F7F4ED] px-4 py-3 text-sm text-[#66706B]">
+              <p className="rounded-xl border border-dashed border-bv-ink/15 bg-bv-surface px-4 py-3 text-sm text-bv-text-muted">
                 Chưa có đơn hàng.
               </p>
             )}
           </section>
 
-          <section className="bv-card rounded-lg p-5">
-            <div className="mb-5 flex items-center gap-2 text-[#17202A]">
-              <Store className="h-5 w-5" aria-hidden="true" />
-              <h2 className="text-xl font-black">Listing của tôi</h2>
+          <section className="rounded-2xl border border-bv-ink/10 bg-white p-6 shadow-sm">
+            <div className="mb-5 flex items-center gap-2 text-bv-heading">
+              <Store className="h-5 w-5 text-bv-primary" aria-hidden="true" />
+              <h2 className="text-xl font-black">Tin bán sách của tôi</h2>
             </div>
             {data.listings.length > 0 ? (
               <div className="space-y-3">
                 {data.listings.map((listing) => (
-                  <div className="rounded-lg bg-[#F7F4ED] px-4 py-3" key={listing.id}>
-                    <p className="line-clamp-1 font-black text-[#17202A]">{listing.title}</p>
-                    <p className="mt-1 text-sm text-[#66706B]">
+                  <div className="rounded-xl border border-bv-ink/10 bg-bv-surface px-4 py-3" key={listing.id}>
+                    <p className="line-clamp-1 font-black text-bv-heading">{listing.title}</p>
+                    <p className="mt-1 text-sm text-bv-text-muted">
                       {getListingStatusLabel(listing.status)} - {formatPrice(listing.price)}
                     </p>
-                    <p className="mt-2 text-xs text-[#66706B]">
+                    <p className="mt-2 text-xs text-bv-text-muted">
                       Lượt xem {listing.views} | Vào giỏ {listing.cartAdds} | Mua {listing.purchases}
                     </p>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="rounded-lg bg-[#F7F4ED] px-4 py-3 text-sm text-[#66706B]">
+              <p className="rounded-xl border border-dashed border-bv-ink/15 bg-bv-surface px-4 py-3 text-sm text-bv-text-muted">
                 Bạn chưa đăng bán sách.
               </p>
             )}
           </section>
 
-          <section className="bv-card rounded-lg p-5">
-            <div className="mb-5 flex items-center gap-2 text-[#17202A]">
-              <Highlighter className="h-5 w-5" aria-hidden="true" />
-              <h2 className="text-xl font-black">Highlight gần đây</h2>
+          <section className="rounded-2xl border border-bv-ink/10 bg-white p-6 shadow-sm">
+            <div className="mb-5 flex items-center gap-2 text-bv-heading">
+              <Highlighter className="h-5 w-5 text-bv-gold" aria-hidden="true" />
+              <h2 className="text-xl font-black">Đoạn tô sáng gần đây</h2>
             </div>
             {data.highlights.length > 0 ? (
               <div className="space-y-3">
                 {data.highlights.map((highlight) => (
                   <Link
-                    className="block rounded-lg bg-[#F7F4ED] px-4 py-3 transition hover:bg-[#EAF2EF]"
+                    className="block rounded-xl border border-bv-ink/10 bg-bv-surface px-4 py-3 transition hover:bg-bv-muted"
                     href={`/read/${highlight.bookId}`}
                     key={highlight.id}
                   >
-                    <p className="text-sm font-black text-[#17202A]">
+                    <p className="text-sm font-black text-bv-heading">
                       {highlight.bookTitle} - trang {highlight.pageNumber}
                     </p>
-                    <p className="mt-2 line-clamp-3 text-sm leading-6 text-[#66706B]">
+                    <p className="mt-2 line-clamp-3 text-sm leading-6 text-bv-text-muted">
                       {highlight.text}
                     </p>
                     {highlight.note ? (
-                      <p className="mt-2 text-xs text-[#C9784A]">{highlight.note}</p>
+                      <p className="mt-2 text-xs font-semibold text-bv-accent">{highlight.note}</p>
                     ) : null}
                   </Link>
                 ))}
               </div>
             ) : (
-              <p className="rounded-lg bg-[#F7F4ED] px-4 py-3 text-sm text-[#66706B]">
-                Chưa có highlight.
+              <p className="rounded-xl border border-dashed border-bv-ink/15 bg-bv-surface px-4 py-3 text-sm text-bv-text-muted">
+                Chưa có đoạn tô sáng.
               </p>
             )}
           </section>
         </div>
 
-        <section className="rounded-lg border border-[#17191F]/10 bg-[#F2C14E]/25 p-5">
-          <div className="flex items-start gap-3">
-            <ClipboardList className="mt-1 h-5 w-5 text-[#17202A]" aria-hidden="true" />
-            <div>
-              <h2 className="text-lg font-black text-[#17202A]">Luồng demo gợi ý</h2>
-              <p className="mt-1 text-sm leading-6 text-[#42524D]">
-                Đọc sách, bookmark, highlight, review và checkout đều tạo event. Các event này được
-                AI service dùng để sinh gợi ý có lý do giải thích.
-              </p>
-            </div>
-          </div>
-        </section>
       </section>
     </main>
   );

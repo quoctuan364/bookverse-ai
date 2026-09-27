@@ -29,7 +29,6 @@ export function buildIntegrationReadiness(
   environment: IntegrationEnvironment,
   databaseReachable: boolean,
 ): IntegrationReadinessItem[] {
-  const googleStatus = pairStatus(environment, "AUTH_GOOGLE_ID", "AUTH_GOOGLE_SECRET");
   const emailStatus = pairStatus(
     environment,
     "BOOKVERSE_PASSWORD_RESET_WEBHOOK_URL",
@@ -67,16 +66,6 @@ export function buildIntegrationReadiness(
         ? "Ứng dụng kết nối được database hiện tại."
         : "Không thể thực hiện truy vấn kiểm tra database.",
       envKeys: ["DATABASE_URL"],
-    },
-    {
-      id: "google",
-      name: "Google OAuth",
-      status: googleStatus,
-      summary:
-        googleStatus === "READY"
-          ? "Đã có đủ Client ID và Client Secret."
-          : "Cần cấu hình đủ OAuth Client ID và Client Secret từ Google Cloud.",
-      envKeys: ["AUTH_GOOGLE_ID", "AUTH_GOOGLE_SECRET"],
     },
     {
       id: "email",

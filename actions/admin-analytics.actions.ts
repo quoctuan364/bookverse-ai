@@ -32,8 +32,6 @@ export async function getAdminAnalytics() {
     marketplaceOrders,
     totalUsers,
     activeSubscriptions,
-    activeBooks,
-    readableBooks,
     chatbotSessions,
     chatbotFeedback,
   ] = await Promise.all([
@@ -68,14 +66,6 @@ export async function getAdminAnalytics() {
         status: SubscriptionStatus.ACTIVE,
         startsAt: { lte: new Date() },
         endsAt: { gt: new Date() },
-      },
-    }),
-    prisma.book.count({ where: { status: "ACTIVE", deletedAt: null } }),
-    prisma.book.count({
-      where: {
-        status: "ACTIVE",
-        deletedAt: null,
-        chunks: { some: {} },
       },
     }),
     prisma.chatbotSession.count({ where: { createdAt: { gte: startDate } } }),
@@ -155,8 +145,6 @@ export async function getAdminAnalytics() {
     summary: {
       totalUsers,
       activeSubscriptions,
-      activeBooks,
-      readableBooks,
       chatbotSessions,
       helpfulFeedback,
       unhelpfulFeedback,

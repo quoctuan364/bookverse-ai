@@ -1,6 +1,8 @@
 import { RecommendationSurface, TargetType } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { normalizeBookCoverUrl } from "@/lib/book-cover";
+import { getVietnameseBookTitle } from "@/lib/book-display-title";
+import { normalizeBookPrice } from "@/lib/book-display-price";
 import { getCurrentUser } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
 import {
@@ -270,10 +272,10 @@ export async function GET(request: Request) {
             expiresAt: recommendation.expiresAt?.toISOString() ?? null,
             book: {
               id: recommendation.book.id,
-              title: recommendation.book.title,
+              title: getVietnameseBookTitle(recommendation.book.id, recommendation.book.title),
               author: recommendation.book.authorName,
               cover_url: normalizeBookCoverUrl(recommendation.book.coverPath),
-              price: decimalToNumber(recommendation.book.price),
+              price: normalizeBookPrice(recommendation.book.price),
               rating: recommendation.book.rating ? decimalToNumber(recommendation.book.rating) : null,
               category: recommendation.book.category,
             },
@@ -405,10 +407,10 @@ export async function GET(request: Request) {
               expiresAt: recommendation.expiresAt?.toISOString() ?? null,
               book: {
                 id: book.id,
-                title: book.title,
+                title: getVietnameseBookTitle(book.id, book.title),
                 author: book.authorName,
                 cover_url: normalizeBookCoverUrl(book.coverPath),
-                price: decimalToNumber(book.price),
+                price: normalizeBookPrice(book.price),
                 rating: book.rating ? decimalToNumber(book.rating) : null,
                 category: book.category,
               },

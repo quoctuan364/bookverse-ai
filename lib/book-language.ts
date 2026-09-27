@@ -133,6 +133,7 @@ const DISTINCTIVE_VIETNAMESE_WORDS = new Set([
 
 function tokenizeTitle(title: string): string[] {
   return title
+    .replace(/[đĐ]/g, "d")
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
     .toLowerCase()
@@ -157,6 +158,10 @@ export function hasVietnameseTitleEvidence(title: string): boolean {
 }
 
 export function hasEnglishTitleEvidence(title: string): boolean {
+  // Sách có ký tự tiếng Việt có dấu rõ ràng không phải là sách tiếng Anh
+  if (/[À-ỹĐđ]/u.test(title)) {
+    return false;
+  }
   const tokens = tokenizeTitle(title);
   return tokens.some((token) => ENGLISH_TITLE_WORDS.has(token));
 }

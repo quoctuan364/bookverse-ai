@@ -35,9 +35,28 @@ def prepare_blinded_assignments(
             {
                 "participant_code": participant,
                 "book_id": book_id,
+                "book_title": str(row.get("book_title", "")).strip(),
+                "author_name": str(row.get("author_name", "")).strip(),
+                "category_name": str(row.get("category_name", "")).strip(),
+                "description_excerpt": str(
+                    row.get("description_excerpt", "")
+                ).strip(),
                 "memberships": [],
             },
         )
+        for field in (
+            "book_title",
+            "author_name",
+            "category_name",
+            "description_excerpt",
+        ):
+            incoming = str(row.get(field, "")).strip()
+            if incoming and item[field] and incoming != item[field]:
+                raise ValueError(
+                    f"Metadata {field} không nhất quán cho cùng participant/book."
+                )
+            if incoming and not item[field]:
+                item[field] = incoming
         membership = {"algorithm": algorithm, "rank": rank}
         if membership in item["memberships"]:
             raise ValueError("Candidate algorithm/rank bị trùng.")
@@ -63,6 +82,10 @@ def prepare_blinded_assignments(
                     "participant_code": participant,
                     "display_order": display_order,
                     "book_id": item["book_id"],
+                    "book_title": item["book_title"],
+                    "author_name": item["author_name"],
+                    "category_name": item["category_name"],
+                    "description_excerpt": item["description_excerpt"],
                     "consent": "",
                     "relevance_rating_1_5": "",
                     "note_optional": "",
