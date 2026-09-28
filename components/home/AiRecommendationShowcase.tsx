@@ -22,13 +22,15 @@ function formatPrice(price: number): string {
   }).format(price);
 }
 
-/** Khu gợi ý gồm các nhu cầu thường gặp và một cuốn sách tiêu biểu. */
+/** Khu gợi ý gồm các nhu cầu thường gặp và ba bìa sách tiêu biểu. */
 export function AiRecommendationShowcase({
   books,
   hasVerifiedPersonalization,
   recommendationRequestId,
 }: AiRecommendationShowcaseProps) {
-  const [featuredBook, ...remainingBooks] = books;
+  const [featuredBook] = books;
+  const previewBooks = books.slice(0, 3);
+  const remainingBooks = books.slice(3);
   const isPersonalized = hasVerifiedPersonalization || Boolean(featuredBook?.recommendationEvidence);
 
   return (
@@ -80,27 +82,32 @@ export function AiRecommendationShowcase({
 
           {featuredBook ? (
             <article className="relative grid overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_20px_48px_rgba(37,49,56,0.12)] transition-shadow duration-300 hover:shadow-[0_24px_56px_rgba(37,49,56,0.18)] sm:grid-cols-[minmax(210px,0.82fr)_minmax(0,1.18fr)]">
-              <div className="relative grid min-h-[340px] place-items-center overflow-hidden bg-gradient-to-br from-[#E0ECE7] via-[#F4E9D1] to-[#D8C39B] p-7 sm:min-h-[420px]">
+              <div className="relative grid min-h-[300px] place-items-center overflow-hidden bg-gradient-to-br from-[#E0ECE7] via-[#F4E9D1] to-[#D8C39B] p-5 sm:min-h-[420px] sm:p-7">
                 <div className="absolute -left-16 -top-16 h-52 w-52 rounded-full border-[32px] border-white/30" aria-hidden="true" />
                 <div className="absolute -bottom-16 -right-12 h-48 w-48 rounded-full bg-bv-primary/15 blur-2xl" aria-hidden="true" />
-                <RecommendationTrackedLink
-                  aria-label={`Xem chi tiết sách ${featuredBook.title}`}
-                  bookId={featuredBook.id}
-                  className="group relative z-10 block w-full max-w-[230px] cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-bv-primary/50 focus-visible:ring-offset-4"
-                  href={`/book/${featuredBook.id}`}
-                  requestId={recommendationRequestId}
-                >
-                  <BookCover
-                    alt={`Bìa sách ${featuredBook.title}`}
-                    author={featuredBook.author}
-                    bookId={featuredBook.id}
-                    category={featuredBook.category}
-                    className="aspect-[2/3] w-full rounded-xl object-cover shadow-[0_24px_45px_rgba(24,45,41,0.32)] transition-transform duration-300 group-hover:-translate-y-1"
-                    loading="eager"
-                    src={featuredBook.coverImage}
-                    title={featuredBook.title}
-                  />
-                </RecommendationTrackedLink>
+                <div aria-label="Ba sách Nova đề xuất" className="relative z-10 grid w-full max-w-[430px] grid-cols-3 items-end gap-2 sm:gap-3">
+                  {previewBooks.map((book, index) => (
+                    <RecommendationTrackedLink
+                      aria-label={`Xem chi tiết sách ${book.title}`}
+                      bookId={book.id}
+                      className={`group block min-w-0 cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-bv-primary/50 focus-visible:ring-offset-4 ${index === 1 ? "-translate-y-3" : ""}`}
+                      href={`/book/${book.id}`}
+                      key={book.id}
+                      requestId={recommendationRequestId}
+                    >
+                      <BookCover
+                        alt={`Bìa sách ${book.title}`}
+                        author={book.author}
+                        bookId={book.id}
+                        category={book.category}
+                        className="aspect-[2/3] w-full rounded-xl object-cover shadow-[0_18px_34px_rgba(24,45,41,0.3)] transition-transform duration-200 group-hover:-translate-y-1"
+                        loading={index === 0 ? "eager" : "lazy"}
+                        src={book.coverImage}
+                        title={book.title}
+                      />
+                    </RecommendationTrackedLink>
+                  ))}
+                </div>
                 <span className="absolute bottom-4 left-4 z-10 inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/90 px-3 py-1.5 text-xs font-black text-bv-primary-dark shadow-sm backdrop-blur-sm">
                   <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
                   Có bản đọc thử
