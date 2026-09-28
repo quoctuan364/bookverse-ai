@@ -63,13 +63,6 @@ export default async function HomePage() {
   const readableBooks = selectHomeShelfBooks(shelves.readable.books, seenBookIds, HOME_SHELF_SIZE, dayOfYear);
   // Hero ưu tiên sách mới và dùng kệ phổ biến làm dự phòng để không hiện khung rỗng.
   const heroBooks = (newestBooks.length > 0 ? newestBooks : popularBooks).slice(0, 5);
-  // Nova dùng các kệ đã tải thành công làm dự phòng khi AI hoặc profile chưa có dữ liệu.
-  const recommendationFallbackBooks = [
-    ...newestBooks,
-    ...popularBooks,
-    ...topRatedBooks,
-    ...readableBooks,
-  ].slice(0, HOME_SHELF_SIZE);
 
   return (
     <main className="bv-page overflow-x-hidden pb-16">
@@ -283,7 +276,7 @@ export default async function HomePage() {
       ) : null}
 
       <Suspense fallback={<AiRecommendationSkeleton />}>
-        <AiRecommendationSection fallbackBooks={recommendationFallbackBooks} />
+        <AiRecommendationSection />
       </Suspense>
 
       <HomeBookShelf
