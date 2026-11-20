@@ -1,85 +1,138 @@
-# BookVerse AI — Smart Online Bookstore, E-Book Reader &amp; RAG Platform
 
-![Next.js](https://img.shields.io/badge/Next.js-15-0B1120?style=for-the-badge&logo=nextdotjs&logoColor=F8FAFC)
-![React](https://img.shields.io/badge/React-19-0B1120?style=for-the-badge&logo=react&logoColor=38BDF8)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-0B1120?style=for-the-badge&logo=typescript&logoColor=38BDF8)
-![FastAPI](https://img.shields.io/badge/FastAPI-Recommender-0B1120?style=for-the-badge&logo=fastapi&logoColor=10B981)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-0B1120?style=for-the-badge&logo=postgresql&logoColor=38BDF8)
 
-**BookVerse AI** là nền tảng nhà sách trực tuyến thông minh tích hợp khám phá sách, đọc E-Book trực tuyến, gói hội viên, chợ sách (Marketplace) và hệ thống gợi ý kết hợp **RAG Assistant**. Dự án kết hợp ứng dụng web **Next.js 15 + React 19** với dịch vụ recommendation **FastAPI**, sử dụng **PostgreSQL + Prisma + pgvector** làm tầng dữ liệu chính.
+BookVerse AI là nền tảng nhà sách trực tuyến thông minh tích hợp khám phá sách, đọc Ebook, hội viên, chợ sách và hệ thống gợi ý.
+Dự án kết hợp ứng dụng web Next.js với dịch vụ recommendation FastAPI, sử dụng PostgreSQL/Prisma làm tầng dữ liệu chính.
 
----
+🛠️ Công nghệ chính
 
-## Kiến Trúc Hệ Thống (System Architecture)
+Frontend / Web: Next.js 15, React 19, TypeScript, Tailwind CSS
 
-```mermaid
-flowchart TD
-    Client["Web (Next.js 15 / React 19) &amp; Mobile (React Native / Expo)"]
-    NextServer["Next.js Server Actions &amp; Route Handlers"]
-    Auth["Auth.js / NextAuth.js (RBAC: Reader, Seller, Moderator, Admin)"]
-    RAG["RAG Book Assistant (with Graceful Fallback)"]
-    FastAPI["FastAPI Recommendation Service (Pandas · Scikit-learn · SQLAlchemy)"]
-    DB[("PostgreSQL + Prisma ORM + pgvector")]
+Backend: Next.js Server Actions & Route Handlers
 
-    Client --> NextServer
-    NextServer --> Auth
-    NextServer --> RAG
-    NextServer --> FastAPI
-    NextServer --> DB
-    FastAPI --> DB
-```
+Database: PostgreSQL, Prisma ORM, pgvector
 
----
+AI / Recommendation: FastAPI, Pandas, Scikit-learn, SQLAlchemy
 
-## Tính Năng Nổi Bật (Core Features)
+Authentication: Auth.js / NextAuth.js
 
-- **Xác thực &amp; Phân quyền đa vai trò:** Đăng ký, đăng nhập, quên mật khẩu và phân quyền rõ ràng cho **Độc giả (Reader)**, **Người bán (Seller)**, **Kiểm duyệt viên (Moderator)** và **Quản trị viên (Admin)**.
-- **Trợ lý AI & Gợi ý thông minh:**
-  - Gợi ý sách kết hợp **Popularity + Content + Behavior** từ dữ liệu tương tác người dùng.
-  - Trợ lý AI **RAG** hỗ trợ hỏi đáp và tìm kiếm sách theo ngữ nghĩa với **pgvector**, có cơ chế fallback khi dịch vụ ngoài không khả dụng.
-- **Trình đọc E-Book trực tuyến:** Hỗ trợ đọc thử, đọc toàn văn bản minh họa, lưu tiến độ đọc, **bookmark** và **highlight**.
-- **Gói hội viên & Chợ sách (Marketplace):**
-  - Mở khóa kho đọc theo thời hạn hội viên.
-  - **Seller Dashboard** hỗ trợ đăng bán, quản lý listing, đơn hàng và doanh thu; giỏ hàng và thanh toán Sandbox/Demo.
-- **Admin Center:** Quản lý người dùng, đầu sách, listing, đơn hàng, hội viên, nội dung và audit log hệ thống.
+Mobile: React Native / Expo
 
----
+Deployment & Demo: Docker Compose
 
-## Công Nghệ Sử Dụng (Tech Stack)
+✨ Chức năng nổi bật
 
-| Layer | Technologies |
-|---|---|
-| **Web Frontend** | Next.js 15, React 19, TypeScript, Tailwind CSS |
-| **Mobile App** | React Native, Expo |
-| **Backend &amp; Auth** | Next.js Server Actions &amp; Route Handlers, Auth.js / NextAuth.js |
-| **AI &amp; Recommendation** | FastAPI, Pandas, Scikit-learn, SQLAlchemy, RAG |
-| **Database &amp; Vector** | PostgreSQL, Prisma ORM, `pgvector` |
-| **Container &amp; Demo** | Docker Compose |
+Đăng ký, đăng nhập, quên mật khẩu và phân quyền Độc giả / Người bán / Kiểm duyệt / Quản trị viên.
 
----
+Khám phá, tìm kiếm và xem chi tiết sách theo catalog.
 
-## Cài Đặt & Chạy Nhanh (Quick Start)
+Gợi ý sách dựa trên Popularity + Content + Behavior và dữ liệu tương tác.
 
-**Yêu cầu môi trường:** Node.js 20+, PowerShell 7 (trên Windows), Docker Desktop.
+Trợ lý AI hỗ trợ hỏi đáp và tìm sách bằng RAG, có cơ chế fallback khi dịch vụ ngoài không khả dụng.
 
-```bash
+Đọc Ebook online, đọc thử, lưu tiến độ, bookmark và highlight.
+
+Gói hội viên cho phép mở khóa kho đọc theo thời hạn.
+
+Chợ sách và Seller Dashboard hỗ trợ đăng bán, quản lý listing, đơn hàng và doanh thu.
+
+Giỏ hàng, đơn hàng và thanh toán Sandbox/Demo.
+
+Admin Center quản lý người dùng, sách, listing, đơn hàng, hội viên, nội dung và audit log.
+
+🧩 Kiến trúc tổng quan
+
+Browser / Mobile
+       │
+       ▼
+Next.js 15 + React 19
+ ├─ UI / Server Actions / API Routes
+ ├─ Authentication & Authorization
+ └─ RAG Assistant
+       │
+       ├──────────────► FastAPI Recommendation Service
+       │
+       ▼
+PostgreSQL + Prisma + pgvector
+
+🚀 Chạy nhanh
+
+Yêu cầu
+
+Node.js 20+
+
+PowerShell 7
+
+Docker Desktop
+
 git clone https://github.com/quoctuan364/bookverse-ai.git
 cd bookverse-ai
 npm run demo:bootstrap
 npm run demo:start
-```
 
-Sau khi khởi chạy, truy cập ứng dụng tại: `http://127.0.0.1:3000`
+Mở ứng dụng tại:
 
----
+http://127.0.0.1:3000
 
-## Tài Khoản Demo
+👤 Tài khoản demo
 
-| Vai trò | Email | Mật khẩu |
-|---|---|---|
-| **Độc giả (Reader)** | `reader.bookverse.demo@gmail.com` | `123456` |
-| **Người bán (Seller)** | `seller.bookverse.demo@gmail.com` | `123456` |
-| **Kiểm duyệt viên (Moderator)** | `moderator.bookverse.demo@gmail.com` | `123456` |
-| **Quản trị viên (Admin)** | `admin.bookverse.demo@gmail.com` | `123456` |
+Vai trò
 
-> **Lưu ý:** Toàn bộ thanh toán trong hệ thống sử dụng môi trường **Sandbox / Demo** (không phát sinh giao dịch tiền thật). Một phần dữ liệu catalog, giá và tương tác sử dụng synthetic/demo data; các giới hạn và trạng thái kiểm chứng hiện hành được tài liệu hóa trong `docs/CURRENT_STATUS.md`.
+Email
+
+Mật khẩu
+
+Độc giả
+
+reader.bookverse.demo@gmail.com
+
+123456
+
+Người bán
+
+seller.bookverse.demo@gmail.com
+
+123456
+
+Kiểm duyệt viên
+
+moderator.bookverse.demo@gmail.com
+
+123456
+
+Quản trị viên
+
+admin.bookverse.demo@gmail.com
+
+123456
+
+Các tài khoản trên chỉ phục vụ môi trường demo của đồ án.
+
+📖 Documentation
+
+Hướng dẫn cài đặt trên máy sạch
+
+Kiến trúc hệ thống
+
+Kịch bản demo bảo vệ
+
+Trạng thái hiện hành của dự án
+
+⚠️ Lưu ý
+
+Thanh toán trong hệ thống sử dụng Sandbox/Demo, không phải giao dịch tiền thật.
+
+Một phần catalog, giá, interaction và dữ liệu đánh giá được sử dụng dưới dạng demo/synthetic data phục vụ đồ án.
+
+Nội dung Ebook minh họa không mặc định được xem là toàn văn tác phẩm gốc.
+
+Các giới hạn và trạng thái kiểm chứng hiện hành được ghi rõ trong docs/CURRENT_STATUS.md.
+
+🎓 Thông tin đồ án
+
+Đề tài: PHÁT TRIỂN NHÀ SÁCH TRỰC TUYẾN THÔNG MINH TÍCH HỢP HỆ THỐNG GỢI Ý (BOOKVERSE AI)
+Sinh viên: Lương Nguyễn Quốc Tuấn
+MSSV: 22050098
+
+<p align="center">
+  <strong>BookVerse AI</strong> — Smart Online Bookstore & Recommendation System
+</p>
